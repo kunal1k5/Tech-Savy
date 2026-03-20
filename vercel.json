@@ -1,0 +1,10 @@
+{
+  "buildCommand": "cd gigshield-ai/frontend && npm install && npm run build",
+  "outputDirectory": "gigshield-ai/frontend/build",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
