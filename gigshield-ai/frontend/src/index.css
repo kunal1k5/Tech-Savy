@@ -1,0 +1,32 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+  }
+}
+
+body {
+  @apply bg-slate-950 text-slate-50 antialiased;
+  background-image: radial-gradient(circle at 50% -20%, #1e3a8a 0%, #020617 80%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* Glass Card + Hover Glow */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  transition: box-shadow 0.3s ease, border 0.3s ease;
+}
+
+.glass-panel:hover {
+  box-shadow: 0 8px 32px 0 rgba(37, 99, 235, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
