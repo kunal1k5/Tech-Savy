@@ -11,8 +11,13 @@ export default function RiskMap() {
     <motion.div variants={container} initial="hidden" animate="show" className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 h-full flex flex-col">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-2 gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Live Risk Map</h1>
-          <p className="text-slate-400">Real-time artificial intelligence assessing weather, traffic, and zone warnings.</p>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold tracking-tight text-white">Live Risk Map</h1>
+            <span className="text-[10px] font-bold tracking-wider uppercase bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-1 rounded flex items-center">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 mr-1.5 animate-ping"></span> Live updating...
+            </span>
+          </div>
+          <p className="text-slate-400">Real-time data engine assessing weather, traffic, and zone warnings.</p>
         </div>
         <div className="flex flex-wrap gap-3">
             <motion.button 
@@ -54,7 +59,7 @@ export default function RiskMap() {
               <div className="absolute inset-0 bg-blue-500/20 animate-pulse"></div>
               <Activity className="text-blue-400 relative z-10" size={36} />
             </div>
-            <h3 className="text-2xl font-bold text-white mb-3 drop-shadow-md">GigShield AI Backend</h3>
+            <h3 className="text-2xl font-bold text-white mb-3 drop-shadow-md">GigShield Data Core</h3>
           </div>
 
           {/* Red Zone Drop Tooltip / Pulse */}

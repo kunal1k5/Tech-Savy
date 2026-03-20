@@ -1,11 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Smartphone, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export default function Login() {
   const [step, setStep] = useState(1);
+  const [otp, setOtp] = useState(new Array(4).fill(''));
+  const inputRefs = useRef([]);
   const navigate = useNavigate();
+
+  // Auto-focus first OTP input when step changes to 2
+  useEffect(() => {
+    if (step === 2 && inputRefs.current[0]) {
+      inputRefs.current[0].focus();
+    }
+  }, [step]);
 
   const handleSendOTP = (e) => {
     e.preventDefault();
@@ -14,7 +23,49 @@ export default function Login() {
 
   const handleVerify = (e) => {
     e.preventDefault();
-    navigate('/dashboard');
+    const combinedOtp = otp.join('');
+    if (combinedOtp.length === 4) {
+      navigate('/dashboard');
+    }
+  };
+
+  const handleOtpChange = (e, index) => {
+    const value = e.target.value;
+    if (isNaN(value)) return;
+
+    const newOtp = [...otp];
+    // Allow only the last entered digit
+    newOtp[index] = value.substring(value.length - 1);
+    setOtp(newOtp);
+
+    // Auto-advance
+    if (value && index < 3 && inputRefs.current[index + 1]) {
+      inputRefs.current[index + 1].focus();
+    }
+  };
+
+  const handleOtpKeyDown = (e, index) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0 && inputRefs.current[index - 1]) {
+      inputRefs.current[index - 1].focus();
+    }
+  };
+
+  const handleOtpPaste = (e) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text/plain').trim();
+    if (isNaN(pastedData)) return;
+
+    const pastedArray = pastedData.slice(0, 4).split('');
+    const newOtp = [...otp];
+    pastedArray.forEach((char, idx) => {
+      newOtp[idx] = char;
+    });
+    setOtp(newOtp);
+
+    const nextIndex = pastedArray.length < 4 ? pastedArray.length : 3;
+    if (inputRefs.current[nextIndex]) {
+      inputRefs.current[nextIndex].focus();
+    }
   };
 
   return (
@@ -71,14 +122,21 @@ export default function Login() {
                     <span className="text-xs text-blue-400 cursor-pointer hover:underline" onClick={() => setStep(1)}>Change Number</span>
                   </div>
                   <div className="flex gap-2 justify-between">
-                    {[1, 2, 3, 4].map((i) => (
+                    {otp.map((data, index) => (
                       <input 
-                        key={i}
+                        key={index}
                         type="text" 
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         maxLength="1"
-                        className="w-14 h-14 text-center text-xl bg-slate-900/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-bold"
+                        ref={(ref) => (inputRefs.current[index] = ref)}
+                        value={data}
+                        onChange={(e) => handleOtpChange(e, index)}
+                        onKeyDown={(e) => handleOtpKeyDown(e, index)}
+                        onPaste={handleOtpPaste}
+                        className="w-14 h-14 text-center text-xl bg-slate-900/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all font-bold"
                         required
-                        autoFocus={i === 1}
+                        aria-label={`OTP input digit ${index + 1}`}
                       />
                     ))}
                   </div>

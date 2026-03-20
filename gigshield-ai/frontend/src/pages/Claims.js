@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Clock, AlertCircle, Calendar, MapPin, IndianRupee, CloudRain, Wind } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const claimsData = [
   {
@@ -30,24 +31,58 @@ const claimsData = [
     zone: "HSR Layout, Bangalore",
     amount: "₹300",
     status: "PENDING_REVIEW",
-    time: "Pending AI Fraud Check",
+    time: "Analyzing Data Sources",
     icon: <AlertCircle size={24} />
   }
 ];
 
 export default function Claims() {
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(false);
+      toast('Syncing latest parametric triggers...', {
+        icon: '🔄',
+        id: 'sync-toast',
+      });
+      setTimeout(() => {
+        toast.success('Claims up to date', { id: 'sync-toast' });
+      }, 1500);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
   const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } };
   const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } };
+
+  if (loading) {
+    return (
+      <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
+        <div className="h-10 bg-slate-800/50 rounded-xl w-1/4 animate-pulse mb-8"></div>
+        <div className="space-y-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-24 bg-white/5 rounded-2xl animate-pulse"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
       
       <div className="flex justify-between items-end mb-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Claim History</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Claim History</h1>
+            <span className="text-[10px] font-medium tracking-wider uppercase bg-slate-800 text-slate-300 px-2 py-1 rounded flex items-center mb-2">
+              <Clock size={10} className="mr-1" /> Updated just now
+            </span>
+          </div>
           <p className="text-slate-400 mb-2">Zero-touch claims. Triggered by data, paid in seconds.</p>
           <div className="inline-block bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm px-3 py-1.5 rounded-full">
-            ✨ No action required — auto processed by AI
+            ✨ No action required — auto processed instantly
           </div>
         </div>
       </div>

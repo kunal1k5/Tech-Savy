@@ -22,8 +22,8 @@ export default function Dashboard() {
     // Simulate smart API connection load
     const timer = setTimeout(() => {
       setLoading(false);
-      toast.success("AI Risk Engine Connected & Live", { 
-        icon: '🤖',
+      toast.success("Risk Engine Connected & Live", { 
+        icon: '🟢',
         duration: 3000 
       });
     }, 1500);
@@ -72,7 +72,7 @@ export default function Dashboard() {
             <span className="hidden sm:block text-slate-600">|</span>
             <span className="flex items-center text-emerald-400 text-sm font-medium bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
               <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2 animate-pulse"></span>
-              AI Monitoring Active (Real-time)
+              Real-time Monitoring Active (Live)
             </span>
           </div>
         </div>
@@ -111,9 +111,9 @@ export default function Dashboard() {
           </div>
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-slate-400 text-sm font-medium mb-1">Live AI Risk Score</p>
+              <p className="text-slate-400 text-sm font-medium mb-1">Live Risk Score</p>
               <h2 className="text-2xl font-bold text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.5)] flex items-center gap-2">
-                 🔥 HIGH RISK
+                 <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse border border-white/20"></span> HIGH RISK
               </h2>
             </div>
             <motion.div animate={{ scale: [1, 1.1, 1] }} transition={{ repeat: Infinity, duration: 1.5 }} className="p-3 bg-red-500/20 rounded-2xl text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)] group-hover:rotate-12 transition-transform">
@@ -155,7 +155,10 @@ export default function Dashboard() {
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
           <p className="text-indigo-200 text-sm font-medium mb-1">Weekly Premium Plan</p>
           <div className="text-4xl font-bold text-white mb-4">₹25<span className="text-lg text-indigo-300 font-normal"> / wk</span></div>
-          <motion.button whileTap={{ scale: 0.95 }} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 rounded-xl transition-all shadow-[0_4px_20px_rgba(37,99,235,0.4)] hover:shadow-[0_4px_25px_rgba(37,99,235,0.6)] flex items-center justify-center group-hover:scale-[1.02]">
+          <motion.button 
+            whileTap={{ scale: 0.95 }} 
+            onClick={() => toast.success('Redirecting to Upgrade Coverage...')}
+            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 rounded-xl transition-all shadow-[0_4px_20px_rgba(37,99,235,0.4)] hover:shadow-[0_4px_25px_rgba(37,99,235,0.6)] flex items-center justify-center group-hover:scale-[1.02]">
             Upgrade Coverage <ChevronRight size={18} className="ml-1 group-hover:translate-x-1 transition-transform" />
           </motion.button>
         </motion.div>
@@ -190,7 +193,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex justify-between items-end text-slate-400 text-xs">
                     <div>
-                      <p className="mb-0.5 text-emerald-200/70">Processed 2 mins ago</p>
+                      <p className="mb-0.5 text-emerald-200/70 font-medium">Processed instantly</p>
                       <p>Koramangala Zone</p>
                     </div>
                     <span className="text-xl font-bold text-white group-hover:text-emerald-400 transition-colors">₹450</span>
@@ -215,7 +218,9 @@ export default function Dashboard() {
               </div>
             </div>
             
-            <button className="w-full mt-4 text-blue-400 text-sm font-medium hover:text-blue-300 py-3 bg-blue-500/10 rounded-xl transition-all hover:bg-blue-500/20 flex items-center justify-center gap-1 group">
+            <button 
+                onClick={() => toast('Loading Detailed History...', { icon: '⏳' })}
+                className="w-full mt-4 text-blue-400 text-sm font-medium hover:text-blue-300 py-3 bg-blue-500/10 rounded-xl transition-all hover:bg-blue-500/20 flex items-center justify-center gap-1 group">
                 View Detailed History <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
             </button>
         </motion.div>

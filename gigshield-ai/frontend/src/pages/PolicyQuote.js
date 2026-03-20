@@ -12,7 +12,7 @@ export default function PolicyQuote() {
       
       <div className="text-center mb-12">
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white mb-4">Choose Your Protection</h1>
-        <p className="text-slate-400 max-w-2xl mx-auto">GigShield AI dynamically calculates your premium based on your delivery zone, historical weather data, and real-time risk scores.</p>
+        <p className="text-slate-400 max-w-2xl mx-auto">GigShield dynamically calculates your premium based on your delivery zone, historical weather data, and real-time risk scores.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 mt-8">
@@ -38,7 +38,7 @@ export default function PolicyQuote() {
         {/* AI Recommended Plan */}
         <motion.div variants={item} whileHover={{ scale: 1.05 }} className="glass-panel p-8 rounded-[2rem] border-2 border-blue-500/50 relative bg-gradient-to-b from-blue-900/40 to-slate-900/80 transform md:-translate-y-4 shadow-[0_0_40px_rgba(37,99,235,0.2)] hover:shadow-[0_0_60px_rgba(37,99,235,0.3)] transition-all">
           <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-xs font-bold px-4 py-2 rounded-full flex items-center shadow-[0_0_20px_rgba(59,130,246,0.6)] animate-pulse border border-blue-400/50 w-max">
-            <Zap size={14} className="mr-1.5 fill-white" /> RECOMMENDED BY AI · BEST FOR YOUR LOCATION
+            <Zap size={14} className="mr-1.5 fill-white" /> RECOMMENDED PLAN · BEST FOR YOUR LOCATION
           </div>
           
           <h3 className="text-2xl font-bold text-white mb-2 text-center mt-3">Comprehensive Cover</h3>
