@@ -1,45 +1,65 @@
 """
-Fraud Detection Engine — Identifies suspicious claims.
+Fraud detection helpers for GigShield claims.
 
-DETECTION STRATEGIES (Phase-1):
+The engine combines a simple rule-based layer with an optional trained model.
+It is designed for practical claim review, not just binary rejection.
 
-1. GPS Spoofing Detection
-   - Compare the worker's last known location with the disruption zone.
-   - If the worker was not in the affected zone during the event → flag.
+Scoring bands:
+  0-39   -> low fraud risk
+  40-69  -> medium fraud risk
+  70-100 -> high fraud risk
 
-2. Duplicate Claim Detection
-   - Check if the same worker has already filed a claim for the same trigger event.
-   - Multiple claims for the same trigger → block.
-
-3. Fake Weather Event Detection
-   - Cross-verify the trigger's weather data with independent API sources.
-   - If the disruption data doesn't match → flag.
-
-4. Frequency Analysis
-   - Workers with an abnormally high claim frequency (>3 per month) → flag.
-
-5. Amount Anomaly Detection
-   - Claims significantly above the worker's typical coverage → flag.
-
-OUTPUT:
-  fraud_score (0-100):
-    0-59   → pass  (auto-approve)
-    60-79  → flag  (manual review)
-    80-100 → block (auto-reject)
+Recommendations:
+  low    -> pass
+  medium -> flag
+  high   -> block
 """
 
+from __future__ import annotations
+
 import os
-import numpy as np
+from typing import Dict, List, Optional
+
 import joblib
+import numpy as np
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "models", "fraud_model.pkl")
+HIGH_SPEED_THRESHOLD_KMPH = 80.0
+MEDIUM_SPEED_THRESHOLD_KMPH = 50.0
 
 
 def _load_model():
-    """Load trained fraud model if available."""
+    """Load a trained fraud model when available."""
     if os.path.exists(MODEL_PATH):
-        return joblib.load(MODEL_PATH)
+        try:
+            return joblib.load(MODEL_PATH)
+        except Exception:
+            return None
     return None
+
+
+def _calculate_travel_speed(location_jump_km: float, location_window_minutes: int) -> float:
+    if location_jump_km <= 0 or location_window_minutes <= 0:
+        return 0.0
+
+    hours = location_window_minutes / 60.0
+    return float(location_jump_km / hours)
+
+
+def _risk_level(fraud_score: float) -> str:
+    if fraud_score < 40:
+        return "low"
+    if fraud_score < 70:
+        return "medium"
+    return "high"
+
+
+def _recommendation(fraud_score: float) -> str:
+    if fraud_score < 40:
+        return "pass"
+    if fraud_score < 70:
+        return "flag"
+    return "block"
 
 
 def check_fraud(
@@ -50,56 +70,130 @@ def check_fraud(
     avg_claim_amount: float = 0.0,
     worker_in_zone: bool = True,
     duplicate_trigger: bool = False,
-) -> dict:
+    predicted_destination_id: Optional[int] = None,
+    actual_destination_id: Optional[int] = None,
+    location_jump_km: float = 0.0,
+    location_window_minutes: int = 0,
+    repeated_claims_6h: int = 0,
+    nearby_similar_claims_count: int = 0,
+    device_fingerprint_changed: bool = False,
+) -> Dict[str, object]:
     """
-    Run fraud checks on a claim.
+    Score a claim for suspicious behavior.
 
-    Phase-1 uses rule-based scoring. Trained model is used when available.
+    Existing callers can continue to use the original fields.
+    New optional fields allow stronger checks such as route mismatch,
+    unrealistic travel speed, and coordinated behavior patterns.
     """
+
     model = _load_model()
-    flags = []
+    flags: List[str] = []
+    strong_signal_count = 0
+    weak_signal_count = 0
+    rule_score = 0.0
 
     if model is not None:
-        features = np.array([[
-            claim_amount, worker_claims_30d, avg_claim_amount,
-            1.0 if worker_in_zone else 0.0,
-            1.0 if duplicate_trigger else 0.0,
-        ]])
-        fraud_score = float(np.clip(model.predict(features)[0], 0, 100))
+        model_features = np.array(
+            [[
+                claim_amount,
+                worker_claims_30d,
+                avg_claim_amount,
+                1.0 if worker_in_zone else 0.0,
+                1.0 if duplicate_trigger else 0.0,
+            ]],
+            dtype=float,
+        )
+        base_score = float(np.clip(model.predict(model_features)[0], 0, 100))
     else:
-        # Rule-based fraud scoring
-        fraud_score = 0.0
+        base_score = 0.0
 
-        # Check 1: GPS / Zone presence
-        if not worker_in_zone:
-            fraud_score += 35
-            flags.append("worker_not_in_zone")
+    if not worker_in_zone:
+        rule_score += 20
+        strong_signal_count += 1
+        flags.append("zone_mismatch")
 
-        # Check 2: Duplicate claim for same trigger
-        if duplicate_trigger:
-            fraud_score += 40
-            flags.append("duplicate_trigger_claim")
+    if duplicate_trigger:
+        rule_score += 30
+        strong_signal_count += 1
+        flags.append("duplicate_trigger")
 
-        # Check 3: High claim frequency
-        if worker_claims_30d > 3:
-            fraud_score += 15
-            flags.append("high_claim_frequency")
-        elif worker_claims_30d > 2:
-            fraud_score += 8
+    if worker_claims_30d > 3:
+        rule_score += 12
+        weak_signal_count += 1
+        flags.append("high_claim_frequency_30d")
+    elif worker_claims_30d > 1:
+        rule_score += 5
+        weak_signal_count += 1
 
-        # Check 4: Amount anomaly (claim > 2x average)
-        if avg_claim_amount > 0 and claim_amount > avg_claim_amount * 2:
-            fraud_score += 20
-            flags.append("amount_anomaly")
+    if repeated_claims_6h >= 2:
+        rule_score += 18
+        strong_signal_count += 1
+        flags.append("repeat_claim_pattern_6h")
+    elif repeated_claims_6h == 1:
+        rule_score += 8
+        weak_signal_count += 1
 
-        fraud_score = min(fraud_score, 100)
+    if avg_claim_amount > 0 and claim_amount > avg_claim_amount * 2:
+        rule_score += 12
+        weak_signal_count += 1
+        flags.append("amount_anomaly")
+
+    if (
+        predicted_destination_id is not None
+        and actual_destination_id is not None
+        and predicted_destination_id != actual_destination_id
+    ):
+        rule_score += 18
+        strong_signal_count += 1
+        flags.append("route_mismatch")
+
+    travel_speed_kmph = _calculate_travel_speed(location_jump_km, location_window_minutes)
+    if location_jump_km >= 5 and travel_speed_kmph >= HIGH_SPEED_THRESHOLD_KMPH:
+        rule_score += 25
+        strong_signal_count += 1
+        flags.append("unrealistic_travel_speed")
+    elif location_jump_km >= 3 and travel_speed_kmph >= MEDIUM_SPEED_THRESHOLD_KMPH:
+        rule_score += 12
+        weak_signal_count += 1
+        flags.append("suspicious_travel_speed")
+
+    if nearby_similar_claims_count >= 3:
+        rule_score += 14
+        strong_signal_count += 1
+        flags.append("possible_group_fraud")
+    elif nearby_similar_claims_count == 2:
+        rule_score += 6
+        weak_signal_count += 1
+
+    if device_fingerprint_changed:
+        rule_score += 12
+        weak_signal_count += 1
+        flags.append("device_fingerprint_changed")
+
+    fraud_score = float(np.clip(base_score + rule_score, 0, 100))
+
+    # False-positive protection:
+    # keep single weak signals from becoming punitive.
+    if strong_signal_count == 0 and weak_signal_count <= 1:
+        fraud_score = min(fraud_score, 45.0)
+
+    # One strong signal alone should usually lead to review, not an automatic block.
+    if strong_signal_count == 1 and weak_signal_count == 0:
+        fraud_score = min(fraud_score, 65.0)
+
+    fraud_score = round(float(fraud_score), 2)
+    risk_level = _risk_level(fraud_score)
 
     return {
-        "fraud_score": round(fraud_score, 2),
+        "fraud_score": fraud_score,
+        "risk_level": risk_level,
         "flags": flags,
-        "recommendation": (
-            "pass" if fraud_score < 60
-            else "flag" if fraud_score < 80
-            else "block"
-        ),
+        "recommendation": _recommendation(fraud_score),
+        "travel_speed_kmph": round(travel_speed_kmph, 2),
+        "signal_summary": {
+            "strong_signals": strong_signal_count,
+            "weak_signals": weak_signal_count,
+            "worker_id": worker_id,
+            "trigger_type": trigger_type,
+        },
     }

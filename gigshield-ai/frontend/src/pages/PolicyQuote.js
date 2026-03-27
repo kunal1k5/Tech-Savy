@@ -1,72 +1,148 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Shield, Check, Zap } from 'lucide-react';
-import toast from 'react-hot-toast';
+import React from "react";
+import { motion } from "framer-motion";
+import { Check, Shield, Sparkles, Wallet } from "lucide-react";
+import InfoTooltip from "../components/ui/InfoTooltip";
+import SectionHeader from "../components/ui/SectionHeader";
+import StatusPill from "../components/ui/StatusPill";
+import { useGigShieldData } from "../context/GigShieldDataContext";
+import { formatINR } from "../utils/helpers";
 
 export default function PolicyQuote() {
-  const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } };
-  const item = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
+  const { platformState, derivedData, actions } = useGigShieldData();
 
   return (
-    <motion.div variants={container} initial="hidden" animate="show" className="p-4 md:p-8 max-w-5xl mx-auto space-y-8">
-      
-      <div className="text-center mb-12">
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white mb-4">Choose Your Protection</h1>
-        <p className="text-slate-400 max-w-2xl mx-auto">GigShield dynamically calculates your premium based on your delivery zone, historical weather data, and real-time risk scores.</p>
-      </div>
+    <div className="page-shell">
+      <SectionHeader
+        eyebrow="Coverage design"
+        title="Choose a plan that matches current route risk"
+        description="Plans are now driven by live mock data so recommendation logic, payout caps, and coverage reasoning feel realistic during a demo."
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12 mt-8">
-        
-        {/* Basic Plan */}
-        <motion.div variants={item} whileHover={{ scale: 1.05 }} className="glass-panel p-8 rounded-[2rem] border border-white/5 relative bg-gradient-to-b from-slate-800/20 to-slate-900/50 hover:border-white/10 transition-colors h-fit">
-          <h3 className="text-xl font-bold text-white mb-2">Basic Cover</h3>
-          <p className="text-slate-400 text-sm mb-6">Essential protection for minor disruptions.</p>
-          <div className="text-4xl font-bold text-white mb-6">₹15 <span className="text-lg text-slate-500 font-normal">/ week</span></div>
-          
-          <ul className="space-y-4 mb-8">
-            <li className="flex items-start"><Check size={18} className="text-blue-400 mr-2 mt-0.5"/> <span className="text-slate-300 text-sm">₹300 daily max payout</span></li>
-            <li className="flex items-start"><Check size={18} className="text-blue-400 mr-2 mt-0.5"/> <span className="text-slate-300 text-sm">Cover for severe rain (>50mm)</span></li>
-            <li className="flex items-start opacity-40"><Check size={18} className="text-slate-600 mr-2 mt-0.5"/> <span className="text-slate-500 text-sm">No coverage for heatwaves</span></li>
-            <li className="flex items-start opacity-40"><Check size={18} className="text-slate-600 mr-2 mt-0.5"/> <span className="text-slate-500 text-sm">No coverage for high AQI</span></li>
-          </ul>
-          
-          <motion.button whileTap={{ scale: 0.95 }} className="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-3.5 rounded-xl transition-all border border-white/10" onClick={() => toast("Basic plan selected")}>
-            Select Basic
-          </motion.button>
-        </motion.div>
-
-        {/* AI Recommended Plan */}
-        <motion.div variants={item} whileHover={{ scale: 1.05 }} className="glass-panel p-8 rounded-[2rem] border-2 border-blue-500/50 relative bg-gradient-to-b from-blue-900/40 to-slate-900/80 transform md:-translate-y-4 shadow-[0_0_40px_rgba(37,99,235,0.2)] hover:shadow-[0_0_60px_rgba(37,99,235,0.3)] transition-all">
-          <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-xs font-bold px-4 py-2 rounded-full flex items-center shadow-[0_0_20px_rgba(59,130,246,0.6)] animate-pulse border border-blue-400/50 w-max">
-            <Zap size={14} className="mr-1.5 fill-white" /> RECOMMENDED PLAN · BEST FOR YOUR LOCATION
-          </div>
-          
-          <h3 className="text-2xl font-bold text-white mb-2 text-center mt-3">Comprehensive Cover</h3>
-          <p className="text-blue-200/70 text-sm mb-4 text-center">Full protection tailored for Bangalore Zones.</p>
-          
-          <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm font-bold py-1.5 px-4 rounded-full mx-auto w-max mb-6 shadow-[0_0_15px_rgba(16,185,129,0.2)] flex items-center justify-center animate-pulse">
-            ✨ You save ₹200/week with this plan
+      <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+        <div className="glass-panel rounded-[2rem] border border-white/10 p-6">
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-semibold text-white">Recommendation summary</h2>
+            <InfoTooltip
+              label="Recommendation info"
+              text="The recommended plan is based on the current zone feed, recent payouts, and disruption pressure in the worker's area."
+            />
           </div>
 
-          <div className="text-5xl font-bold text-white mb-6 text-center shadow-blue-500/50 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]">₹25 <span className="text-lg text-blue-300/50 font-normal">/ week</span></div>
-          
-          <ul className="space-y-4 mb-8 bg-black/20 p-5 rounded-2xl border border-white/5">
-            <li className="flex items-start"><Check size={18} className="text-emerald-400 mr-2 mt-0.5 shadow-[0_0_10px_rgba(16,185,129,0.5)] rounded-full"/> <span className="text-slate-200 text-sm font-medium">₹600 daily max payout (80% income)</span></li>
-            <li className="flex items-start"><Check size={18} className="text-emerald-400 mr-2 mt-0.5 shadow-[0_0_10px_rgba(16,185,129,0.5)] rounded-full"/> <span className="text-slate-200 text-sm">Cover for severe rain & waterlogging</span></li>
-            <li className="flex items-start"><Check size={18} className="text-emerald-400 mr-2 mt-0.5 shadow-[0_0_10px_rgba(16,185,129,0.5)] rounded-full"/> <span className="text-slate-200 text-sm">Cover for extreme Heatwaves (>45°C)</span></li>
-            <li className="flex items-start"><Check size={18} className="text-emerald-400 mr-2 mt-0.5 shadow-[0_0_10px_rgba(16,185,129,0.5)] rounded-full"/> <span className="text-slate-200 text-sm">Cover for hazardous pollution (AQI >400)</span></li>
-          </ul>
-          
-          <motion.button 
-            whileTap={{ scale: 0.95 }}
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-4 rounded-xl transition-all shadow-[0_4px_20px_rgba(37,99,235,0.5)] hover:shadow-[0_4px_30px_rgba(37,99,235,0.7)] flex justify-center items-center hover:scale-[1.02]"
-            onClick={() => toast.success('Policy active! Instantly processing payment...')}
-          >
-            Buy Policy <Shield size={18} className="ml-2" />
-          </motion.button>
-        </motion.div>
+          <div className="mt-6 rounded-[2rem] border border-sky-500/20 bg-sky-500/10 p-5">
+            <div className="flex flex-wrap items-center gap-3">
+              <StatusPill tone="info">Recommended</StatusPill>
+              <div className="text-lg font-semibold text-white">
+                {derivedData.recommendedPlan.name}
+              </div>
+            </div>
+            <p className="mt-4 text-sm leading-7 text-sky-100/90">
+              {derivedData.recommendedPlan.note}
+            </p>
+          </div>
 
+          <div className="mt-6 space-y-4">
+            <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-4">
+              <div className="text-sm text-slate-400">Current zone pressure</div>
+              <div className="mt-2 text-2xl font-semibold text-white">
+                {derivedData.currentRisk.zone} at {derivedData.currentRisk.score}/100
+              </div>
+              <div className="mt-3 text-sm text-slate-500">
+                Higher disruption pressure increases the value of faster automated payout handling.
+              </div>
+            </div>
+            <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-4">
+              <div className="text-sm text-slate-400">Paid this week</div>
+              <div className="mt-2 text-2xl font-semibold text-white">
+                {formatINR(derivedData.weeklyPayouts)}
+              </div>
+              <div className="mt-3 text-sm text-slate-500">
+                The selected plan should still leave room for one more large disruption this week.
+              </div>
+            </div>
+            <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-4">
+              <div className="text-sm text-slate-400">Current active plan</div>
+              <div className="mt-2 text-2xl font-semibold text-white">
+                {derivedData.activePlan.name}
+              </div>
+              <div className="mt-3 text-sm text-slate-500">
+                Daily cap {formatINR(derivedData.activePlan.payoutCap)} for verified claims.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {platformState.plans.map((plan) => {
+            const isActive = plan.id === platformState.activePlanId;
+            const isRecommended = plan.id === platformState.recommendedPlanId;
+
+            return (
+              <motion.div
+                key={plan.id}
+                whileHover={{ y: -4 }}
+                className={`glass-panel flex h-full flex-col rounded-[2rem] border p-6 ${
+                  isRecommended
+                    ? "border-sky-500/25 bg-gradient-to-b from-sky-500/10 to-transparent"
+                    : "border-white/10"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm text-slate-400">{plan.description}</div>
+                    <h3 className="mt-2 text-2xl font-semibold text-white">{plan.name}</h3>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3 text-white">
+                    {isRecommended ? <Sparkles size={18} /> : <Shield size={18} />}
+                  </div>
+                </div>
+
+                <div className="mt-5 flex items-end gap-2">
+                  <div className="text-4xl font-semibold text-white">
+                    {formatINR(plan.premiumWeekly)}
+                  </div>
+                  <div className="pb-1 text-sm text-slate-500">per week</div>
+                </div>
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {isRecommended ? <StatusPill tone="info">Recommended</StatusPill> : null}
+                  {isActive ? <StatusPill tone="success">Active</StatusPill> : null}
+                </div>
+
+                <ul className="mt-6 flex-1 space-y-3">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-3 text-sm leading-6 text-slate-300">
+                      <span className="mt-1 rounded-full bg-emerald-500/15 p-1 text-emerald-300">
+                        <Check size={12} />
+                      </span>
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-6 rounded-3xl border border-white/10 bg-slate-950/60 p-4 text-sm leading-6 text-slate-400">
+                  <div className="flex items-center gap-2 text-white">
+                    <Wallet size={15} className="text-emerald-300" />
+                    Payout cap {formatINR(plan.payoutCap)}
+                  </div>
+                  <div className="mt-2">{plan.note}</div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => actions.selectPlan(plan.id)}
+                  className={`mt-6 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                    isActive
+                      ? "border border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
+                      : "bg-sky-600 text-white hover:bg-sky-500"
+                  }`}
+                >
+                  {isActive ? "Plan active" : `Switch to ${plan.name}`}
+                </button>
+              </motion.div>
+            );
+          })}
+        </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

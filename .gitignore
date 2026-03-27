@@ -1,0 +1,3 @@
+.venv/
+tmp_pycache/
+package-lock.json

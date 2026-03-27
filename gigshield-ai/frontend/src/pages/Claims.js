@@ -1,136 +1,256 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { CheckCircle2, Clock, AlertCircle, Calendar, MapPin, IndianRupee, CloudRain, Wind } from 'lucide-react';
-import toast from 'react-hot-toast';
+import React from "react";
+import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CloudRain,
+  History,
+  ShieldAlert,
+  Siren,
+  Wind,
+} from "lucide-react";
+import EmptyState from "../components/ui/EmptyState";
+import InfoTooltip from "../components/ui/InfoTooltip";
+import SectionHeader from "../components/ui/SectionHeader";
+import StatusPill from "../components/ui/StatusPill";
+import { useGigShieldData } from "../context/GigShieldDataContext";
+import { getFraudStatusLabel, getStatusLabel } from "../data/mockPlatform";
+import { formatINR } from "../utils/helpers";
 
-const claimsData = [
-  {
-    id: "CLM-8842-X",
-    date: "17 Mar 2026",
-    trigger: "Auto-triggered due to heavy rain (72mm)",
-    zone: "Koramangala, Bangalore",
-    amount: "₹450",
-    status: "PAID",
-    time: "Processed instantly",
-    icon: <CloudRain size={24} />
-  },
-  {
-    id: "CLM-7731-Y",
-    date: "05 Oct 2025",
-    trigger: "Auto-triggered due to hazardous AQI (420)",
-    zone: "Indiranagar, Bangalore",
-    amount: "₹300",
-    status: "PAID",
-    time: "Auto-processed in 1m 40s",
-    icon: <Wind size={24} />
-  },
-  {
-    id: "CLM-6620-Z",
-    date: "28 Sep 2025",
-    trigger: "Waterlogging / Traffic Halt",
-    zone: "HSR Layout, Bangalore",
-    amount: "₹300",
-    status: "PENDING_REVIEW",
-    time: "Analyzing Data Sources",
-    icon: <AlertCircle size={24} />
-  }
-];
+const EVENT_ICONS = {
+  Rainfall: CloudRain,
+  AQI: Wind,
+};
+
+const HISTORY_TONES = {
+  success: "border-emerald-500/20 bg-emerald-500/10 text-emerald-100",
+  warning: "border-amber-500/20 bg-amber-500/10 text-amber-100",
+  danger: "border-red-500/20 bg-red-500/10 text-red-100",
+  info: "border-sky-500/20 bg-sky-500/10 text-sky-100",
+  default: "border-white/10 bg-white/5 text-slate-200",
+};
 
 export default function Claims() {
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-      toast('Syncing latest parametric triggers...', {
-        icon: '🔄',
-        id: 'sync-toast',
-      });
-      setTimeout(() => {
-        toast.success('Claims up to date', { id: 'sync-toast' });
-      }, 1500);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } };
-  const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } };
-
-  if (loading) {
-    return (
-      <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
-        <div className="h-10 bg-slate-800/50 rounded-xl w-1/4 animate-pulse mb-8"></div>
-        <div className="space-y-4">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-24 bg-white/5 rounded-2xl animate-pulse"></div>
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const { platformState, derivedData, actions } = useGigShieldData();
 
   return (
-    <motion.div variants={container} initial="hidden" animate="show" className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
-      
-      <div className="flex justify-between items-end mb-6">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Claim History</h1>
-            <span className="text-[10px] font-medium tracking-wider uppercase bg-slate-800 text-slate-300 px-2 py-1 rounded flex items-center mb-2">
-              <Clock size={10} className="mr-1" /> Updated just now
-            </span>
+    <div className="page-shell">
+      <SectionHeader
+        eyebrow="Claims system"
+        title="Automated claim lifecycle"
+        description="Claims are generated from monitored events, run through fraud checks, and move through review states with timestamps and history."
+        action={
+          <>
+            <button
+              type="button"
+              onClick={() => actions.triggerScenario("rainBurst")}
+              className="inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-500"
+            >
+              Trigger rain event
+              <CloudRain size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={actions.runFraudDrill}
+              className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:border-red-500/20 hover:bg-red-500/10 hover:text-red-200"
+            >
+              Trigger fraud drill
+              <ShieldAlert size={16} />
+            </button>
+          </>
+        }
+      />
+
+      <div className="grid gap-5 md:grid-cols-3">
+        <div className="glass-panel rounded-[2rem] border border-white/10 p-5">
+          <div className="text-sm text-slate-400">Claims tracked</div>
+          <div className="mt-2 text-3xl font-semibold text-white">
+            {platformState.claims.length}
           </div>
-          <p className="text-slate-400 mb-2">Zero-touch claims. Triggered by data, paid in seconds.</p>
-          <div className="inline-block bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm px-3 py-1.5 rounded-full">
-            ✨ No action required — auto processed instantly
+          <div className="mt-3 text-sm text-slate-500">
+            Includes paid, approved, pending, and manual review claims.
+          </div>
+        </div>
+        <div className="glass-panel rounded-[2rem] border border-white/10 p-5">
+          <div className="text-sm text-slate-400">Claims in progress</div>
+          <div className="mt-2 text-3xl font-semibold text-white">
+            {derivedData.pendingClaims.length}
+          </div>
+          <div className="mt-3 text-sm text-slate-500">
+            These claims are still inside automated approval or review logic.
+          </div>
+        </div>
+        <div className="glass-panel rounded-[2rem] border border-white/10 p-5">
+          <div className="flex items-center gap-2 text-sm text-slate-400">
+            Fraud watch
+            <InfoTooltip
+              label="Fraud watch info"
+              text="Location jumps and rapid repeat claims are shown here so judges can see the anti-fraud story without opening another screen."
+            />
+          </div>
+          <div className="mt-2 text-3xl font-semibold text-white">
+            {getFraudStatusLabel(platformState.fraudWatch.status)}
+          </div>
+          <div className="mt-3 text-sm text-slate-500">
+            {platformState.fraudWatch.latestAudit}
           </div>
         </div>
       </div>
 
-      <div className="space-y-4">
-        {claimsData.map((claim, idx) => (
-          <motion.div key={claim.id} variants={item} whileHover={{ scale: 1.02 }} className={`glass-panel p-6 rounded-2xl flex flex-col md:flex-row justify-between md:items-center gap-4 transition-all border ${
-            idx === 0 ? 'border-emerald-500/30 bg-emerald-950/20 shadow-[0_0_20px_rgba(16,185,129,0.1)] hover:bg-emerald-900/30' : 'border-white/5 hover:bg-white/10'
-          }`}>
-            
-            <div className="flex items-start gap-4">
-              <div className={`p-3 rounded-full mt-1 ${claim.status === 'PAID' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
-                {claim.icon}
-              </div>
-              
-              <div>
-                <h3 className="text-lg font-bold text-white mb-1">{claim.trigger}</h3>
-                <div className="flex flex-wrap gap-3 text-sm text-slate-400">
-                  <span className="flex items-center"><Calendar size={14} className="mr-1"/> {claim.date}</span>
-                  <span className="flex items-center"><MapPin size={14} className="mr-1"/> {claim.zone}</span>
-                  <span className="flex items-center text-white font-medium"><IndianRupee size={14} className="mr-0.5"/> {claim.amount} payout</span>
+      {!platformState.claims.length ? (
+        <EmptyState
+          icon={History}
+          title="No claims generated yet"
+          description="Simulate a weather or fraud scenario to populate the claims timeline with realistic statuses and timestamps."
+          action={
+            <button
+              type="button"
+              onClick={() => actions.triggerScenario("rainBurst")}
+              className="rounded-2xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-500"
+            >
+              Generate first claim
+            </button>
+          }
+        />
+      ) : (
+        <div className="space-y-5">
+          {platformState.claims.map((claim) => {
+            const EventIcon = EVENT_ICONS[claim.eventType] || Siren;
+
+            return (
+              <motion.div
+                key={claim.id}
+                whileHover={{ y: -3 }}
+                className="glass-panel rounded-[2rem] border border-white/10 p-6"
+              >
+                <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="flex gap-4">
+                    <div className="mt-1 rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-100">
+                      <EventIcon size={20} />
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-xl font-semibold text-white">{claim.headline}</h3>
+                        <StatusPill
+                          tone={
+                            claim.status === "paid"
+                              ? "success"
+                              : claim.status === "manual_review"
+                                ? "danger"
+                                : "warning"
+                          }
+                        >
+                          {getStatusLabel(claim.status)}
+                        </StatusPill>
+                        <StatusPill
+                          tone={claim.fraudStatus === "flagged" ? "danger" : claim.fraudStatus === "verified" ? "success" : "warning"}
+                        >
+                          {getFraudStatusLabel(claim.fraudStatus)}
+                        </StatusPill>
+                      </div>
+                      <p className="max-w-3xl text-sm leading-7 text-slate-400">
+                        {claim.source} logged {claim.triggerValue} in {claim.area}. Claim
+                        amount is {formatINR(claim.amount)}.
+                      </p>
+                      <div className="flex flex-wrap gap-3 text-sm text-slate-500">
+                        <span>ID {claim.id}</span>
+                        <span>Detected {new Date(claim.detectedAt).toLocaleString()}</span>
+                        <span>Updated {new Date(claim.updatedAt).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-4 xl:min-w-[240px]">
+                    <div className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                      Payout status
+                    </div>
+                    <div className="mt-2 text-2xl font-semibold text-white">
+                      {formatINR(claim.amount)}
+                    </div>
+                    <div className="mt-3 text-sm text-slate-400">{claim.payoutWindow}</div>
+                    {claim.flags.length ? (
+                      <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+                        {claim.flags[0]}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="text-left md:text-right bg-black/30 p-4 rounded-xl border border-white/5 min-w-[200px] flex flex-col justify-center">
-              <div className={`text-xs font-bold px-3 py-1.5 rounded-full inline-flex items-center justify-center mb-2 w-max shadow-lg ${
-                claim.status === 'PAID' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-              }`}>
-                {claim.status === 'PAID' ? <><CheckCircle2 size={14} className="mr-1.5"/> Paid ✅</> : 'REVIEW PENDING'}
-              </div>
-              <p className="text-xs text-slate-500 flex items-center md:justify-end">
-                <Clock size={12} className="mr-1"/> {claim.time}
-              </p>
-            </div>
+                <div className="mt-6 grid gap-4 xl:grid-cols-[1fr_0.8fr]">
+                  <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-4">
+                    <div className="flex items-center gap-2 text-sm font-medium text-white">
+                      Claim history
+                      <InfoTooltip
+                        label="Claim history info"
+                        text="Every status transition is timestamped so the automated flow is easy to explain during a demo."
+                      />
+                    </div>
+                    <div className="mt-4 space-y-3">
+                      {claim.history.map((entry) => (
+                        <div
+                          key={entry.id}
+                          className={`rounded-2xl border px-4 py-3 text-sm ${
+                            HISTORY_TONES[entry.tone] || HISTORY_TONES.default
+                          }`}
+                        >
+                          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                            <div className="font-medium text-white">
+                              {entry.stage.replace(/_/g, " ")}
+                            </div>
+                            <div className="text-xs text-slate-400">
+                              {new Date(entry.timestamp).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="mt-2 leading-6">{entry.detail}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
 
-          </motion.div>
-        ))}
-      </div>
-
-      <div className="mt-8 p-6 glass-panel rounded-2xl border-blue-500/20 bg-blue-900/10 flex items-start gap-4">
-        <div className="text-blue-400 mt-1"><AlertCircle size={24} /></div>
-        <div>
-          <h4 className="text-white font-medium mb-1">How do parametric claims work?</h4>
-          <p className="text-sm text-slate-400">You don't need to file a claim. Our platform continuously monitors weather and traffic APIs for your zone. If conditions cross your policy's threshold, a claim is auto-generated and paid directly to your linked UPI/Bank account.</p>
+                  <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-4">
+                    <div className="text-sm font-medium text-white">Judge-friendly summary</div>
+                    <div className="mt-4 space-y-3 text-sm leading-6 text-slate-400">
+                      <p>
+                        This claim shows how event detection, risk review, and payout states
+                        stay visible in one place.
+                      </p>
+                      <p>
+                        Current fraud status:{" "}
+                        <span className="font-medium text-white">
+                          {getFraudStatusLabel(claim.fraudStatus)}
+                        </span>
+                      </p>
+                      <p>
+                        Current claim status:{" "}
+                        <span className="font-medium text-white">
+                          {getStatusLabel(claim.status)}
+                        </span>
+                      </p>
+                    </div>
+                    <Link
+                      to="/dashboard"
+                      className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-sky-300 transition hover:text-sky-200"
+                    >
+                      Back to dashboard
+                      <ArrowRight size={16} />
+                    </Link>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
-      </div>
+      )}
 
-    </motion.div>
+      <div className="rounded-[2rem] border border-white/10 bg-white/5 p-5 text-sm leading-7 text-slate-400">
+        <div className="mb-2 flex items-center gap-2 text-white">
+          <AlertTriangle size={16} className="text-amber-300" />
+          Why this flow feels real
+        </div>
+        Claims are not static cards anymore. They are generated from event scenarios,
+        timestamped automatically, and updated in place as approval and fraud logic runs.
+      </div>
+    </div>
   );
 }

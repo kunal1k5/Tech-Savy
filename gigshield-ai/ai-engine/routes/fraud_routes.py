@@ -21,6 +21,13 @@ class FraudCheckRequest(BaseModel):
     avg_claim_amount: Optional[float] = 0.0
     worker_in_zone: Optional[bool] = True
     duplicate_trigger: Optional[bool] = False
+    predicted_destination_id: Optional[int] = None
+    actual_destination_id: Optional[int] = None
+    location_jump_km: Optional[float] = 0.0
+    location_window_minutes: Optional[int] = 0
+    repeated_claims_6h: Optional[int] = 0
+    nearby_similar_claims_count: Optional[int] = 0
+    device_fingerprint_changed: Optional[bool] = False
 
 
 @router.post("/check")
@@ -37,6 +44,13 @@ async def fraud_check(req: FraudCheckRequest):
         avg_claim_amount=req.avg_claim_amount,
         worker_in_zone=req.worker_in_zone,
         duplicate_trigger=req.duplicate_trigger,
+        predicted_destination_id=req.predicted_destination_id,
+        actual_destination_id=req.actual_destination_id,
+        location_jump_km=req.location_jump_km,
+        location_window_minutes=req.location_window_minutes,
+        repeated_claims_6h=req.repeated_claims_6h,
+        nearby_similar_claims_count=req.nearby_similar_claims_count,
+        device_fingerprint_changed=req.device_fingerprint_changed,
     )
 
     return result

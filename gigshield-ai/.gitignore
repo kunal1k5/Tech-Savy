@@ -13,6 +13,8 @@ env/
 
 # Build outputs
 frontend/build/
+frontend/build-temp/
+frontend/build-verification/
 frontend/dist/
 backend/dist/
 
@@ -30,10 +32,12 @@ Thumbs.db
 logs/
 *.log
 npm-debug.log*
+.runlogs/
 
 # AI model artifacts
 ai-engine/models/*.pkl
 ai-engine/models/*.joblib
+ai-engine/artifacts/**/*.pkl
 
 # Docker
 docker-compose.override.yml

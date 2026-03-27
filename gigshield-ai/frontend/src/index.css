@@ -1,32 +1,80 @@
-﻿@tailwind base;
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    color-scheme: dark;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply bg-slate-950 text-slate-50 antialiased;
+    background-image:
+      radial-gradient(circle at top left, rgba(14, 165, 233, 0.18), transparent 28%),
+      radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.12), transparent 24%),
+      linear-gradient(180deg, #020617 0%, #020617 46%, #06111f 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  ::selection {
+    background: rgba(14, 165, 233, 0.35);
+    color: #f8fafc;
   }
 }
 
-body {
-  @apply bg-slate-950 text-slate-50 antialiased;
-  background-image: radial-gradient(circle at 50% -20%, #1e3a8a 0%, #020617 80%);
-  background-attachment: fixed;
-  min-height: 100vh;
+@layer components {
+  .glass-panel {
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.88), rgba(2, 6, 23, 0.92));
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    box-shadow:
+      0 20px 50px rgba(2, 6, 23, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    transition:
+      transform 180ms ease,
+      border-color 180ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .glass-panel:hover {
+    border-color: rgba(148, 163, 184, 0.22);
+    box-shadow:
+      0 24px 60px rgba(2, 6, 23, 0.36),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .page-shell {
+    @apply mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8 xl:px-8;
+  }
+
+  .text-gradient {
+    background: linear-gradient(90deg, #e2e8f0, #7dd3fc);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .fintech-grid {
+    background-image:
+      linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
+    background-size: 36px 36px;
+  }
 }
 
-/* Glass Card + Hover Glow */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  transition: box-shadow 0.3s ease, border 0.3s ease;
-}
+@layer utilities {
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 
-.glass-panel:hover {
-  box-shadow: 0 8px 32px 0 rgba(37, 99, 235, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
