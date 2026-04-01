@@ -18,8 +18,22 @@ import {
   getStatusLabel,
   updateTrendWithPayout,
 } from "../data/mockPlatform";
+import {
+  buyPolicy,
+  getClaims,
+  getPolicyState,
+  getPremium,
+  triggerClaim,
+} from "../services/demoFlow";
+import { getDemoSession, getToken, getUserFromToken } from "../utils/auth";
 
 const GigShieldDataContext = createContext(null);
+
+const BACKEND_SCENARIO_PAYLOADS = {
+  rainBurst: { rainfall: 72, aqi: 140, mode: "auto" },
+  airQualitySpike: { rainfall: 0, aqi: 428, mode: "auto" },
+  gpsSpoof: { rainfall: 0, aqi: 0, mode: "fraud_drill" },
+};
 
 function updateClaim(claims, claimId, updater) {
   return claims.map((claim) => {
@@ -30,16 +44,221 @@ function updateClaim(claims, claimId, updater) {
   });
 }
 
+function applySessionWorker(baseState, sessionUser) {
+  if (!sessionUser) {
+    return baseState;
+  }
+
+  return {
+    ...baseState,
+    worker: {
+      ...baseState.worker,
+      name: sessionUser.full_name || sessionUser.fullName || baseState.worker.name,
+      city: sessionUser.city || baseState.worker.city,
+      area: sessionUser.zone || baseState.worker.area,
+      platform: sessionUser.platform || baseState.worker.platform,
+      weeklyIncome:
+        Number(sessionUser.weekly_income ?? sessionUser.weeklyIncome) || baseState.worker.weeklyIncome,
+    },
+  };
+}
+
+function mapRiskLevel(level) {
+  if (!level) {
+    return "Medium";
+  }
+
+  const normalized = String(level).toLowerCase();
+  if (normalized === "low" || normalized === "safe") {
+    return "Low";
+  }
+  if (normalized === "high") {
+    return "High";
+  }
+  return "Medium";
+}
+
+function mapBackendPlans(plans = []) {
+  return plans.map((plan) => ({
+    id: plan.id,
+    name: plan.name,
+    premiumWeekly: plan.premium,
+    payoutCap: Math.max(250, Math.round((plan.coverage || 3000) / 7)),
+    description: plan.description,
+    features: plan.features || [],
+    note:
+      plan.status === "active"
+        ? "Policy is active and ready for claim processing."
+        : "Select this plan to activate protection.",
+    status: plan.status,
+    coverageAmount: plan.coverage,
+  }));
+}
+
+function mapBackendClaims(claims = []) {
+  return claims.map((claim) => ({
+    ...claim,
+    status:
+      claim.fraudStatus === "flagged" && claim.status === "pending"
+        ? "manual_review"
+        : claim.status,
+  }));
+}
+
+function buildRiskFeed(currentFeed, premiumData, workerArea) {
+  if (!premiumData) {
+    return currentFeed;
+  }
+
+  const level = mapRiskLevel(premiumData.riskLevel);
+  const score = premiumData.riskScore || 56;
+  const baseZone = workerArea || currentFeed[0]?.zone || "Koramangala";
+  const otherZones = ["Indiranagar", "HSR Layout", "Whitefield"];
+
+  return [
+    { zone: baseZone, level, score, change: level === "High" ? "+12" : level === "Medium" ? "+6" : "-4" },
+    ...otherZones.map((zone, index) => ({
+      zone,
+      level: index === 0 && level === "High" ? "Medium" : index === 2 ? "Low" : level,
+      score: Math.max(22, score - (index + 1) * 9),
+      change: index === 2 ? "-2" : `+${Math.max(1, 6 - index * 2)}`,
+    })),
+  ];
+}
+
+function buildLiveMonitor(currentMonitor, premiumData, claimsData, workerArea) {
+  const latestClaim = claimsData?.claims?.[0];
+
+  if (latestClaim) {
+    return {
+      stage: latestClaim.status,
+      headline: latestClaim.headline,
+      summary:
+        latestClaim.status === "paid"
+          ? "Claim paid successfully and protection story is complete."
+          : latestClaim.status === "approved"
+            ? "Claim approved. Money is being released."
+            : latestClaim.status === "manual_review"
+              ? "Claim moved to manual review after suspicious checks."
+              : "Claim created automatically and payout checks started.",
+      lastHeartbeatAt: new Date().toISOString(),
+      activeScenarioId:
+        latestClaim.eventType === "Rainfall"
+          ? "rainBurst"
+          : latestClaim.eventType === "AQI"
+            ? "airQualitySpike"
+            : "gpsSpoof",
+    };
+  }
+
+  if (premiumData) {
+    return {
+      ...currentMonitor,
+      stage: "risk_updated",
+      headline: `${premiumData.riskLevel} risk in ${workerArea || "your area"}`,
+      summary: premiumData.summary || "Premium updated from the latest risk signal.",
+      lastHeartbeatAt: new Date().toISOString(),
+    };
+  }
+
+  return currentMonitor;
+}
+
+function mergeBackendState(current, { policyData, premiumData, claimsData } = {}, sessionUser) {
+  const nextState = applySessionWorker(current, sessionUser);
+  const plansSource = policyData?.plans || premiumData?.plans;
+  const activePolicy = policyData?.activePolicy || premiumData?.activePolicy;
+
+  if (plansSource?.length) {
+    nextState.plans = mapBackendPlans(plansSource);
+  }
+
+  if (activePolicy?.planId) {
+    nextState.activePlanId = activePolicy.planId;
+  } else if (policyData) {
+    nextState.activePlanId = null;
+  }
+
+  if (premiumData) {
+    nextState.recommendedPlanId = premiumData.riskKey === "high" ? "premium" : "basic";
+    nextState.riskFeed = buildRiskFeed(current.riskFeed, premiumData, nextState.worker.area);
+  }
+
+  if (claimsData?.claims) {
+    nextState.claims = mapBackendClaims(claimsData.claims);
+    nextState.fraudWatch = claimsData.fraudWatch || nextState.fraudWatch;
+  }
+
+  nextState.liveMonitor = buildLiveMonitor(
+    nextState.liveMonitor,
+    premiumData,
+    claimsData,
+    nextState.worker.area
+  );
+
+  return nextState;
+}
+
 export function GigShieldDataProvider({ children }) {
-  const [platformState, setPlatformState] = useState(() => createInitialPlatformState());
+  const [platformState, setPlatformState] = useState(() => {
+    const baseState = createInitialPlatformState();
+    return applySessionWorker(baseState, getUserFromToken() || getDemoSession());
+  });
   const timeoutIdsRef = useRef([]);
   const intervalIdsRef = useRef([]);
   const hasBootstrappedRef = useRef(false);
+
+  function schedule(callback, delay) {
+    const timeoutId = window.setTimeout(callback, delay);
+    timeoutIdsRef.current.push(timeoutId);
+    return timeoutId;
+  }
+
+  async function syncBackendState({ requestedRisk } = {}) {
+    if (!getToken()) {
+      return;
+    }
+
+    try {
+      const [policyData, premiumData, claimsData] = await Promise.all([
+        getPolicyState(),
+        getPremium(requestedRisk),
+        getClaims(),
+      ]);
+
+      startTransition(() => {
+        setPlatformState((current) =>
+          mergeBackendState(current, { policyData, premiumData, claimsData }, getUserFromToken())
+        );
+      });
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Could not sync live demo data.");
+    }
+  }
 
   useEffect(() => {
     return () => {
       timeoutIdsRef.current.forEach((id) => window.clearTimeout(id));
       intervalIdsRef.current.forEach((id) => window.clearInterval(id));
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleAuthChange() {
+      const nextSessionUser = getUserFromToken() || getDemoSession();
+
+      startTransition(() => {
+        setPlatformState(applySessionWorker(createInitialPlatformState(), nextSessionUser));
+      });
+
+      if (getToken()) {
+        syncBackendState();
+      }
+    }
+
+    window.addEventListener("gigshield-auth-changed", handleAuthChange);
+    return () => {
+      window.removeEventListener("gigshield-auth-changed", handleAuthChange);
     };
   }, []);
 
@@ -61,21 +280,84 @@ export function GigShieldDataProvider({ children }) {
     }, 45000);
     intervalIdsRef.current.push(heartbeatId);
 
-    const initialEventId = window.setTimeout(() => {
-      triggerScenario("rainBurst", { origin: "auto" });
-    }, 1400);
-    timeoutIdsRef.current.push(initialEventId);
+    if (getToken()) {
+      syncBackendState();
+    }
 
     return undefined;
   }, []);
 
-  function schedule(callback, delay) {
-    const timeoutId = window.setTimeout(callback, delay);
-    timeoutIdsRef.current.push(timeoutId);
-    return timeoutId;
+  async function simulateRisk(riskKey, { silent = false } = {}) {
+    if (getToken()) {
+      try {
+        const premiumData = await getPremium(riskKey);
+
+        startTransition(() => {
+          setPlatformState((current) =>
+            mergeBackendState(current, { premiumData }, getUserFromToken())
+          );
+        });
+
+        if (!silent) {
+          toast.success(`Risk changed to ${premiumData.riskLevel}. Premium is now ${premiumData.premium} INR.`);
+        }
+      } catch (error) {
+        toast.error(error.response?.data?.error || "Could not update risk.");
+      }
+      return;
+    }
+
+    const scenario =
+      riskKey === "high"
+        ? disruptionScenarios.rainBurst
+        : riskKey === "low"
+          ? {
+              ...disruptionScenarios.airQualitySpike,
+              zoneUpdates: disruptionScenarios.airQualitySpike.zoneUpdates.map((zone, index) => ({
+                ...zone,
+                level: index === 0 ? "Low" : "Medium",
+                score: Math.max(28, zone.score - 22),
+              })),
+            }
+          : disruptionScenarios.airQualitySpike;
+
+    startTransition(() => {
+      setPlatformState((current) => ({
+        ...current,
+        riskFeed: scenario.zoneUpdates,
+        liveMonitor: {
+          ...current.liveMonitor,
+          headline: `${mapRiskLevel(riskKey)} risk simulated`,
+          summary: `${scenario.summary} Premium cards are ready to update.`,
+          lastHeartbeatAt: new Date().toISOString(),
+        },
+      }));
+    });
+
+    if (!silent) {
+      toast.success(`${mapRiskLevel(riskKey)} risk simulated.`);
+    }
   }
 
-  function selectPlan(planId) {
+  async function selectPlan(planId) {
+    if (getToken()) {
+      try {
+        const policyData = await buyPolicy(planId);
+
+        startTransition(() => {
+          setPlatformState((current) =>
+            mergeBackendState(current, { policyData }, getUserFromToken())
+          );
+        });
+
+        const chosenPlan = policyData.plans?.find((plan) => plan.id === planId);
+        toast.success(`${chosenPlan?.name || "Policy"} is now active.`);
+      } catch (error) {
+        toast.error(error.response?.data?.error || "Could not activate this policy.");
+      }
+      return;
+    }
+
     startTransition(() => {
       setPlatformState((current) => ({
         ...current,
@@ -90,31 +372,46 @@ export function GigShieldDataProvider({ children }) {
   }
 
   function refreshSignals() {
-    const scenario =
-      platformState.liveMonitor.activeScenarioId === "airQualitySpike"
-        ? disruptionScenarios.rainBurst
-        : disruptionScenarios.airQualitySpike;
-
-    startTransition(() => {
-      setPlatformState((current) => ({
-        ...current,
-        riskFeed: scenario.zoneUpdates,
-        liveMonitor: {
-          ...current.liveMonitor,
-          headline: "Signal refresh complete",
-          summary: `${scenario.summary} Coverage thresholds were recalculated for nearby zones.`,
-          lastHeartbeatAt: new Date().toISOString(),
-        },
-      }));
-    });
-
-    toast.success("Zone signals refreshed from the mock monitoring feed.");
+    const riskSequence = ["low", "medium", "high"];
+    const currentLevel = String(platformState.riskFeed[0]?.level || "Medium").toLowerCase();
+    const currentIndex = riskSequence.indexOf(currentLevel === "safe" ? "low" : currentLevel);
+    const nextRisk = riskSequence[(currentIndex + 1 + riskSequence.length) % riskSequence.length];
+    simulateRisk(nextRisk);
   }
 
-  function triggerScenario(scenarioId, { origin = "manual" } = {}) {
+  async function triggerScenario(scenarioId, { origin = "manual" } = {}) {
     const scenario = disruptionScenarios[scenarioId];
     if (!scenario) {
       return;
+    }
+
+    if (getToken()) {
+      const loadingToastId = toast.loading(`${scenario.title} detected. Checking for auto-claim.`);
+
+      try {
+        const response = await triggerClaim(BACKEND_SCENARIO_PAYLOADS[scenarioId] || {});
+
+        startTransition(() => {
+          setPlatformState((current) =>
+            mergeBackendState(current, { claimsData: response }, getUserFromToken())
+          );
+        });
+
+        if (!response.triggered) {
+          toast.error(response.message || "No claim was triggered.", { id: loadingToastId });
+          return;
+        }
+
+        toast.success(response.message, { id: loadingToastId });
+        schedule(() => syncBackendState(), 2100);
+        schedule(() => syncBackendState(), 4100);
+        return;
+      } catch (error) {
+        toast.error(error.response?.data?.error || "Could not trigger claim.", {
+          id: loadingToastId,
+        });
+        return;
+      }
     }
 
     const liveClaim = createLiveClaimFromScenario(scenario, platformState.claims.length);
@@ -158,6 +455,7 @@ export function GigShieldDataProvider({ children }) {
           claims: updateClaim(current.claims, liveClaim.id, (claim) => ({
             ...claim,
             fraudStatus: fraudResult.status,
+            status: fraudResult.suspicious ? "manual_review" : claim.status,
             flags: fraudResult.flags,
             updatedAt: new Date().toISOString(),
             payoutWindow: fraudResult.suspicious
@@ -260,11 +558,12 @@ export function GigShieldDataProvider({ children }) {
 
   const derivedData = useMemo(() => {
     const activePlan =
-      platformState.plans.find((plan) => plan.id === platformState.activePlanId) ||
-      platformState.plans[0];
+      platformState.plans.find((plan) => plan.id === platformState.activePlanId) || null;
     const recommendedPlan =
       platformState.plans.find((plan) => plan.id === platformState.recommendedPlanId) ||
-      activePlan;
+      activePlan ||
+      platformState.plans[0];
+    const displayPlan = activePlan || recommendedPlan || platformState.plans[0];
     const currentRisk = platformState.riskFeed[0];
     const latestClaim = platformState.claims[0] || null;
     const pendingClaims = platformState.claims.filter((claim) =>
@@ -277,9 +576,24 @@ export function GigShieldDataProvider({ children }) {
       (sum, entry) => sum + entry.downtimeHours,
       0
     );
+    const todayTrend = platformState.earningsTrend[platformState.earningsTrend.length - 1];
+    const estimatedHourlyIncome = platformState.worker.weeklyIncome / 42;
+    const latestLossAmount =
+      latestClaim?.amount || Math.round(estimatedHourlyIncome * (todayTrend?.downtimeHours || 0));
+    const riskTone =
+      currentRisk?.level === "High" ? "danger" : currentRisk?.level === "Medium" ? "warning" : "success";
+    const claimTone =
+      latestClaim?.status === "paid"
+        ? "success"
+        : latestClaim?.status === "manual_review"
+          ? "danger"
+          : "warning";
+    const fraudTone = platformState.fraudWatch.status === "flagged" ? "danger" : "success";
 
     return {
       activePlan,
+      displayPlan,
+      hasActivePolicy: Boolean(activePlan),
       recommendedPlan,
       currentRisk,
       latestClaim,
@@ -287,7 +601,13 @@ export function GigShieldDataProvider({ children }) {
       weeklyPayouts,
       fraudFlags,
       downtimeThisWeek: Number(downtimeThisWeek.toFixed(1)),
-      totalProtectedAmount: activePlan.payoutCap * 7,
+      hoursLostToday: Number((todayTrend?.downtimeHours || 0).toFixed(1)),
+      latestLossAmount,
+      riskTone,
+      claimTone,
+      fraudTone,
+      dynamicPremium: displayPlan?.premiumWeekly || 0,
+      totalProtectedAmount: (displayPlan?.payoutCap || 0) * 7,
       statusLabels: {
         claim: latestClaim ? getStatusLabel(latestClaim.status) : "No claim",
         fraud: getFraudStatusLabel(platformState.fraudWatch.status),
@@ -303,6 +623,7 @@ export function GigShieldDataProvider({ children }) {
         refreshSignals,
         runFraudDrill,
         selectPlan,
+        simulateRisk,
         triggerScenario,
       },
     }),

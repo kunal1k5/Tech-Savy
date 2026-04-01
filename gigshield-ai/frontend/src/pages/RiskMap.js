@@ -1,8 +1,6 @@
 import React, { useState } from "react";
-import { motion } from "framer-motion";
 import {
   Activity,
-  AlertTriangle,
   CloudRain,
   Gauge,
   MapPin,
@@ -11,10 +9,15 @@ import {
   ShieldCheck,
   Wind,
 } from "lucide-react";
+import Card, { CardDescription, CardHeader, CardTitle } from "../components/ui/Card";
+import Badge from "../components/ui/Badge";
+import Button from "../components/ui/Button";
+import { LoadingPanel } from "../components/ui/Loader";
+import SectionHeader from "../components/ui/SectionHeader";
 import {
   SAMPLE_RISK_PAYLOAD,
-  predictRisk,
   predictLiveRisk,
+  predictRisk,
 } from "../services/riskPrediction";
 
 const FIELD_CONFIG = [
@@ -32,7 +35,7 @@ const FIELD_CONFIG = [
 ];
 
 const PRESET_PAYLOADS = {
-  "Low Risk Sample": {
+  "Low Risk": {
     temperature: 24,
     humidity: 45,
     wind: 8,
@@ -45,7 +48,7 @@ const PRESET_PAYLOADS = {
     visibility: 10,
     gust: 12,
   },
-  "Medium Risk Sample": {
+  "Medium Risk": {
     temperature: 31,
     humidity: 68,
     wind: 18,
@@ -58,35 +61,18 @@ const PRESET_PAYLOADS = {
     visibility: 6,
     gust: 24,
   },
-  "High Risk Sample": SAMPLE_RISK_PAYLOAD,
+  "High Risk": SAMPLE_RISK_PAYLOAD,
 };
 
 const RISK_STYLES = {
-  "Low Risk": {
-    panel:
-      "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-[0_0_25px_rgba(16,185,129,0.12)]",
-    badge: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30",
-  },
-  "Medium Risk": {
-    panel:
-      "border-amber-500/30 bg-amber-500/10 text-amber-200 shadow-[0_0_25px_rgba(245,158,11,0.12)]",
-    badge: "bg-amber-500/15 text-amber-200 border border-amber-500/30",
-  },
-  "High Risk": {
-    panel:
-      "border-red-500/35 bg-red-500/10 text-red-200 shadow-[0_0_30px_rgba(239,68,68,0.16)]",
-    badge: "bg-red-500/15 text-red-200 border border-red-500/35",
-  },
-  default: {
-    panel: "border-white/10 bg-white/5 text-slate-200",
-    badge: "bg-white/5 text-slate-300 border border-white/10",
-  },
+  "Low Risk": { tone: "success", glow: "emerald" },
+  "Medium Risk": { tone: "warning", glow: "amber" },
+  "High Risk": { tone: "danger", glow: "rose" },
+  default: { tone: "info", glow: "sky" },
 };
 
 function toFormState(payload) {
-  return Object.fromEntries(
-    FIELD_CONFIG.map(({ name }) => [name, String(payload[name] ?? "")])
-  );
+  return Object.fromEntries(FIELD_CONFIG.map(({ name }) => [name, String(payload[name] ?? "")]));
 }
 
 function toNumericPayload(formData) {
@@ -187,303 +173,232 @@ export default function RiskMap() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="p-4 md:p-8 max-w-7xl mx-auto space-y-6"
-    >
-      <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-3xl font-bold tracking-tight text-white">
-              Risk Response Monitor
-            </h1>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-full px-3 py-1">
-              React to Flask
-            </span>
-          </div>
-          <p className="text-slate-400 max-w-2xl">
-            Send weather and air-quality data to the Flask API, run the
-            risk-based service, and surface the returned response tier in the UI.
-          </p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-3 w-full xl:w-auto xl:items-center">
-          <label className="flex items-center gap-3 px-4 py-2 rounded-full border border-white/10 bg-white/5 text-slate-200">
-            <MapPin size={16} className="text-blue-300" />
-            <input
-              type="text"
-              value={city}
-              onChange={(event) => setCity(event.target.value)}
-              placeholder="Enter city"
-              className="bg-transparent outline-none min-w-[160px] text-sm"
-            />
-          </label>
-          <button
-            type="button"
-            onClick={handleLiveWeather}
-            disabled={isFetchingLiveWeather}
-            className="px-4 py-2 rounded-full text-sm font-medium border border-blue-500/20 text-blue-100 bg-blue-500/10 hover:bg-blue-500/20 disabled:opacity-70 disabled:cursor-not-allowed transition-colors"
-          >
-            {isFetchingLiveWeather ? "Fetching live weather..." : "Use Live Weather"}
-          </button>
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          {Object.entries(PRESET_PAYLOADS).map(([label, payload]) => (
-            <button
-              key={label}
+    <div className="page-shell">
+      <SectionHeader
+        eyebrow="Risk intelligence"
+        title="Live weather to risk response"
+        description="This page now feels like a real underwriting tool: clean inputs, clear risk verdicts, and stronger loading and feedback states."
+        action={
+          <>
+            <div className="flex items-center gap-3 rounded-[22px] border border-white/10 bg-white/5 px-4 py-3 text-slate-200">
+              <MapPin size={16} className="text-sky-300" />
+              <input
+                type="text"
+                value={city}
+                onChange={(event) => setCity(event.target.value)}
+                placeholder="Enter city"
+                className="min-w-[150px] bg-transparent text-sm outline-none"
+              />
+            </div>
+            <Button
               type="button"
-              onClick={() => applyPreset(payload)}
-              className="px-4 py-2 rounded-full text-sm font-medium border border-white/10 text-slate-200 bg-white/5 hover:bg-white/10 transition-colors"
+              variant="secondary"
+              loading={isFetchingLiveWeather}
+              onClick={handleLiveWeather}
             >
-              {label}
-            </button>
-          ))}
-        </div>
+              {isFetchingLiveWeather ? "Fetching Live Weather" : "Use Live Weather"}
+            </Button>
+          </>
+        }
+      />
+
+      <div className="flex flex-wrap gap-3">
+        {Object.entries(PRESET_PAYLOADS).map(([label, payload]) => (
+          <Button key={label} type="button" variant="ghost" onClick={() => applyPreset(payload)}>
+            {label}
+          </Button>
+        ))}
       </div>
 
-      <div className="grid xl:grid-cols-[1.4fr_0.9fr] gap-6">
-        <form
-          onSubmit={handleSubmit}
-          className="glass-panel border border-white/10 rounded-3xl p-6 md:p-8 space-y-6"
-        >
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-            Live weather mode:
-            <span className="text-emerald-200">
-              {" "}city enter karo, phir "Use Live Weather" click karo. Backend weather API se realtime values laakar model ko feed karega.
-            </span>
-          </div>
-
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <p className="text-sm uppercase tracking-[0.2em] text-slate-500 mb-2">
-                Predictor Input
-              </p>
-              <h2 className="text-xl font-semibold text-white">
-                POST /predict payload
-              </h2>
-            </div>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => applyPreset(SAMPLE_RISK_PAYLOAD)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-white/10 text-slate-200 bg-white/5 hover:bg-white/10 transition-colors"
-              >
-                <RefreshCcw size={16} />
-                Reset Sample
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-500 disabled:opacity-70 disabled:cursor-not-allowed transition-colors shadow-[0_10px_30px_rgba(37,99,235,0.25)]"
-              >
-                <Send size={16} />
-                {isSubmitting ? "Predicting..." : "Predict Risk"}
-              </button>
-            </div>
-          </div>
-
-          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {FIELD_CONFIG.map((field) => (
-              <label
-                key={field.name}
-                className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3"
-              >
-                <span className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                  {field.label}
-                </span>
-                <div className="mt-2 flex items-center gap-3">
-                  <input
-                    type="number"
-                    step="any"
-                    value={formData[field.name]}
-                    onChange={(event) => updateField(field.name, event.target.value)}
-                    className="w-full bg-transparent text-white text-base outline-none"
-                    placeholder="0"
-                  />
-                  <span className="text-xs text-slate-500 whitespace-nowrap">
-                    {field.unit}
-                  </span>
+      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <Card glow="violet">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <CardHeader>
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
+                  Predictor Input
                 </div>
-              </label>
-            ))}
-          </div>
+                <CardTitle className="mt-2">POST /predict payload</CardTitle>
+                <CardDescription className="mt-2">
+                  Feed manual weather and air-quality values or pull live city data from the Flask service.
+                </CardDescription>
+              </div>
+              <Badge tone="violet">React → Flask</Badge>
+            </CardHeader>
 
-          {apiError ? (
-            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-              {apiError}
+            <div className="rounded-[24px] border border-emerald-400/20 bg-emerald-400/10 px-4 py-4 text-sm text-emerald-100">
+              Live weather mode keeps your API key server-side while still making the demo feel real-time and production-ready.
             </div>
-          ) : (
-            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm text-blue-100">
-              Example request:
-              <span className="text-blue-200"> React -&gt; Flask -&gt; weather API -&gt; model -&gt; risk label</span>
+
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {FIELD_CONFIG.map((field) => (
+                <label
+                  key={field.name}
+                  className="rounded-[22px] border border-white/10 bg-slate-950/55 px-4 py-3"
+                >
+                  <span className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
+                    {field.label}
+                  </span>
+                  <div className="mt-3 flex items-center gap-3">
+                    <input
+                      type="number"
+                      step="any"
+                      value={formData[field.name]}
+                      onChange={(event) => updateField(field.name, event.target.value)}
+                      className="w-full bg-transparent text-base text-white outline-none"
+                      placeholder="0"
+                    />
+                    <span className="whitespace-nowrap text-xs text-slate-500">{field.unit}</span>
+                  </div>
+                </label>
+              ))}
             </div>
-          )}
-        </form>
+
+            {apiError ? (
+              <div className="rounded-[22px] border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
+                {apiError}
+              </div>
+            ) : (
+              <div className="rounded-[22px] border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm text-sky-100">
+                Use presets for a quick demo or enter custom weather data to show the full scoring flow.
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-3">
+              <Button type="button" variant="secondary" leftIcon={RefreshCcw} onClick={() => applyPreset(SAMPLE_RISK_PAYLOAD)}>
+                Reset Sample
+              </Button>
+              <Button type="submit" variant="primary" rightIcon={Send} loading={isSubmitting}>
+                {isSubmitting ? "Predicting Risk" : "Predict Risk"}
+              </Button>
+            </div>
+          </form>
+        </Card>
 
         <div className="space-y-6">
-          <div
-            className={`glass-panel border rounded-3xl p-6 md:p-7 min-h-[280px] ${styles.panel}`}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-400 mb-2">
-                  Risk Response
-                </p>
-                <h2 className="text-2xl font-bold text-white mb-3">
-                  {prediction || "Waiting for prediction"}
-                </h2>
-                <p className="text-sm text-slate-300 max-w-sm">
-                  Current response risk field:
-                  <span className="text-white">
-                    {` { "risk": "${prediction || "Low Risk"}" }`}
-                  </span>
-                </p>
-                {predictionDetails ? (
-                  <p className="text-sm text-slate-400 mt-3 max-w-sm">
-                    Class {predictionDetails.predictionClass} selected with feature mode{" "}
-                    <span className="text-white">{predictionDetails.featureMode}</span>.
-                  </p>
-                ) : null}
-              </div>
-              <div className="p-4 rounded-2xl bg-slate-950/40 border border-white/10">
-                <Activity size={28} className="text-blue-300" />
-              </div>
-            </div>
+          {isSubmitting || isFetchingLiveWeather ? <LoadingPanel title="Scoring disruption risk" /> : null}
 
-            <div className="mt-6 flex flex-wrap gap-3">
-              <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${styles.badge}`}>
-                {prediction || "No result yet"}
-              </span>
-              <span className="px-3 py-1.5 rounded-full text-sm border border-white/10 bg-white/5 text-slate-300">
-                Model ready
-              </span>
-              <span className="px-3 py-1.5 rounded-full text-sm border border-white/10 bg-white/5 text-slate-300">
-                Live weather ready
-              </span>
+          <Card glow={styles.glow}>
+            <CardHeader>
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Risk Response</div>
+                <CardTitle className="mt-2">
+                  {prediction || "Waiting for prediction"}
+                </CardTitle>
+                <CardDescription className="mt-2">
+                  The result is presented as a clear, judge-friendly risk tier instead of raw model output.
+                </CardDescription>
+              </div>
+              <Badge tone={styles.tone} pulse={prediction === "High Risk"}>
+                {prediction || "No result"}
+              </Badge>
+            </CardHeader>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-3">
+              <div className="rounded-[22px] border border-white/10 bg-slate-950/55 p-4">
+                <div className="flex items-center gap-2 text-sm text-slate-400">
+                  <CloudRain size={15} className="text-sky-300" />
+                  Rain
+                </div>
+                <div className="mt-3 text-2xl font-semibold text-white">{submittedPayload.rain} mm</div>
+              </div>
+              <div className="rounded-[22px] border border-white/10 bg-slate-950/55 p-4">
+                <div className="flex items-center gap-2 text-sm text-slate-400">
+                  <Gauge size={15} className="text-amber-300" />
+                  AQ snapshot
+                </div>
+                <div className="mt-3 text-2xl font-semibold text-white">
+                  {Math.max(submittedPayload.pm25, submittedPayload.pm10)}
+                </div>
+              </div>
+              <div className="rounded-[22px] border border-white/10 bg-slate-950/55 p-4">
+                <div className="flex items-center gap-2 text-sm text-slate-400">
+                  <Wind size={15} className="text-cyan-300" />
+                  Gust
+                </div>
+                <div className="mt-3 text-2xl font-semibold text-white">{submittedPayload.gust} km/h</div>
+              </div>
             </div>
 
             {liveWeatherMeta ? (
-              <div className="mt-6 rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                <div className="flex items-center gap-2 text-slate-400 text-sm mb-2">
-                  <MapPin size={15} />
+              <div className="mt-5 rounded-[22px] border border-white/10 bg-slate-950/55 p-4">
+                <div className="flex items-center gap-2 text-sm text-slate-400">
+                  <MapPin size={15} className="text-sky-300" />
                   Live weather source
                 </div>
-                <div className="text-white font-medium">
+                <div className="mt-2 font-semibold text-white">
                   {liveWeatherMeta.name}
                   {liveWeatherMeta.region ? `, ${liveWeatherMeta.region}` : ""}
                   {liveWeatherMeta.country ? `, ${liveWeatherMeta.country}` : ""}
                 </div>
-                <div className="text-sm text-slate-400 mt-1">
-                  Local time: {liveWeatherMeta.localtime || "N/A"}
+                <div className="mt-1 text-sm text-slate-400">
+                  Local time {liveWeatherMeta.localtime || "N/A"}
                 </div>
                 {liveWeatherSource ? (
-                  <div className="text-sm text-slate-400 mt-1">
-                    Source: {liveWeatherSource}
-                  </div>
+                  <div className="mt-1 text-sm text-slate-400">Source: {liveWeatherSource}</div>
                 ) : null}
               </div>
             ) : null}
+          </Card>
 
-            <div className="grid sm:grid-cols-3 gap-4 mt-6">
-              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                <div className="flex items-center gap-2 text-slate-400 text-sm mb-2">
-                  <CloudRain size={15} />
-                  Rain signal
-                </div>
-                <div className="text-2xl font-semibold text-white">
-                  {submittedPayload.rain} mm
-                </div>
+          <Card glow="sky">
+            <CardHeader>
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Response Debug</div>
+                <CardTitle className="mt-2">Confidence breakdown</CardTitle>
               </div>
-
-              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                <div className="flex items-center gap-2 text-slate-400 text-sm mb-2">
-                  <Gauge size={15} />
-                  AQ snapshot
-                </div>
-                <div className="text-2xl font-semibold text-white">
-                  {Math.max(submittedPayload.pm25, submittedPayload.pm10)}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                <div className="flex items-center gap-2 text-slate-400 text-sm mb-2">
-                  <Wind size={15} />
-                  Gust
-                </div>
-                <div className="text-2xl font-semibold text-white">
-                  {submittedPayload.gust} km/h
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 xl:grid-cols-1 gap-6">
+              <Activity size={18} className="text-sky-300" />
+            </CardHeader>
             {predictionDetails ? (
-              <div className="glass-panel border border-white/10 rounded-3xl p-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <Activity size={18} className="text-blue-300" />
-                  <h3 className="text-lg font-semibold text-white">
-                    Response Debug
-                  </h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-[22px] border border-white/10 bg-slate-950/55 p-4">
+                  <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Predicted class</div>
+                  <div className="mt-2 text-3xl font-semibold text-white">{predictionDetails.predictionClass}</div>
                 </div>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                    <div className="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">
-                      Predicted Class
-                    </div>
-                    <div className="text-2xl font-semibold text-white">
-                      {predictionDetails.predictionClass}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-slate-950/35 p-4">
-                    <div className="text-xs uppercase tracking-[0.2em] text-slate-500 mb-2">
-                      Probability Split
-                    </div>
-                    <div className="space-y-1 text-sm text-slate-300">
-                      {Object.entries(predictionDetails.probabilities).map(([label, value]) => (
-                        <div key={label} className="flex items-center justify-between">
-                          <span>{label}</span>
-                          <span className="text-white">{(value * 100).toFixed(1)}%</span>
+                <div className="rounded-[22px] border border-white/10 bg-slate-950/55 p-4">
+                  <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Feature mode</div>
+                  <div className="mt-2 text-lg font-semibold text-white">{predictionDetails.featureMode}</div>
+                </div>
+                <div className="rounded-[22px] border border-white/10 bg-slate-950/55 p-4 sm:col-span-2">
+                  <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Probability split</div>
+                  <div className="mt-3 space-y-3">
+                    {Object.entries(predictionDetails.probabilities).map(([label, value]) => (
+                      <div key={label}>
+                        <div className="mb-2 flex items-center justify-between text-sm">
+                          <span className="text-slate-400">{label}</span>
+                          <span className="font-semibold text-white">{(value * 100).toFixed(1)}%</span>
                         </div>
-                      ))}
-                    </div>
+                        <div className="h-2 rounded-full bg-white/5">
+                          <div
+                            className="h-2 rounded-full bg-gradient-to-r from-sky-300 to-cyan-400"
+                            style={{ width: `${value * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
-            ) : null}
-
-            <div className="glass-panel border border-white/10 rounded-3xl p-6">
-              <div className="flex items-center gap-3 mb-3">
-                <ShieldCheck size={18} className="text-emerald-300" />
-                <h3 className="text-lg font-semibold text-white">
-                  Frontend Integration
-                </h3>
+            ) : (
+              <div className="rounded-[22px] border border-white/10 bg-slate-950/55 p-4 text-sm leading-6 text-slate-400">
+                Run a prediction to surface confidence values and model details.
               </div>
-              <p className="text-sm text-slate-400 leading-relaxed">
-                The page now supports both manual values and city-based realtime
-                weather lookup. Live weather is fetched from the Flask backend so
-                your API key stays hidden on the server side.
-              </p>
-            </div>
+            )}
+          </Card>
 
-            <div className="glass-panel border border-white/10 rounded-3xl p-6">
-              <div className="flex items-center gap-3 mb-3">
-                <AlertTriangle size={18} className="text-amber-300" />
-                <h3 className="text-lg font-semibold text-white">
-                  Error Handling
-                </h3>
+          <Card glow="emerald">
+            <div className="flex items-center gap-3">
+              <ShieldCheck size={18} className="text-emerald-300" />
+              <div>
+                <div className="font-semibold text-white">Frontend integration</div>
+                <div className="text-sm text-slate-400">
+                  Loading states, clearer risk tiers, and city-based live weather make this feel much closer to a real underwriting tool.
+                </div>
               </div>
-              <p className="text-sm text-slate-400 leading-relaxed">
-                Invalid or missing values are blocked in the UI and rechecked in
-                Flask. API failures surface as a friendly message in the same
-                panel, so the page never silently fails.
-              </p>
             </div>
-          </div>
+          </Card>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

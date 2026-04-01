@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -5,36 +7,86 @@
 @layer base {
   :root {
     color-scheme: dark;
+    --app-bg: #050816;
+    --panel-bg: rgba(10, 15, 29, 0.82);
+    --panel-line: rgba(148, 163, 184, 0.14);
+  }
+
+  * {
+    box-sizing: border-box;
   }
 
   html {
     @apply scroll-smooth;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(226, 232, 240, 0.72) rgba(5, 8, 22, 0.96);
+  }
+
+  html::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  html::-webkit-scrollbar-track {
+    background: rgba(5, 8, 22, 0.96);
+  }
+
+  html::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    border: 2px solid rgba(5, 8, 22, 0.96);
+    background: rgba(226, 232, 240, 0.72);
+  }
+
+  html::-webkit-scrollbar-thumb:hover {
+    background: rgba(226, 232, 240, 0.82);
   }
 
   body {
-    @apply bg-slate-950 text-slate-50 antialiased;
+    @apply min-h-screen bg-slate-950 text-slate-50 antialiased;
+    font-family: "Inter", sans-serif;
+    background-color: var(--app-bg);
     background-image:
-      radial-gradient(circle at top left, rgba(14, 165, 233, 0.18), transparent 28%),
-      radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.12), transparent 24%),
-      linear-gradient(180deg, #020617 0%, #020617 46%, #06111f 100%);
+      radial-gradient(circle at 12% 10%, rgba(34, 211, 238, 0.08), transparent 22%),
+      radial-gradient(circle at 82% 16%, rgba(99, 102, 241, 0.1), transparent 24%),
+      linear-gradient(180deg, #050816 0%, #070b15 52%, #060912 100%);
     background-attachment: fixed;
+  }
+
+  #root {
     min-height: 100vh;
   }
 
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-display {
+    font-family: "Poppins", sans-serif;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
   ::selection {
-    background: rgba(14, 165, 233, 0.35);
+    background: rgba(56, 189, 248, 0.32);
     color: #f8fafc;
   }
 }
 
 @layer components {
   .glass-panel {
-    background: linear-gradient(180deg, rgba(15, 23, 42, 0.88), rgba(2, 6, 23, 0.92));
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    border: 1px solid rgba(148, 163, 184, 0.14);
+    background:
+      linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(9, 13, 27, 0.96)),
+      rgba(10, 15, 29, 0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--panel-line);
     box-shadow:
-      0 20px 50px rgba(2, 6, 23, 0.28),
+      0 14px 40px rgba(2, 6, 23, 0.26),
       inset 0 1px 0 rgba(255, 255, 255, 0.04);
     transition:
       transform 180ms ease,
@@ -43,18 +95,18 @@
   }
 
   .glass-panel:hover {
-    border-color: rgba(148, 163, 184, 0.22);
+    border-color: rgba(255, 255, 255, 0.14);
     box-shadow:
-      0 24px 60px rgba(2, 6, 23, 0.36),
-      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      0 18px 44px rgba(2, 6, 23, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 
   .page-shell {
-    @apply mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 md:py-8 xl:px-8;
+    @apply mx-auto flex w-full max-w-[1600px] flex-col gap-6 pl-4 pr-6 py-6 md:pl-6 md:pr-8 md:py-8 xl:pl-8 xl:pr-10;
   }
 
   .text-gradient {
-    background: linear-gradient(90deg, #e2e8f0, #7dd3fc);
+    background: linear-gradient(90deg, #f8fafc 0%, #7dd3fc 38%, #c4b5fd 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -64,7 +116,8 @@
     background-image:
       linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
       linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
-    background-size: 36px 36px;
+    background-size: 40px 40px;
+    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.95), transparent 92%);
   }
 }
 
@@ -76,5 +129,55 @@
 
   .hide-scrollbar::-webkit-scrollbar {
     display: none;
+  }
+
+  .animate-shimmer {
+    animation: shimmer 1.7s linear infinite;
+  }
+
+  .risk-pulse {
+    animation: dangerPulse 1.8s ease-in-out infinite;
+  }
+
+  .scan-ring {
+    animation: scanRing 1.8s ease-out infinite;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes dangerPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(251, 113, 133, 0.18);
+  }
+
+  50% {
+    box-shadow: 0 0 0 10px rgba(251, 113, 133, 0.02);
+  }
+}
+
+@keyframes scanRing {
+  0% {
+    opacity: 0.2;
+    transform: scale(0.72);
+  }
+
+  70% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.25);
   }
 }

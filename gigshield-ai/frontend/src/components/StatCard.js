@@ -1,11 +1,13 @@
 import React from "react";
-import clsx from "clsx";
+import Card from "./ui/Card";
+import Badge from "./ui/Badge";
 
 const ACCENTS = {
-  sky: "from-sky-500/18 to-sky-500/0 text-sky-200 border-sky-500/20",
-  emerald: "from-emerald-500/18 to-emerald-500/0 text-emerald-200 border-emerald-500/20",
-  amber: "from-amber-500/18 to-amber-500/0 text-amber-200 border-amber-500/20",
-  rose: "from-rose-500/18 to-rose-500/0 text-rose-200 border-rose-500/20",
+  sky: "sky",
+  emerald: "emerald",
+  amber: "amber",
+  rose: "rose",
+  violet: "violet",
 };
 
 export default function StatCard({
@@ -16,38 +18,36 @@ export default function StatCard({
   accent = "sky",
   hint,
   trend,
+  pulse = false,
 }) {
   return (
-    <div
-      className={clsx(
-        "glass-panel rounded-3xl border bg-gradient-to-br p-5",
-        ACCENTS[accent] || ACCENTS.sky
-      )}
-    >
+    <Card glow={ACCENTS[accent] || "sky"} interactive className="h-full">
       <div className="flex items-start justify-between gap-4">
-        <div className="space-y-2">
+        <div className="space-y-3">
           <p className="text-sm font-medium text-slate-400">{title}</p>
-          <div className="text-3xl font-semibold tracking-tight text-white">{value}</div>
+          <div className="font-display text-3xl font-semibold tracking-tight text-white md:text-[2rem]">
+            {value}
+          </div>
           {subtitle ? <p className="text-sm leading-6 text-slate-400">{subtitle}</p> : null}
         </div>
 
         {Icon ? (
-          <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-3 text-white">
+          <div className="rounded-[22px] border border-white/10 bg-slate-950/55 p-3 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
             <Icon size={20} />
           </div>
         ) : null}
       </div>
 
       {(hint || trend) && (
-        <div className="mt-5 flex flex-wrap items-center gap-3 text-xs">
+        <div className="mt-6 flex flex-wrap items-center gap-3">
           {trend ? (
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
+            <Badge tone={accent === "rose" ? "danger" : accent === "amber" ? "warning" : accent === "emerald" ? "success" : "info"} pulse={pulse}>
               {trend}
-            </span>
+            </Badge>
           ) : null}
-          {hint ? <span className="text-slate-500">{hint}</span> : null}
+          {hint ? <span className="text-sm text-slate-500">{hint}</span> : null}
         </div>
       )}
-    </div>
+    </Card>
   );
 }

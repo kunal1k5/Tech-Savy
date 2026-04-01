@@ -2,7 +2,11 @@ import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Bike, MapPinned, Shield } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { saveDemoSession } from "../utils/auth";
+import Badge from "../components/ui/Badge";
+import Button from "../components/ui/Button";
+import Card from "../components/ui/Card";
+import { registerWorker } from "../services/demoFlow";
+import { saveAuthSession } from "../utils/auth";
 
 const INITIAL_FORM = {
   fullName: "",
@@ -39,81 +43,83 @@ export default function Register() {
 
     setLoading(true);
 
-    window.setTimeout(() => {
-      saveDemoSession({
-        fullName: form.fullName.trim(),
-        phone: form.phone.replace(/\D/g, ""),
-        city: form.city,
-        zone: form.zone,
-        platform: form.platform,
-        weeklyIncome: Number(form.weeklyIncome),
+    registerWorker({
+      fullName: form.fullName.trim(),
+      phone: form.phone.replace(/\D/g, ""),
+      city: form.city,
+      zone: form.zone,
+      platform: form.platform,
+      weeklyIncome: Number(form.weeklyIncome),
+    })
+      .then((response) => {
+        saveAuthSession(response);
+        navigate("/dashboard", { replace: true });
+      })
+      .catch((registerError) => {
+        setError(registerError.response?.data?.error || "Could not create profile right now.");
+      })
+      .finally(() => {
+        setLoading(false);
       });
-      navigate("/dashboard", { replace: true });
-    }, 900);
   }
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-8 text-slate-50">
       <div className="pointer-events-none absolute inset-0 fintech-grid opacity-30" />
-      <div className="pointer-events-none absolute left-[12%] top-[10%] h-72 w-72 rounded-full bg-sky-600/20 blur-[120px]" />
-      <div className="pointer-events-none absolute right-[10%] top-[35%] h-72 w-72 rounded-full bg-emerald-600/15 blur-[120px]" />
+      <div className="pointer-events-none absolute left-[10%] top-[10%] h-80 w-80 rounded-full bg-sky-500/[0.16] blur-[150px]" />
+      <div className="pointer-events-none absolute right-[8%] top-[30%] h-80 w-80 rounded-full bg-violet-500/[0.16] blur-[150px]" />
 
-      <motion.div
-        initial={{ opacity: 0, y: 18 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-6xl"
-      >
-        <div className="grid overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/80 shadow-[0_30px_90px_rgba(2,6,23,0.55)] backdrop-blur-xl lg:grid-cols-[0.92fr_1.08fr]">
-          <div className="border-b border-white/5 bg-gradient-to-br from-slate-950 to-slate-900 p-8 lg:border-b-0 lg:border-r">
+      <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-6xl">
+        <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
+          <Card glow="violet">
             <div className="flex items-center gap-3">
-              <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 p-3">
-                <Shield className="fill-sky-400/15 text-sky-300" size={24} />
+              <div className="grid h-12 w-12 place-items-center rounded-[20px] border border-sky-400/25 bg-sky-400/10">
+                <Shield className="fill-sky-300/15 text-sky-200" size={20} />
               </div>
               <div>
-                <div className="text-xl font-semibold">GigShield</div>
-                <div className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                <div className="font-display text-2xl font-semibold text-white">GigShield</div>
+                <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
                   Demo onboarding
                 </div>
               </div>
             </div>
 
-            <div className="mt-10 space-y-6">
+            <div className="mt-12 space-y-6">
+              <Badge tone="info" className="w-fit">Worker profile setup</Badge>
               <div>
-                <div className="text-sm uppercase tracking-[0.24em] text-slate-500">
-                  Why this setup works
-                </div>
-                <h1 className="mt-3 text-4xl font-semibold leading-tight text-white">
-                  Create a realistic worker profile in under one minute.
+                <h1 className="font-display text-5xl font-semibold leading-tight text-white">
+                  Create a realistic profile in under a minute.
                 </h1>
+                <p className="mt-4 text-base leading-8 text-slate-300">
+                  This onboarding flow sets up the worker context used across the dashboard, claim simulator, and payout story.
+                </p>
               </div>
 
               <div className="space-y-4">
                 {[
-                  "Pre-fills a worker identity for the dashboard and claim simulator",
-                  "Lets judges switch city, zone, and platform context quickly",
-                  "Keeps the flow fully interactive without backend dependency",
+                  "Pre-fills worker identity across the product",
+                  "Lets judges switch platform and zone context quickly",
+                  "Keeps the whole experience interactive with zero backend friction",
                 ].map((item) => (
-                  <div
-                    key={item}
-                    className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300"
-                  >
+                  <div key={item} className="rounded-[22px] border border-white/10 bg-slate-950/55 px-4 py-4 text-sm text-slate-300">
                     {item}
                   </div>
                 ))}
               </div>
             </div>
-          </div>
+          </Card>
 
-          <div className="p-6 sm:p-8 lg:p-10">
+          <Card glow="sky">
             <div className="mx-auto max-w-xl">
-              <div className="mb-8 flex items-center justify-between">
+              <div className="mb-8 flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-xs uppercase tracking-[0.24em] text-slate-500">
-                    Worker profile
-                  </div>
-                  <h2 className="mt-2 text-3xl font-semibold text-white">
+                  <Badge tone="violet" className="w-fit">Worker profile</Badge>
+                  <h2 className="mt-4 font-display text-4xl font-semibold text-white">
                     Set up your demo account
                   </h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-400">
+                    Create the demo user that powers the live GigShield experience.
+                  </p>
                 </div>
                 <Link to="/" className="text-sm text-slate-400 transition hover:text-white">
                   Back
@@ -127,7 +133,7 @@ export default function Register() {
                     value={form.fullName}
                     onChange={(event) => updateField("fullName", event.target.value)}
                     placeholder="Rahul Singh"
-                    className="mt-3 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white placeholder-slate-500 outline-none transition focus:border-sky-500/30 focus:ring-2 focus:ring-sky-500/20"
+                    className="mt-3 w-full rounded-[22px] border border-white/10 bg-slate-950/55 px-4 py-3 text-white placeholder-slate-500 outline-none transition focus:border-sky-400/30 focus:ring-2 focus:ring-sky-400/20"
                   />
                 </label>
 
@@ -139,7 +145,7 @@ export default function Register() {
                       updateField("phone", event.target.value.replace(/\D/g, "").slice(0, 10))
                     }
                     placeholder="9876543210"
-                    className="mt-3 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white placeholder-slate-500 outline-none transition focus:border-sky-500/30 focus:ring-2 focus:ring-sky-500/20"
+                    className="mt-3 w-full rounded-[22px] border border-white/10 bg-slate-950/55 px-4 py-3 text-white placeholder-slate-500 outline-none transition focus:border-sky-400/30 focus:ring-2 focus:ring-sky-400/20"
                   />
                 </label>
 
@@ -148,7 +154,7 @@ export default function Register() {
                   <select
                     value={form.platform}
                     onChange={(event) => updateField("platform", event.target.value)}
-                    className="mt-3 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none transition focus:border-sky-500/30 focus:ring-2 focus:ring-sky-500/20"
+                    className="mt-3 w-full rounded-[22px] border border-white/10 bg-slate-950/55 px-4 py-3 text-white outline-none transition focus:border-sky-400/30 focus:ring-2 focus:ring-sky-400/20"
                   >
                     <option>Swiggy</option>
                     <option>Zomato</option>
@@ -163,7 +169,7 @@ export default function Register() {
                     <input
                       value={form.city}
                       onChange={(event) => updateField("city", event.target.value)}
-                      className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 pr-10 text-white outline-none transition focus:border-sky-500/30 focus:ring-2 focus:ring-sky-500/20"
+                      className="w-full rounded-[22px] border border-white/10 bg-slate-950/55 px-4 py-3 pr-10 text-white outline-none transition focus:border-sky-400/30 focus:ring-2 focus:ring-sky-400/20"
                     />
                     <MapPinned className="absolute right-3 top-3.5 text-slate-500" size={18} />
                   </div>
@@ -174,45 +180,35 @@ export default function Register() {
                   <input
                     value={form.zone}
                     onChange={(event) => updateField("zone", event.target.value)}
-                    className="mt-3 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none transition focus:border-sky-500/30 focus:ring-2 focus:ring-sky-500/20"
+                    className="mt-3 w-full rounded-[22px] border border-white/10 bg-slate-950/55 px-4 py-3 text-white outline-none transition focus:border-sky-400/30 focus:ring-2 focus:ring-sky-400/20"
                   />
                 </label>
 
                 <label className="sm:col-span-2">
-                  <span className="text-sm font-medium text-slate-300">
-                    Average weekly income
-                  </span>
+                  <span className="text-sm font-medium text-slate-300">Average weekly income</span>
                   <div className="relative mt-3">
                     <input
                       value={form.weeklyIncome}
-                      onChange={(event) =>
-                        updateField("weeklyIncome", event.target.value.replace(/\D/g, ""))
-                      }
-                      className="w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 pr-10 text-white outline-none transition focus:border-sky-500/30 focus:ring-2 focus:ring-sky-500/20"
+                      onChange={(event) => updateField("weeklyIncome", event.target.value.replace(/\D/g, ""))}
+                      className="w-full rounded-[22px] border border-white/10 bg-slate-950/55 px-4 py-3 pr-10 text-white outline-none transition focus:border-sky-400/30 focus:ring-2 focus:ring-sky-400/20"
                     />
                     <Bike className="absolute right-3 top-3.5 text-slate-500" size={18} />
                   </div>
                 </label>
 
                 {error ? (
-                  <div className="sm:col-span-2 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                  <div className="sm:col-span-2 rounded-[22px] border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
                     {error}
                   </div>
                 ) : (
-                  <div className="sm:col-span-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                    This flow creates a local demo profile and takes you directly into the
-                    product workspace.
+                  <div className="sm:col-span-2 rounded-[22px] border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
+                    This profile creates a live demo user and starts the protected GigShield flow immediately.
                   </div>
                 )}
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="sm:col-span-2 inline-flex items-center justify-center gap-2 rounded-2xl bg-sky-600 px-5 py-4 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {loading ? "Creating profile..." : "Create demo account"}
-                  <ArrowRight size={16} />
-                </button>
+                <Button type="submit" variant="primary" block size="lg" loading={loading} rightIcon={ArrowRight} className="sm:col-span-2">
+                  {loading ? "Creating profile" : "Create demo account"}
+                </Button>
               </form>
 
               <div className="mt-6 text-center text-sm text-slate-500">
@@ -223,7 +219,7 @@ export default function Register() {
                 .
               </div>
             </div>
-          </div>
+          </Card>
         </div>
       </motion.div>
     </div>

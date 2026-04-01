@@ -1,22 +1,21 @@
 import React from "react";
+import Badge from "./Badge";
 
 export default function SectionHeader({ eyebrow, title, description, action }) {
   return (
-    <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-      <div className="space-y-2">
+    <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="max-w-3xl space-y-3">
         {eyebrow ? (
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+          <Badge tone="violet" size="sm" className="w-fit">
             {eyebrow}
-          </p>
+          </Badge>
         ) : null}
-        <div className="space-y-2">
-          <h2 className="text-2xl font-semibold tracking-tight text-white md:text-3xl">
+        <div className="space-y-3">
+          <h2 className="font-display text-3xl font-semibold tracking-tight text-white md:text-4xl">
             {title}
           </h2>
           {description ? (
-            <p className="max-w-3xl text-sm leading-6 text-slate-400 md:text-base">
-              {description}
-            </p>
+            <p className="text-sm leading-7 text-slate-400 md:text-base">{description}</p>
           ) : null}
         </div>
       </div>

@@ -20,11 +20,13 @@ const triggerRoutes = require("./routes/trigger.routes");
 const paymentRoutes = require("./routes/payment.routes");
 const adminRoutes = require("./routes/admin.routes");
 const riskRoutes = require("./routes/risk.routes");
+const demoRoutes = require("./routes/demo.routes");
 
 // Middleware
 const { errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
+app.set("etag", false);
 
 function getAllowedOrigins() {
   const configuredOrigins = [
@@ -82,6 +84,7 @@ app.use("/api/triggers", triggerRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/risk", riskRoutes);
+app.use("/api", demoRoutes);
 
 // ── 404 Catch-All ───────────────────────────────────────────
 app.use((_req, res) => {

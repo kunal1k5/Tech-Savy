@@ -1,4 +1,5 @@
 import React from "react";
+import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -8,163 +9,157 @@ import {
   Siren,
   Wallet,
 } from "lucide-react";
+import Badge from "../components/ui/Badge";
+import Card from "../components/ui/Card";
+import { buttonStyles } from "../components/ui/Button";
 import { isAuthenticated } from "../utils/auth";
 
 const features = [
   {
     icon: CloudRain,
-    title: "Event detection",
+    title: "Trigger-led protection",
     description:
-      "Weather, AQI, and slowdown signals are watched continuously so disruption thresholds are caught early.",
+      "Weather, AQI, and route slowdown signals create claims automatically when disruption crosses policy thresholds.",
   },
   {
     icon: Siren,
-    title: "Automated claim flow",
+    title: "Visual claim lifecycle",
     description:
-      "Claims move from detection to review to payout with clear timestamps and status history.",
+      "Claims move from Created to Processing to Paid with visible timestamps, rupee values, and payout timing.",
   },
   {
     icon: MapPinned,
-    title: "Fraud controls",
+    title: "Fraud-aware payout flow",
     description:
-      "Route consistency and rapid-repeat checks help separate normal claims from suspicious movement patterns.",
+      "Route consistency checks and anomaly detection stay visible without making the product feel overly technical.",
   },
 ];
 
 const stats = [
   { label: "Average payout window", value: "4 min" },
-  { label: "Signals monitored per zone", value: "14" },
-  { label: "Weekly cover entry point", value: "INR 15" },
+  { label: "Signals watched per zone", value: "14" },
+  { label: "Starter cover", value: "₹15 / week" },
 ];
 
 export default function Landing() {
   const homeCta = isAuthenticated() ? "/dashboard" : "/register";
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-50">
+    <div className="relative min-h-screen overflow-hidden text-slate-50">
       <div className="pointer-events-none absolute inset-0 fintech-grid opacity-30" />
-      <div className="pointer-events-none absolute left-[-10%] top-[-8%] h-[30rem] w-[30rem] rounded-full bg-sky-700/20 blur-[150px]" />
-      <div className="pointer-events-none absolute right-[-10%] top-[25%] h-[28rem] w-[28rem] rounded-full bg-emerald-700/15 blur-[140px]" />
+      <div className="pointer-events-none absolute left-[-8%] top-[-8%] h-[34rem] w-[34rem] rounded-full bg-sky-500/[0.16] blur-[180px]" />
+      <div className="pointer-events-none absolute right-[-8%] top-[20%] h-[28rem] w-[28rem] rounded-full bg-violet-500/[0.18] blur-[160px]" />
+      <div className="pointer-events-none absolute bottom-[-14%] right-[16%] h-[24rem] w-[24rem] rounded-full bg-cyan-500/[0.14] blur-[150px]" />
 
-      <div className="relative z-10 mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-6 md:px-6 lg:px-8">
-        <header className="flex items-center justify-between rounded-full border border-white/10 bg-slate-950/70 px-4 py-3 backdrop-blur-xl">
+      <div className="relative z-10 mx-auto flex min-h-screen max-w-[1600px] flex-col px-4 py-6 md:px-6 lg:px-8">
+        <header className="glass-panel flex items-center justify-between rounded-[30px] px-4 py-4 md:px-6">
           <div className="flex items-center gap-3">
-            <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 p-2.5">
-              <Shield className="fill-sky-400/15 text-sky-300" size={20} />
+            <div className="grid h-12 w-12 place-items-center rounded-[20px] border border-sky-400/25 bg-sky-400/10">
+              <Shield className="fill-sky-300/15 text-sky-200" size={20} />
             </div>
             <div>
-              <div className="text-lg font-semibold tracking-tight">GigShield</div>
-              <div className="text-xs uppercase tracking-[0.24em] text-slate-500">
-                Data-driven income cover
+              <div className="font-display text-xl font-semibold">GigShield</div>
+              <div className="text-[11px] uppercase tracking-[0.26em] text-slate-500">
+                Income Protection OS
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <Link
-              to="/login"
-              className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-300 transition hover:border-white/20 hover:bg-white/5 hover:text-white"
-            >
+            <Link to="/login" className={buttonStyles({ variant: "ghost" })}>
               Sign in
             </Link>
-            <Link
-              to={homeCta}
-              className="rounded-full bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-500"
-            >
-              {isAuthenticated() ? "Open dashboard" : "Start demo"}
+            <Link to={homeCta} className={buttonStyles({ variant: "primary" })}>
+              {isAuthenticated() ? "Open Dashboard" : "Start Demo"}
             </Link>
           </div>
         </header>
 
         <main className="flex flex-1 items-center py-10 lg:py-16">
-          <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.9fr]">
-            <div className="space-y-8">
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-200">
-                <Wallet size={16} />
-                Payout-ready protection for delivery and mobility workers
-              </div>
+          <div className="grid w-full items-center gap-10 lg:grid-cols-[1.08fr_0.92fr]">
+            <motion.div
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-8"
+            >
+              <Badge tone="success" className="w-fit">
+                Payout-ready cover for delivery and mobility workers
+              </Badge>
 
-              <div className="space-y-6">
-                <h1 className="max-w-4xl text-4xl font-semibold leading-tight text-white md:text-6xl">
-                  Protect earnings with
-                  <span className="text-gradient"> automated, risk-based cover</span>
-                  {" "}that feels real in a live demo.
+              <div className="space-y-5">
+                <h1 className="font-display max-w-5xl text-5xl font-semibold leading-[1.05] text-white md:text-7xl">
+                  Gig worker income protection that
+                  <span className="text-gradient"> looks and feels production-ready.</span>
                 </h1>
                 <p className="max-w-2xl text-base leading-8 text-slate-300 md:text-lg">
-                  GigShield combines disruption monitoring, automated claim handling,
-                  and fraud checks into one polished workflow for gig worker income protection.
+                  GigShield combines live disruption monitoring, automated claims, and fraud checks into one premium fintech workflow designed to impress judges and feel intuitive for users.
                 </p>
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row">
-                <Link
-                  to={homeCta}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-500"
-                >
-                  {isAuthenticated() ? "Open Dashboard" : "Launch Product Demo"}
+                <Link to={homeCta} className={buttonStyles({ variant: "primary", size: "lg" })}>
+                  {isAuthenticated() ? "Launch Dashboard" : "Launch Product Demo"}
                   <ArrowRight size={16} />
                 </Link>
-                <Link
-                  to="/register"
-                  className="inline-flex items-center justify-center rounded-2xl border border-white/10 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-white/20 hover:bg-white/5"
-                >
+                <Link to="/register" className={buttonStyles({ variant: "secondary", size: "lg" })}>
                   Create Demo Account
                 </Link>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-3">
                 {stats.map((stat) => (
-                  <div
-                    key={stat.label}
-                    className="glass-panel rounded-3xl border border-white/10 px-5 py-4"
-                  >
-                    <div className="text-2xl font-semibold text-white">{stat.value}</div>
+                  <Card key={stat.label} glow="sky" padding="md">
+                    <div className="font-display text-3xl font-semibold text-white">{stat.value}</div>
                     <div className="mt-2 text-sm text-slate-400">{stat.label}</div>
-                  </div>
+                  </Card>
                 ))}
               </div>
-            </div>
+            </motion.div>
 
-            <div className="glass-panel rounded-[2rem] border border-white/10 p-6 md:p-8">
-              <div className="flex items-center justify-between border-b border-white/5 pb-5">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.24em] text-slate-500">
-                    What judges can explore
-                  </div>
-                  <div className="mt-2 text-2xl font-semibold text-white">
-                    One product story, four linked flows
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-sky-500/20 bg-sky-500/10 p-3 text-sky-200">
-                  <Shield size={22} />
-                </div>
-              </div>
-
-              <div className="mt-6 space-y-4">
-                {features.map((feature) => {
-                  const Icon = feature.icon;
-
-                  return (
-                    <div
-                      key={feature.title}
-                      className="rounded-3xl border border-white/10 bg-slate-950/60 p-5 transition hover:border-white/15 hover:bg-white/5"
-                    >
-                      <div className="flex items-start gap-4">
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-slate-100">
-                          <Icon size={18} />
-                        </div>
-                        <div>
-                          <div className="text-lg font-medium text-white">{feature.title}</div>
-                          <p className="mt-2 text-sm leading-6 text-slate-400">
-                            {feature.description}
-                          </p>
-                        </div>
-                      </div>
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.08 }}
+            >
+              <Card glow="violet">
+                <div className="flex items-center justify-between border-b border-white/10 pb-5">
+                  <div>
+                    <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
+                      Product Story
                     </div>
-                  );
-                })}
-              </div>
-            </div>
+                    <div className="mt-2 font-display text-3xl font-semibold text-white">
+                      One platform, four linked flows
+                    </div>
+                  </div>
+                  <div className="grid h-12 w-12 place-items-center rounded-[20px] border border-white/10 bg-slate-950/55 text-white">
+                    <Wallet size={18} />
+                  </div>
+                </div>
+
+                <div className="mt-6 space-y-4">
+                  {features.map((feature) => {
+                    const Icon = feature.icon;
+                    return (
+                      <motion.div
+                        key={feature.title}
+                        whileHover={{ x: 4 }}
+                        className="rounded-[24px] border border-white/10 bg-slate-950/55 p-5"
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className="grid h-12 w-12 place-items-center rounded-[18px] border border-white/10 bg-white/5 text-white">
+                            <Icon size={18} />
+                          </div>
+                          <div>
+                            <div className="text-lg font-semibold text-white">{feature.title}</div>
+                            <p className="mt-2 text-sm leading-7 text-slate-400">{feature.description}</p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </Card>
+            </motion.div>
           </div>
         </main>
       </div>
