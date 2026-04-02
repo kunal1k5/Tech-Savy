@@ -46,7 +46,11 @@ export default function Login() {
       const response = await requestOtp(phone);
       setSessionId(response.sessionId);
       setStep(2);
-      setMessage("OTP sent. Use 1234 to continue.");
+      setMessage(
+        response.fallbackMode === "offline_demo"
+          ? "API is offline. Switched to local demo mode. Use OTP 1234 to continue."
+          : "OTP sent. Use 1234 to continue."
+      );
     } catch (requestError) {
       setError(requestError.response?.data?.error || "Could not send OTP. Try again.");
     } finally {
@@ -140,7 +144,11 @@ export default function Login() {
       setSessionId(response.sessionId);
       setOtp(new Array(4).fill(""));
       setError("");
-      setMessage("Fresh OTP sent. Continue with 1234.");
+      setMessage(
+        response.fallbackMode === "offline_demo"
+          ? "Fresh local demo OTP ready. Continue with 1234."
+          : "Fresh OTP sent. Continue with 1234."
+      );
       inputRefs.current[0]?.focus();
     } catch (requestError) {
       setError(requestError.response?.data?.error || "Could not resend OTP.");
