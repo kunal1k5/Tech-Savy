@@ -44,6 +44,8 @@ export function saveAuthSession({ token, user }) {
 
   if (token) {
     saveToken(token);
+  } else {
+    removeToken();
   }
 
   if (normalizedUser) {

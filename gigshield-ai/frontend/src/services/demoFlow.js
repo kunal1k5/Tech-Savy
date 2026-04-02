@@ -1,23 +1,221 @@
 import api from "./api";
 
+const OFFLINE_OTP_CODE = "1234";
+const OFFLINE_OTP_TTL_MS = 5 * 60 * 1000;
+const OFFLINE_OTP_SESSIONS_KEY = "gigshield_offline_otp_sessions";
+const OFFLINE_USERS_KEY = "gigshield_offline_users";
+
+function sanitizePhone(phone) {
+  return String(phone || "").replace(/\D/g, "").slice(0, 10);
+}
+
+function readStorage(key, fallbackValue) {
+  if (typeof window === "undefined") {
+    return fallbackValue;
+  }
+
+  try {
+    const rawValue = localStorage.getItem(key);
+    return rawValue ? JSON.parse(rawValue) : fallbackValue;
+  } catch {
+    localStorage.removeItem(key);
+    return fallbackValue;
+  }
+}
+
+function writeStorage(key, value) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+function createDemoError(message, status = 400) {
+  const error = new Error(message);
+  error.response = {
+    status,
+    data: { error: message },
+  };
+  return error;
+}
+
+function shouldUseOfflineFallback(error) {
+  return !error?.response;
+}
+
+function createOfflineSessionId() {
+  return `offline-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function buildOfflineUser(profile = {}) {
+  const phone = sanitizePhone(profile.phone);
+
+  return {
+    id: profile.id || `demo-user-${phone || Math.random().toString(36).slice(2, 8)}`,
+    full_name: profile.full_name || profile.fullName || "Rahul Singh",
+    phone,
+    city: profile.city || "Bengaluru",
+    zone: profile.zone || "Koramangala",
+    platform: profile.platform || "Swiggy",
+    weekly_income: Number(profile.weekly_income ?? profile.weeklyIncome) || 18350,
+  };
+}
+
+function getOfflineUsers() {
+  return readStorage(OFFLINE_USERS_KEY, {});
+}
+
+function saveOfflineUser(profile = {}) {
+  const phone = sanitizePhone(profile.phone);
+  if (phone.length !== 10) {
+    throw createDemoError("A valid 10-digit mobile number is required.");
+  }
+
+  const currentUsers = getOfflineUsers();
+  const nextUser = buildOfflineUser({
+    ...currentUsers[phone],
+    ...profile,
+    phone,
+  });
+
+  writeStorage(OFFLINE_USERS_KEY, {
+    ...currentUsers,
+    [phone]: nextUser,
+  });
+
+  return nextUser;
+}
+
+function getOfflineUser(phone) {
+  const sanitizedPhone = sanitizePhone(phone);
+  if (!sanitizedPhone) {
+    return null;
+  }
+
+  return getOfflineUsers()[sanitizedPhone] || null;
+}
+
+function requestOfflineOtp(phone) {
+  const sanitizedPhone = sanitizePhone(phone);
+  if (sanitizedPhone.length !== 10) {
+    throw createDemoError("A valid 10-digit mobile number is required.");
+  }
+
+  const sessionId = createOfflineSessionId();
+  const sessions = readStorage(OFFLINE_OTP_SESSIONS_KEY, {});
+
+  writeStorage(OFFLINE_OTP_SESSIONS_KEY, {
+    ...sessions,
+    [sessionId]: {
+      phone: sanitizedPhone,
+      expiresAt: Date.now() + OFFLINE_OTP_TTL_MS,
+    },
+  });
+
+  return {
+    sessionId,
+    phone: sanitizedPhone,
+    otp: OFFLINE_OTP_CODE,
+    message: "API unavailable. Offline demo mode is active.",
+    fallbackMode: "offline_demo",
+  };
+}
+
+function verifyOfflineOtp({ sessionId, phone, otp, profile }) {
+  const sanitizedPhone = sanitizePhone(phone);
+  if (sanitizedPhone.length !== 10) {
+    throw createDemoError("A valid 10-digit mobile number is required.");
+  }
+
+  if (String(otp) !== OFFLINE_OTP_CODE) {
+    throw createDemoError("Invalid OTP. Use 1234 for the demo.", 401);
+  }
+
+  if (sessionId?.startsWith("offline-")) {
+    const sessions = readStorage(OFFLINE_OTP_SESSIONS_KEY, {});
+    const session = sessions[sessionId];
+
+    if (!session || session.phone !== sanitizedPhone || session.expiresAt < Date.now()) {
+      throw createDemoError("OTP session expired. Please request a new OTP.");
+    }
+
+    delete sessions[sessionId];
+    writeStorage(OFFLINE_OTP_SESSIONS_KEY, sessions);
+  }
+
+  const existingUser = getOfflineUser(sanitizedPhone);
+  const user = existingUser
+    ? saveOfflineUser({
+        ...existingUser,
+        ...profile,
+        phone: sanitizedPhone,
+      })
+    : saveOfflineUser({
+        fullName: "Rahul Singh",
+        city: "Bengaluru",
+        zone: "Koramangala",
+        platform: "Swiggy",
+        weeklyIncome: 18350,
+        ...profile,
+        phone: sanitizedPhone,
+      });
+
+  return {
+    user,
+    fallbackMode: "offline_demo",
+  };
+}
+
+function registerOfflineWorker(profile = {}) {
+  return {
+    user: saveOfflineUser(profile),
+    fallbackMode: "offline_demo",
+  };
+}
+
 export async function requestOtp(phone) {
-  const response = await api.post("/auth/login", { phone });
-  return response.data;
+  try {
+    const response = await api.post("/auth/login", { phone });
+    return response.data;
+  } catch (error) {
+    if (!shouldUseOfflineFallback(error)) {
+      throw error;
+    }
+
+    return requestOfflineOtp(phone);
+  }
 }
 
 export async function verifyOtp({ sessionId, phone, otp, profile }) {
-  const response = await api.post("/auth/verify-otp", {
-    sessionId,
-    phone,
-    otp,
-    profile,
-  });
-  return response.data;
+  try {
+    const response = await api.post("/auth/verify-otp", {
+      sessionId,
+      phone,
+      otp,
+      profile,
+    });
+    return response.data;
+  } catch (error) {
+    if (!shouldUseOfflineFallback(error)) {
+      throw error;
+    }
+
+    return verifyOfflineOtp({ sessionId, phone, otp, profile });
+  }
 }
 
 export async function registerWorker(profile) {
-  const response = await api.post("/auth/register", profile);
-  return response.data;
+  try {
+    const response = await api.post("/auth/register", profile);
+    return response.data;
+  } catch (error) {
+    if (!shouldUseOfflineFallback(error)) {
+      throw error;
+    }
+
+    return registerOfflineWorker(profile);
+  }
 }
 
 export async function getPolicyState() {
