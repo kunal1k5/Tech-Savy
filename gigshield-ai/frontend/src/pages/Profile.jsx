@@ -15,7 +15,7 @@ import InputField from "../components/profile/InputField";
 import ProfileCard from "../components/profile/ProfileCard";
 import SurfaceButton from "../components/ui/SurfaceButton";
 import StatusBadge from "../components/ui/StatusBadge";
-import { getUserFromToken } from "../utils/auth";
+import { getToken, getUserFromToken, saveAuthSession } from "../utils/auth";
 import { getAuthRiskProfile } from "../utils/authRisk";
 import { cn } from "../utils/cn";
 import { useGigShieldData } from "../context/GigShieldDataContext";
@@ -335,6 +335,21 @@ export default function Profile() {
       toast.error("Complete all personal details first.");
       return;
     }
+
+    const mergedUser = {
+      ...(sessionUser || {}),
+      full_name: personalDetails.fullName.trim(),
+      phone: personalDetails.mobileNumber,
+      city: personalDetails.city.trim(),
+      zone: personalDetails.city.trim(),
+      work_type: personalDetails.workType,
+      platform: sessionUser?.platform || platformState.worker.platform,
+    };
+
+    saveAuthSession({
+      token: getToken(),
+      user: mergedUser,
+    });
 
     toast.success("Profile details saved.");
   }

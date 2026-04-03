@@ -9,6 +9,7 @@ import StatusBadge from "../components/ui/StatusBadge";
 import SurfaceButton from "../components/ui/SurfaceButton";
 import SurfaceLoadingPanel from "../components/ui/SurfaceLoadingPanel";
 import { useGigShieldData } from "../context/GigShieldDataContext";
+import useLiveBackendData from "../hooks/useLiveBackendData";
 import { formatINR } from "../utils/helpers";
 
 const pageVariants = {
@@ -63,10 +64,28 @@ function getPlanSources(plans = []) {
   };
 }
 
+function normalizeRiskLabel(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "high") {
+    return "High";
+  }
+  if (normalized === "low" || normalized === "safe") {
+    return "Low";
+  }
+  return "Medium";
+}
+
 export default function PolicyQuote() {
   const { platformState, derivedData, actions, uiState } = useGigShieldData();
-  const currentRisk = derivedData.currentRisk?.level || "Low";
-  const smartPremium = SMART_PREMIUM_BY_RISK[currentRisk] || 20;
+  const {
+    data: liveBackendData,
+    error: liveBackendError,
+    isLoading: liveBackendLoading,
+    isRefreshing: liveBackendRefreshing,
+  } = useLiveBackendData();
+  const currentRisk = normalizeRiskLabel(liveBackendData?.risk || derivedData.currentRisk?.level || "Low");
+  const smartPremium = Number(liveBackendData?.premium ?? SMART_PREMIUM_BY_RISK[currentRisk] ?? 20);
+  const liveFraudStatus = String(liveBackendData?.status || "SAFE").toLowerCase();
   const { basicSource, smartSource } = useMemo(
     () => getPlanSources(platformState.plans),
     [platformState.plans]
@@ -119,17 +138,34 @@ export default function PolicyQuote() {
       </motion.header>
 
       <AnimatePresence>
-        {uiState.riskUpdating || uiState.planUpdating ? (
+        {uiState.riskUpdating || uiState.planUpdating || (liveBackendLoading && !liveBackendData) ? (
           <SurfaceLoadingPanel
-            title={uiState.planUpdating ? "Activating policy" : "Updating premium"}
+            title={
+              liveBackendLoading && !liveBackendData
+                ? "Loading live backend data"
+                : uiState.planUpdating
+                  ? "Activating policy"
+                  : "Updating premium"
+            }
             description={
-              uiState.planUpdating
+              liveBackendLoading && !liveBackendData
+                ? "Fetching risk, premium, and fraud status from the backend."
+                : uiState.planUpdating
                 ? "Applying your selected plan and refreshing coverage."
                 : "Refreshing premium from live risk conditions."
             }
           />
         ) : null}
       </AnimatePresence>
+
+      {liveBackendError ? (
+        <motion.div
+          variants={itemVariants}
+          className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+        >
+          {liveBackendError}
+        </motion.div>
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <motion.section
@@ -199,6 +235,13 @@ export default function PolicyQuote() {
               <div className="mt-2 text-sm text-slate-600">
                 Risk: {currentRisk} -> Premium: {formatINR(smartPremium)}
               </div>
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-slate-500">Fraud status</span>
+                <StatusBadge status={liveFraudStatus} label={liveFraudStatus.toUpperCase()} />
+              </div>
+              <div className="mt-2 text-xs text-slate-500">
+                {liveBackendRefreshing ? "Refreshing backend data..." : "Live backend data connected."}
+              </div>
             </div>
 
             <div className="mt-6">
@@ -235,6 +278,38 @@ export default function PolicyQuote() {
               riskLevel={currentRisk}
             />
           </motion.div>
+
+          <motion.section
+            variants={itemVariants}
+            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-slate-500">Backend snapshot</p>
+                <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
+                  Real policy intelligence
+                </h3>
+              </div>
+              <StatusBadge status={liveFraudStatus} label={liveFraudStatus.toUpperCase()} />
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-3">
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-sm font-medium text-slate-500">Current Risk</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">{currentRisk}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-sm font-medium text-slate-500">Premium</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">{formatINR(smartPremium)}</p>
+              </div>
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-sm font-medium text-slate-500">Fraud Score</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">
+                  {liveBackendData?.fraud_score ?? "--"}
+                </p>
+              </div>
+            </div>
+          </motion.section>
 
           <motion.section
             variants={itemVariants}

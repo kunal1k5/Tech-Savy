@@ -8,6 +8,7 @@ import StatusBadge from "../components/ui/StatusBadge";
 import SurfaceButton from "../components/ui/SurfaceButton";
 import SurfaceLoadingPanel from "../components/ui/SurfaceLoadingPanel";
 import { useGigShieldData } from "../context/GigShieldDataContext";
+import useLiveBackendData from "../hooks/useLiveBackendData";
 import { formatINR } from "../utils/helpers";
 
 const pageVariants = {
@@ -65,12 +66,34 @@ function CurrencyCount({ value, suffix = "" }) {
   );
 }
 
+function normalizeRiskLabel(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "high") {
+    return "High";
+  }
+  if (normalized === "low" || normalized === "safe") {
+    return "Low";
+  }
+  return "Medium";
+}
+
 export default function Claims() {
   const { platformState, derivedData, actions, uiState } = useGigShieldData();
+  const {
+    data: liveBackendData,
+    error: liveBackendError,
+    isLoading: liveBackendLoading,
+    isRefreshing: liveBackendRefreshing,
+  } = useLiveBackendData();
   const latestClaim = platformState.claims[0] || null;
-  const currentRisk = derivedData.currentRisk?.level || "Low";
-  const smartPremium = SMART_PREMIUM_BY_RISK[currentRisk] || 20;
-  const isLoading = uiState.claimTriggering || uiState.riskUpdating || uiState.syncing;
+  const currentRisk = normalizeRiskLabel(liveBackendData?.risk || derivedData.currentRisk?.level || "Low");
+  const smartPremium = Number(liveBackendData?.premium ?? SMART_PREMIUM_BY_RISK[currentRisk] ?? 20);
+  const liveFraudStatus = String(liveBackendData?.status || "SAFE").toLowerCase();
+  const isLoading =
+    uiState.claimTriggering ||
+    uiState.riskUpdating ||
+    uiState.syncing ||
+    (liveBackendLoading && !liveBackendData);
 
   async function handleAutoClaimDemo(scenarioId, riskKey) {
     await actions.simulateRisk(riskKey, { silent: true });
@@ -98,15 +121,32 @@ export default function Claims() {
       <AnimatePresence>
         {isLoading ? (
           <SurfaceLoadingPanel
-            title={uiState.claimTriggering ? "Creating claim" : "Refreshing claim data"}
+            title={
+              liveBackendLoading && !liveBackendData
+                ? "Loading live backend data"
+                : uiState.claimTriggering
+                  ? "Creating claim"
+                  : "Refreshing claim data"
+            }
             description={
-              uiState.claimTriggering
+              liveBackendLoading && !liveBackendData
+                ? "Fetching real risk, premium, and fraud signals from the backend."
+                : uiState.claimTriggering
                 ? "Checking the latest risk signal and starting the automated payout flow."
                 : "Updating premium, status, and payout information."
             }
           />
         ) : null}
       </AnimatePresence>
+
+      {liveBackendError ? (
+        <motion.div
+          variants={itemVariants}
+          className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+        >
+          {liveBackendError}
+        </motion.div>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <motion.section
@@ -153,7 +193,7 @@ export default function Claims() {
             </p>
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
+          <div className="mt-6 grid gap-4 md:grid-cols-4">
             <div className="rounded-2xl bg-slate-50 p-4">
               <p className="text-sm font-medium text-slate-500">Current risk</p>
               <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
@@ -172,6 +212,16 @@ export default function Claims() {
               <p className="text-sm font-medium text-slate-500">Latest payout</p>
               <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
                 <CurrencyCount value={derivedData.latestLossAmount} />
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-sm font-medium text-slate-500">Fraud status</p>
+              <div className="mt-2">
+                <StatusBadge status={liveFraudStatus} label={liveFraudStatus.toUpperCase()} />
+              </div>
+              <div className="mt-2 text-xs text-slate-500">
+                {liveBackendRefreshing ? "Refreshing..." : `Score: ${liveBackendData?.fraud_score ?? "--"}`}
               </div>
             </div>
           </div>

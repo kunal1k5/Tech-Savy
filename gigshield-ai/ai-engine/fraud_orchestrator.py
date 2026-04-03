@@ -86,7 +86,9 @@ def _resolve_location_context(request: Dict[str, Any], flags: list[str]) -> Dict
         "lower_bound",
         "upper_bound",
     ]
-    if not all(field in request for field in required_fields):
+    has_numeric_location_input = all(field in request for field in required_fields)
+    has_text_location_input = "current_location" in request
+    if not has_numeric_location_input and not has_text_location_input:
         return None
 
     try:
@@ -162,10 +164,18 @@ def _resolve_premium_context(
 def _location_adjustment(location_context: Dict[str, object] | None, flags: list[str]) -> float:
     if not location_context or not location_context.get("ready"):
         return 0.0
-    if location_context.get("suspicious") is True:
-        confidence = float(location_context.get("confidence") or 0.5)
+
+    fraud_signal = str(location_context.get("fraud_signal") or "").upper()
+    confidence = float(location_context.get("confidence") or 0.5)
+    if fraud_signal == "HIGH":
         flags.append("predicted_route_mismatch")
         return min(22.0, max(12.0, confidence * 25.0))
+    if fraud_signal == "MEDIUM":
+        flags.append("predicted_route_variance")
+        return min(14.0, max(6.0, confidence * 16.0))
+    if location_context.get("suspicious") is True:
+        flags.append("predicted_route_mismatch")
+        return min(18.0, max(10.0, confidence * 20.0))
     return 0.0
 
 

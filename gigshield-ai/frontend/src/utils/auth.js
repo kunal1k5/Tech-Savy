@@ -148,7 +148,12 @@ export function getUserFromToken() {
   const token = getToken();
   if (token && isValidJwt(token)) {
     try {
-      return JSON.parse(atob(token.split(".")[1]));
+      const tokenUser = normalizeUser(JSON.parse(atob(token.split(".")[1])));
+      const storedUser = getStoredUser();
+      return normalizeUser({
+        ...(tokenUser || {}),
+        ...(storedUser || {}),
+      });
     } catch {
       return null;
     }

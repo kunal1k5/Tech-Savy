@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   BadgeCheck,
   FileText,
+  MapPin,
   ShieldCheck,
   Wallet,
 } from "lucide-react";
@@ -12,6 +13,7 @@ import InfoTooltip from "../components/ui/InfoTooltip";
 import SurfaceLoadingPanel from "../components/ui/SurfaceLoadingPanel";
 import SurfaceScanPanel from "../components/ui/SurfaceScanPanel";
 import { useGigShieldData } from "../context/GigShieldDataContext";
+import useLiveBackendData from "../hooks/useLiveBackendData";
 import { cn } from "../utils/cn";
 import { formatINR } from "../utils/helpers";
 
@@ -125,6 +127,89 @@ function getRiskAnimation(level) {
   };
 }
 
+function getLocationSignalClasses(signal) {
+  const normalized = String(signal || "").toUpperCase();
+  if (normalized === "HIGH") {
+    return "bg-red-50 text-red-700";
+  }
+  if (normalized === "MEDIUM") {
+    return "bg-amber-50 text-amber-700";
+  }
+  return "bg-emerald-50 text-emerald-700";
+}
+
+function getBehaviorStatusClasses(status) {
+  const normalized = String(status || "").toUpperCase();
+  if (normalized === "ABNORMAL") {
+    return "bg-red-50 text-red-700";
+  }
+  if (normalized === "WARNING") {
+    return "bg-amber-50 text-amber-700";
+  }
+  return "bg-emerald-50 text-emerald-700";
+}
+
+function formatSignalLabel(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  if (!normalized) {
+    return "Checking";
+  }
+
+  return `${normalized.charAt(0)}${normalized.slice(1).toLowerCase()}`;
+}
+
+function getLocationCheckLabel(signal) {
+  const normalized = String(signal || "").trim().toUpperCase();
+  if (normalized === "HIGH") {
+    return "Mismatch";
+  }
+  if (normalized === "MEDIUM") {
+    return "Variance";
+  }
+  if (normalized === "LOW") {
+    return "Aligned";
+  }
+  return "Checking";
+}
+
+function getFraudEngineState(snapshot, fallbackState) {
+  const status = String(snapshot?.status || "").trim().toUpperCase();
+  if (status === "FRAUD") {
+    return {
+      score: snapshot.fraud_score,
+      label: "FRAUD",
+      className: "bg-red-50 text-red-700",
+      dot: "bg-red-500",
+      bar: "bg-red-500",
+      tone: "danger",
+    };
+  }
+
+  if (status === "WARNING") {
+    return {
+      score: snapshot.fraud_score,
+      label: "WARNING",
+      className: "bg-amber-50 text-amber-700",
+      dot: "bg-amber-500",
+      bar: "bg-amber-500",
+      tone: "warning",
+    };
+  }
+
+  if (status === "SAFE") {
+    return {
+      score: snapshot.fraud_score,
+      label: "SAFE",
+      className: "bg-emerald-50 text-emerald-700",
+      dot: "bg-emerald-500",
+      bar: "bg-emerald-500",
+      tone: "success",
+    };
+  }
+
+  return fallbackState;
+}
+
 function DashboardCard({ children, className }) {
   return (
     <motion.section
@@ -153,16 +238,42 @@ function CurrencyValue({ value, className }) {
 
 export default function Dashboard() {
   const { platformState, derivedData, uiState } = useGigShieldData();
+  const {
+    data: liveSnapshot,
+    error: liveBackendError,
+    isLoading: liveBackendLoading,
+  } = useLiveBackendData({
+    refreshIntervalMs: 20000,
+  });
+  const fraudSnapshot = liveSnapshot;
+  const premiumSnapshot = liveSnapshot
+    ? {
+        risk: liveSnapshot.premium_risk || liveSnapshot.risk,
+        premium: liveSnapshot.premium,
+        source: liveSnapshot.premium_source,
+        warning: liveSnapshot.premium_warning,
+      }
+    : null;
+  const behaviorSnapshot = liveSnapshot?.intelligence?.behavior || null;
+  const locationSnapshot = liveSnapshot?.intelligence?.location || null;
+  const premiumError = !premiumSnapshot ? liveBackendError : "";
+  const locationError = !locationSnapshot ? liveBackendError : "";
+  const fraudError = !fraudSnapshot ? liveBackendError : "";
+  const behaviorError = !behaviorSnapshot ? liveBackendError : "";
   const workerFirstName = getFirstName(platformState.worker.name);
-  const currentRisk = derivedData.currentRisk?.level || "Low";
+  const currentRisk = formatSignalLabel(
+    fraudSnapshot?.risk || premiumSnapshot?.risk || derivedData.currentRisk?.level || "Low"
+  );
   const currentRiskStyle = riskStyles[currentRisk] || riskStyles.Low;
   const riskAnimation = getRiskAnimation(currentRisk);
   const activePlan = derivedData.activePlan || derivedData.displayPlan;
+  const livePremiumAmount = Number(premiumSnapshot?.premium ?? derivedData.dynamicPremium ?? 0);
   const recentClaims = platformState.claims.slice(0, 2);
-  const fraudState = getFraudState(
+  const fallbackFraudState = getFraudState(
     platformState.fraudWatch.status,
     platformState.fraudWatch.activeFlags
   );
+  const fraudState = getFraudEngineState(fraudSnapshot, fallbackFraudState);
 
   return (
     <motion.div
@@ -252,6 +363,101 @@ export default function Dashboard() {
         </DashboardCard>
       </section>
 
+      <DashboardCard>
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-500">Backend Premium Check</p>
+            <h3 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+              Current Risk: {premiumSnapshot?.risk || (liveBackendLoading ? "Loading" : currentRisk)}
+            </h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Premium:{" "}
+              {premiumSnapshot
+                ? formatINR(premiumSnapshot.premium)
+                : liveBackendLoading
+                  ? "Fetching from backend..."
+                  : formatINR(livePremiumAmount)}
+            </p>
+          </div>
+
+          {premiumSnapshot?.source ? (
+            <span className="inline-flex w-fit items-center rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700">
+              Source: {premiumSnapshot.source}
+            </span>
+          ) : null}
+        </div>
+
+        {premiumError ? (
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {premiumError}
+          </div>
+        ) : null}
+      </DashboardCard>
+
+      <DashboardCard>
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-500">Location Fraud Check</p>
+            <h3 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+              {locationSnapshot
+                ? locationSnapshot.match
+                  ? "Location Check: Match"
+                  : "Location Check: Mismatch ❌"
+                : "Location Check: Running"}
+            </h3>
+            <p className="mt-2 text-sm text-slate-600">
+              We predict where a worker should be — and flag deviations.
+            </p>
+          </div>
+
+          {locationSnapshot?.fraud_signal ? (
+            <span
+              className={cn(
+                "inline-flex w-fit items-center rounded-full px-3 py-1.5 text-xs font-semibold",
+                getLocationSignalClasses(locationSnapshot.fraud_signal)
+              )}
+            >
+              {locationSnapshot.fraud_signal}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+              <MapPin size={16} />
+              Predicted
+            </div>
+            <p className="mt-3 text-lg font-semibold text-slate-900">
+              {locationSnapshot?.predicted_location || "Waiting for AI engine"}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-sm font-medium text-slate-500">Actual</p>
+            <p className="mt-3 text-lg font-semibold text-slate-900">
+              {locationSnapshot?.actual_location || "Not provided"}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-sm font-medium text-slate-500">Fraud Impact</p>
+            <p className="mt-3 text-lg font-semibold text-slate-900">
+              +{locationSnapshot?.fraud_score_delta ?? 0} score
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              {locationSnapshot?.source === "fallback" ? "Fallback continuity check" : "AI location signal"}
+            </p>
+          </div>
+        </div>
+
+        {locationError ? (
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {locationError}
+          </div>
+        ) : null}
+      </DashboardCard>
+
       <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
         <DashboardCard>
           <div className="flex items-start justify-between gap-4">
@@ -272,7 +478,7 @@ export default function Dashboard() {
               <p className="text-sm font-medium text-slate-500">Premium</p>
               <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
                 <CountUp
-                  end={derivedData.dynamicPremium}
+                  end={livePremiumAmount}
                   duration={1.5}
                   formattingFn={(value) => formatINR(Math.round(value))}
                   preserveValue
@@ -352,12 +558,16 @@ export default function Dashboard() {
               <p className="text-sm font-medium text-slate-500">Fraud Intelligence</p>
               <InfoTooltip
                 label="Fraud intelligence information"
-                text="Automated system checks route continuity, repeated claims, and document signals before payout."
+                text="Automated system combines risk, location, behavior, and context signals before a final fraud decision."
               />
             </div>
             <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
-              Claim trust overview
+              Fraud Intelligence Engine
             </h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              {fraudSnapshot?.engine?.summary ||
+                "We combine multiple intelligence layers into a single fraud decision engine."}
+            </p>
           </div>
 
           <span
@@ -373,7 +583,7 @@ export default function Dashboard() {
 
         <div className="mt-6 grid gap-4 md:grid-cols-[220px_220px_minmax(0,1fr)]">
           <div className="rounded-2xl bg-slate-50 p-4">
-            <p className="text-sm font-medium text-slate-500">Risk Score</p>
+            <p className="text-sm font-medium text-slate-500">Final Score</p>
             <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
               <CountUp end={fraudState.score} duration={1} preserveValue />
             </div>
@@ -395,11 +605,117 @@ export default function Dashboard() {
 
           <div className="space-y-4">
             <SurfaceScanPanel
-              title="Real-time monitoring"
-              description={platformState.fraudWatch.summary}
+              title="Multi-layer orchestration"
+              description={fraudSnapshot?.engine?.summary || platformState.fraudWatch.summary}
               tone={fraudState.tone}
-              badgeLabel={fraudState.label === "Safe" ? "Verified" : fraudState.label}
+              badgeLabel={fraudState.label === "SAFE" ? "Verified" : fraudState.label}
             />
+
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+                  <BadgeCheck size={16} />
+                  Fraud Intelligence Engine
+                </div>
+                {fraudSnapshot?.status ? (
+                  <span
+                    className={cn(
+                      "inline-flex rounded-full px-3 py-1.5 text-xs font-semibold",
+                      fraudState.className
+                    )}
+                  >
+                    {fraudSnapshot.status}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="mt-4 grid gap-3 text-sm text-slate-600">
+                <div className="flex items-center justify-between gap-4 rounded-2xl bg-white px-4 py-3">
+                  <span>Risk</span>
+                  <span className="font-semibold text-slate-900">
+                    {fraudSnapshot?.risk || premiumSnapshot?.risk || currentRisk.toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4 rounded-2xl bg-white px-4 py-3">
+                  <span>Location</span>
+                  <span className="font-semibold text-slate-900">
+                    {getLocationCheckLabel(fraudSnapshot?.location_signal)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4 rounded-2xl bg-white px-4 py-3">
+                  <span>Behavior</span>
+                  <span className="font-semibold text-slate-900">
+                    {formatSignalLabel(fraudSnapshot?.behavior_status || behaviorSnapshot?.behavior_status)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4 rounded-2xl bg-white px-4 py-3">
+                  <span>Final Score</span>
+                  <span className="font-semibold text-slate-900">
+                    {fraudSnapshot?.fraud_score ?? "--"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-4 rounded-2xl bg-white px-4 py-3">
+                  <span>Status</span>
+                  <span className="font-semibold text-slate-900">
+                    {fraudSnapshot?.status || "Checking"}
+                  </span>
+                </div>
+              </div>
+
+              {fraudError ? (
+                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {fraudError}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+                  <AlertTriangle size={16} />
+                  Behavior analytics
+                </div>
+                {behaviorSnapshot?.behavior_status ? (
+                  <span
+                    className={cn(
+                      "inline-flex rounded-full px-3 py-1.5 text-xs font-semibold",
+                      getBehaviorStatusClasses(behaviorSnapshot.behavior_status)
+                    )}
+                  >
+                    {behaviorSnapshot.behavior_status}
+                  </span>
+                ) : null}
+              </div>
+
+              <h4 className="mt-3 text-lg font-semibold tracking-tight text-slate-900">
+                Behavior Check:{" "}
+                {behaviorSnapshot
+                  ? behaviorSnapshot.behavior_status === "ABNORMAL"
+                    ? "Abnormal"
+                    : behaviorSnapshot.behavior_status === "WARNING"
+                      ? "Warning"
+                      : "Normal"
+                  : "Running"}
+              </h4>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                We don&apos;t just track actions — we analyze behavioral patterns to detect anomalies.
+              </p>
+
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-slate-500">
+                  Score: {behaviorSnapshot?.behavior_score ?? "--"}
+                </span>
+                <span className="text-sm font-medium text-slate-500">
+                  Issues: {behaviorSnapshot?.issues?.length ?? 0}
+                </span>
+              </div>
+
+              {behaviorError ? (
+                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {behaviorError}
+                </div>
+              ) : null}
+            </div>
 
             <div className="rounded-2xl bg-slate-50 p-4">
               <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
@@ -414,7 +730,7 @@ export default function Dashboard() {
                 <motion.div
                   className={cn("h-2 rounded-full", fraudState.bar)}
                   initial={{ width: 0 }}
-                  animate={{ width: `${fraudState.score}%` }}
+                  animate={{ width: `${Math.min(fraudState.score, 100)}%` }}
                   transition={{ duration: 0.6, ease: "easeOut" }}
                 />
               </div>

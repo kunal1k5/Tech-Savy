@@ -63,6 +63,10 @@ module.exports = {
     return request("post", "/predict", payload);
   },
 
+  predictWeatherRisk(payload) {
+    return request("post", "/predict-risk", payload);
+  },
+
   predictLiveRisk(payload) {
     return request("post", "/predict/live", payload);
   },

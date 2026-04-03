@@ -19,14 +19,49 @@ const claimRoutes = require("./routes/claim.routes");
 const triggerRoutes = require("./routes/trigger.routes");
 const paymentRoutes = require("./routes/payment.routes");
 const adminRoutes = require("./routes/admin.routes");
+const behaviorRoutes = require("./routes/behavior.routes");
+const fraudOrchestratorRoutes = require("./routes/fraudOrchestrator.routes");
 const riskRoutes = require("./routes/risk.routes");
 const demoRoutes = require("./routes/demo.routes");
+const locationFlowRoutes = require("./routes/locationFlow.routes");
+const premiumFlowRoutes = require("./routes/premiumFlow.routes");
+const testFlowRoutes = require("./routes/testFlow.routes");
 
 // Middleware
 const { errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
 app.set("etag", false);
+
+function isLoopbackIp(value) {
+  const normalizedValue = String(value || "").trim();
+  return (
+    normalizedValue === "::1" ||
+    normalizedValue === "127.0.0.1" ||
+    normalizedValue.startsWith("::ffff:127.0.0.1")
+  );
+}
+
+function isLocalRequest(req) {
+  const forwardedFor = String(req.headers["x-forwarded-for"] || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const origin = String(req.headers.origin || "");
+  const host = String(req.headers.host || "");
+  const hostname = String(req.hostname || "");
+
+  return (
+    isLoopbackIp(req.ip) ||
+    forwardedFor.some(isLoopbackIp) ||
+    origin.startsWith("http://localhost:3000") ||
+    origin.startsWith("http://127.0.0.1:3000") ||
+    host.startsWith("localhost:") ||
+    host.startsWith("127.0.0.1:") ||
+    hostname === "localhost" ||
+    hostname === "127.0.0.1"
+  );
+}
 
 function getAllowedOrigins() {
   const configuredOrigins = [
@@ -63,13 +98,20 @@ app.use(express.json({ limit: "1mb" }));
 app.use(morgan("dev"));
 
 // ── Rate Limiting ───────────────────────────────────────────
+const isProduction = process.env.NODE_ENV === "production";
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000),
+  max: Number(process.env.RATE_LIMIT_MAX || (isProduction ? 1000 : 5000)),
   standardHeaders: true,
   legacyHeaders: false,
+  message: {
+    error: "Too many requests. Slow down for a moment and try again.",
+  },
+  skip(req) {
+    return req.path === "/health" || (!isProduction && isLocalRequest(req));
+  },
 });
-app.use("/api/", limiter);
+app.use("/api", limiter);
 
 // ── Health Check ────────────────────────────────────────────
 app.get("/api/health", (_req, res) => {
@@ -83,8 +125,17 @@ app.use("/api/claims", claimRoutes);
 app.use("/api/triggers", triggerRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api", behaviorRoutes);
+app.use("/api", fraudOrchestratorRoutes);
 app.use("/api/risk", riskRoutes);
 app.use("/api", demoRoutes);
+app.use("/api", locationFlowRoutes);
+app.use("/api", premiumFlowRoutes);
+app.use("/", behaviorRoutes);
+app.use("/", fraudOrchestratorRoutes);
+app.use("/", locationFlowRoutes);
+app.use("/", premiumFlowRoutes);
+app.use("/", testFlowRoutes);
 
 // ── 404 Catch-All ───────────────────────────────────────────
 app.use((_req, res) => {

@@ -4,6 +4,7 @@ import { cn } from "../../utils/cn";
 const BADGE_STYLES = {
   active: "bg-emerald-50 text-emerald-700",
   approved: "bg-blue-50 text-blue-700",
+  fraud: "bg-red-50 text-red-700",
   high: "bg-emerald-50 text-emerald-700",
   low: "bg-red-50 text-red-700",
   manual_review: "bg-red-50 text-red-700",
@@ -16,12 +17,15 @@ const BADGE_STYLES = {
   risk_high: "bg-red-50 text-red-700",
   risk_low: "bg-emerald-50 text-emerald-700",
   risk_medium: "bg-amber-50 text-amber-700",
+  safe: "bg-emerald-50 text-emerald-700",
   verified: "bg-emerald-50 text-emerald-700",
+  warning: "bg-amber-50 text-amber-700",
 };
 
 const LABELS = {
   active: "Active",
   approved: "Approved",
+  fraud: "Fraud",
   high: "High",
   low: "Low",
   manual_review: "Manual Review",
@@ -34,7 +38,9 @@ const LABELS = {
   risk_high: "High Risk",
   risk_low: "Low Risk",
   risk_medium: "Medium Risk",
+  safe: "Safe",
   verified: "Verified",
+  warning: "Warning",
 };
 
 export default function StatusBadge({ status, label, className }) {

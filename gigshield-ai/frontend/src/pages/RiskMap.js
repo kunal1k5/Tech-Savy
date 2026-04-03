@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   CloudRain,
@@ -14,11 +14,13 @@ import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import { LoadingPanel } from "../components/ui/Loader";
 import SectionHeader from "../components/ui/SectionHeader";
+import { useGigShieldData } from "../context/GigShieldDataContext";
 import {
   SAMPLE_RISK_PAYLOAD,
   predictLiveRisk,
   predictRisk,
 } from "../services/riskPrediction";
+import { getUserFromToken } from "../utils/auth";
 
 const FIELD_CONFIG = [
   { name: "temperature", label: "Temperature", unit: "C" },
@@ -97,8 +99,13 @@ function toNumericPayload(formData) {
 }
 
 export default function RiskMap() {
+  const { platformState } = useGigShieldData();
+  const profileCity = useMemo(() => {
+    const sessionUser = getUserFromToken();
+    return sessionUser?.city || platformState.worker.city || "Bengaluru";
+  }, [platformState.worker.city]);
   const [formData, setFormData] = useState(() => toFormState(SAMPLE_RISK_PAYLOAD));
-  const [city, setCity] = useState("Bengaluru");
+  const [city, setCity] = useState(profileCity);
   const [prediction, setPrediction] = useState("");
   const [predictionDetails, setPredictionDetails] = useState(null);
   const [submittedPayload, setSubmittedPayload] = useState(SAMPLE_RISK_PAYLOAD);
@@ -109,6 +116,10 @@ export default function RiskMap() {
   const [liveWeatherSource, setLiveWeatherSource] = useState("");
 
   const styles = RISK_STYLES[prediction] || RISK_STYLES.default;
+
+  useEffect(() => {
+    setCity(profileCity);
+  }, [profileCity]);
 
   function updateField(name, value) {
     setFormData((current) => ({ ...current, [name]: value }));
@@ -173,45 +184,64 @@ export default function RiskMap() {
   }
 
   return (
-    <div className="page-shell">
-      <SectionHeader
-        eyebrow="Risk intelligence"
-        title="Live weather to risk response"
-        description="This page now feels like a real underwriting tool: clean inputs, clear risk verdicts, and stronger loading and feedback states."
-        action={
-          <>
-            <div className="flex items-center gap-3 rounded-[22px] border border-white/10 bg-white/5 px-4 py-3 text-slate-200">
-              <MapPin size={16} className="text-sky-300" />
-              <input
-                type="text"
-                value={city}
-                onChange={(event) => setCity(event.target.value)}
-                placeholder="Enter city"
-                className="min-w-[150px] bg-transparent text-sm outline-none"
-              />
-            </div>
-            <Button
-              type="button"
-              variant="secondary"
-              loading={isFetchingLiveWeather}
-              onClick={handleLiveWeather}
-            >
-              {isFetchingLiveWeather ? "Fetching Live Weather" : "Use Live Weather"}
+    <div className="gigshield-page">
+      <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_18%),radial-gradient(circle_at_top_right,rgba(167,139,250,0.14),transparent_18%),linear-gradient(180deg,#0f172a_0%,#111827_100%)] p-6 shadow-[0_24px_60px_rgba(15,23,42,0.18)] md:p-8">
+        <SectionHeader
+          eyebrow="Risk intelligence"
+          title="Live weather to risk response"
+          description="Use live city weather or enter values manually. We convert those signals into a clear Low, Medium, or High risk verdict."
+          action={
+            <>
+              <div className="flex items-center gap-3 rounded-[22px] border border-white/10 bg-slate-950/55 px-4 py-3 text-slate-200">
+                <MapPin size={16} className="text-sky-300" />
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(event) => setCity(event.target.value)}
+                  placeholder="Enter city"
+                  className="min-w-[150px] bg-transparent text-sm text-white outline-none placeholder:text-slate-500"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                loading={isFetchingLiveWeather}
+                onClick={handleLiveWeather}
+              >
+                {isFetchingLiveWeather ? "Fetching Live Weather" : "Use Live Weather"}
+              </Button>
+            </>
+          }
+        />
+
+        <div className="mt-6 grid gap-3 md:grid-cols-3">
+          <div className="rounded-[22px] border border-white/10 bg-white/5 px-4 py-4">
+            <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Step 1</div>
+            <div className="mt-2 font-semibold text-white">Choose input mode</div>
+            <div className="mt-1 text-sm text-slate-400">Use a preset, type values, or pull live city weather.</div>
+          </div>
+          <div className="rounded-[22px] border border-white/10 bg-white/5 px-4 py-4">
+            <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Step 2</div>
+            <div className="mt-2 font-semibold text-white">Run prediction</div>
+            <div className="mt-1 text-sm text-slate-400">Submit the payload to the AI engine and wait for the verdict.</div>
+          </div>
+          <div className="rounded-[22px] border border-white/10 bg-white/5 px-4 py-4">
+            <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Step 3</div>
+            <div className="mt-2 font-semibold text-white">Read the result</div>
+            <div className="mt-1 text-sm text-slate-400">The page shows risk tier, live source, and confidence breakdown.</div>
+          </div>
+        </div>
+
+        <div className="mt-6 flex flex-wrap gap-3">
+          {Object.entries(PRESET_PAYLOADS).map(([label, payload]) => (
+            <Button key={label} type="button" variant="ghost" onClick={() => applyPreset(payload)}>
+              {label}
             </Button>
-          </>
-        }
-      />
+          ))}
+        </div>
 
-      <div className="flex flex-wrap gap-3">
-        {Object.entries(PRESET_PAYLOADS).map(([label, payload]) => (
-          <Button key={label} type="button" variant="ghost" onClick={() => applyPreset(payload)}>
-            {label}
-          </Button>
-        ))}
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card glow="violet">
+        <div className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+          <Card glow="violet">
           <form onSubmit={handleSubmit} className="space-y-6">
             <CardHeader>
               <div>
@@ -273,12 +303,12 @@ export default function RiskMap() {
               </Button>
             </div>
           </form>
-        </Card>
+          </Card>
 
-        <div className="space-y-6">
+          <div className="space-y-6">
           {isSubmitting || isFetchingLiveWeather ? <LoadingPanel title="Scoring disruption risk" /> : null}
 
-          <Card glow={styles.glow}>
+            <Card glow={styles.glow}>
             <CardHeader>
               <div>
                 <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Risk Response</div>
@@ -339,9 +369,9 @@ export default function RiskMap() {
                 ) : null}
               </div>
             ) : null}
-          </Card>
+            </Card>
 
-          <Card glow="sky">
+            <Card glow="sky">
             <CardHeader>
               <div>
                 <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Response Debug</div>
@@ -384,9 +414,9 @@ export default function RiskMap() {
                 Run a prediction to surface confidence values and model details.
               </div>
             )}
-          </Card>
+            </Card>
 
-          <Card glow="emerald">
+            <Card glow="emerald">
             <div className="flex items-center gap-3">
               <ShieldCheck size={18} className="text-emerald-300" />
               <div>
@@ -396,7 +426,8 @@ export default function RiskMap() {
                 </div>
               </div>
             </div>
-          </Card>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
