@@ -21,6 +21,16 @@ function normalizeUser(user) {
     zone: user.zone,
     platform: user.platform,
     weekly_income: user.weekly_income ?? user.weeklyIncome,
+    work_type: user.work_type || user.workType,
+    worker_id: user.worker_id || user.workerId,
+    work_proof_name: user.work_proof_name || user.workProofName,
+    work_verification_status: user.work_verification_status || user.workVerificationStatus,
+    work_verification_flag:
+      user.work_verification_flag || user.workVerificationFlag || null,
+    device_id: user.device_id || user.deviceId,
+    auth_risk_score: user.auth_risk_score ?? user.authRiskScore,
+    auth_risk_level: user.auth_risk_level || user.authRiskLevel,
+    auth_risk_status: user.auth_risk_status || user.authRiskStatus,
   };
 }
 
@@ -57,6 +67,15 @@ export function saveAuthSession({ token, user }) {
       zone: normalizedUser.zone,
       platform: normalizedUser.platform,
       weeklyIncome: normalizedUser.weekly_income,
+      workType: normalizedUser.work_type,
+      workerId: normalizedUser.worker_id,
+      workProofName: normalizedUser.work_proof_name,
+      workVerificationStatus: normalizedUser.work_verification_status,
+      workVerificationFlag: normalizedUser.work_verification_flag,
+      deviceId: normalizedUser.device_id,
+      authRiskScore: normalizedUser.auth_risk_score,
+      authRiskLevel: normalizedUser.auth_risk_level,
+      authRiskStatus: normalizedUser.auth_risk_status,
     });
     return;
   }
@@ -151,5 +170,14 @@ export function getUserFromToken() {
     city: demoSession.city,
     zone: demoSession.zone,
     platform: demoSession.platform,
+    work_type: demoSession.workType,
+    worker_id: demoSession.workerId,
+    work_proof_name: demoSession.workProofName,
+    work_verification_status: demoSession.workVerificationStatus,
+    work_verification_flag: demoSession.workVerificationFlag,
+    device_id: demoSession.deviceId,
+    auth_risk_score: demoSession.authRiskScore,
+    auth_risk_level: demoSession.authRiskLevel,
+    auth_risk_status: demoSession.authRiskStatus,
   };
 }

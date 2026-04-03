@@ -1,12 +1,4 @@
-# ============================================================
-# GigShield AI — Docker Compose (Development)
-# Run: docker-compose up --build
-# ============================================================
-
-version: "3.9"
-
 services:
-  # ---- PostgreSQL Database ----
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -25,14 +17,31 @@ services:
       timeout: 3s
       retries: 5
 
-  # ---- Redis (caching & job queues) ----
   redis:
     image: redis:7-alpine
     restart: unless-stopped
     ports:
       - "6379:6379"
 
-  # ---- Node.js Backend API ----
+  ai-engine:
+    build:
+      context: ./ai-engine
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      WEATHER_API_KEY: ${WEATHER_API_KEY:-}
+      WEATHER_API_BASE_URL: ${WEATHER_API_BASE_URL:-https://weather.indianapi.in}
+      DEFAULT_WEATHER_CITY: ${DEFAULT_WEATHER_CITY:-Bengaluru}
+      LOCATION_MODEL_PATH: /app/models/location_model.pkl
+      LOCATION_REFERENCE_PATH: /app/data/next_location_reference.csv
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./ai-engine:/app
+
   backend:
     build:
       context: ./backend
@@ -50,32 +59,18 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       REDIS_URL: redis://redis:6379
       AI_ENGINE_URL: http://ai-engine:8000
+      AI_ENGINE_TIMEOUT_MS: 10000
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_started
+      ai-engine:
+        condition: service_started
     volumes:
       - ./backend:/app
       - /app/node_modules
 
-  # ---- Python AI Engine ----
-  ai-engine:
-    build:
-      context: ./ai-engine
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-postgres}@postgres:5432/gigshield
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ./ai-engine:/app
-
-  # ---- React Frontend ----
   frontend:
     build:
       context: ./frontend
@@ -85,8 +80,10 @@ services:
       - "3000:3000"
     environment:
       REACT_APP_API_URL: http://localhost:5000/api
+      REACT_APP_FLASK_API_URL: http://localhost:8000
     depends_on:
       - backend
+      - ai-engine
     volumes:
       - ./frontend:/app
       - /app/node_modules

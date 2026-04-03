@@ -3,11 +3,9 @@
  * compute risk scores and determine premium tiers for workers.
  */
 
-const axios = require("axios");
 const { pool } = require("../database/connection");
+const aiService = require("../integrations/aiService");
 const logger = require("../utils/logger");
-
-const AI_ENGINE_URL = process.env.AI_ENGINE_URL || "http://localhost:8000";
 
 const RiskService = {
   /**
@@ -31,7 +29,7 @@ const RiskService = {
     // 2. Call the AI engine
     let aiResponse;
     try {
-      aiResponse = await axios.post(`${AI_ENGINE_URL}/api/risk/assess`, {
+      aiResponse = await aiService.assessRisk({
         worker_id: worker.id,
         city: worker.city,
         zone: worker.zone,
@@ -43,7 +41,7 @@ const RiskService = {
       throw err;
     }
 
-    const { risk_score, risk_tier, features } = aiResponse.data;
+    const { risk_score, risk_tier, features } = aiResponse;
 
     // 3. Persist the assessment
     const result = await pool.query(

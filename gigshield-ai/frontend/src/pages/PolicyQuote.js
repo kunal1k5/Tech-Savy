@@ -1,181 +1,280 @@
-import React from "react";
-import {
-  AlertTriangle,
-  Check,
-  CloudRain,
-  Shield,
-  Sparkles,
-  Wallet,
-} from "lucide-react";
-import Badge from "../components/ui/Badge";
-import Button from "../components/ui/Button";
-import Card, { CardDescription, CardHeader, CardTitle } from "../components/ui/Card";
-import SectionHeader from "../components/ui/SectionHeader";
+import React, { useMemo } from "react";
+import CountUp from "react-countup";
+import { AnimatePresence, motion } from "framer-motion";
+import { AlertTriangle, CloudRain, ShieldCheck, Wind } from "lucide-react";
+import ActivePolicyCard from "../components/policy/ActivePolicyCard";
+import PlanCard from "../components/policy/PlanCard";
+import InfoTooltip from "../components/ui/InfoTooltip";
+import StatusBadge from "../components/ui/StatusBadge";
+import SurfaceButton from "../components/ui/SurfaceButton";
+import SurfaceLoadingPanel from "../components/ui/SurfaceLoadingPanel";
 import { useGigShieldData } from "../context/GigShieldDataContext";
 import { formatINR } from "../utils/helpers";
 
+const pageVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.35,
+      ease: "easeOut",
+      staggerChildren: 0.08,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 18 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.3, ease: "easeOut" },
+  },
+};
+
 const RISK_OPTIONS = [
-  { id: "low", label: "Low", tone: "success" },
-  { id: "medium", label: "Medium", tone: "warning" },
-  { id: "high", label: "High", tone: "danger" },
+  { id: "low", label: "Low" },
+  { id: "medium", label: "Medium" },
+  { id: "high", label: "High" },
 ];
 
+const SMART_PREMIUM_BY_RISK = {
+  Low: 10,
+  Medium: 20,
+  High: 30,
+};
+
+function getPlanSources(plans = []) {
+  if (!plans.length) {
+    return { basicSource: null, smartSource: null };
+  }
+
+  const sortedPlans = [...plans].sort((firstPlan, secondPlan) => {
+    const firstValue = firstPlan.coverageAmount || firstPlan.payoutCap || firstPlan.premiumWeekly || 0;
+    const secondValue =
+      secondPlan.coverageAmount || secondPlan.payoutCap || secondPlan.premiumWeekly || 0;
+    return firstValue - secondValue;
+  });
+
+  return {
+    basicSource: sortedPlans[0],
+    smartSource: sortedPlans[sortedPlans.length - 1],
+  };
+}
+
 export default function PolicyQuote() {
-  const { platformState, derivedData, actions } = useGigShieldData();
+  const { platformState, derivedData, actions, uiState } = useGigShieldData();
+  const currentRisk = derivedData.currentRisk?.level || "Low";
+  const smartPremium = SMART_PREMIUM_BY_RISK[currentRisk] || 20;
+  const { basicSource, smartSource } = useMemo(
+    () => getPlanSources(platformState.plans),
+    [platformState.plans]
+  );
+
+  const displayedPlans = [
+    {
+      sourceId: basicSource?.id,
+      title: "Basic Plan",
+      coverageLabel: "Coverage: Limited",
+      premiumLabel: `${formatINR(10)}/week`,
+      features: ["Basic risk coverage"],
+      summary: "Entry cover for essential disruptions during active work hours.",
+      isRecommended: false,
+    },
+    {
+      sourceId: smartSource?.id,
+      title: "Smart Plan",
+      coverageLabel: "Coverage: Full",
+      premiumLabel: `${formatINR(smartPremium)}/week`,
+      features: ["Full risk coverage", "Automatic claim support"],
+      summary: "Dynamic premium linked to live risk conditions and auto-claim support.",
+      isRecommended: true,
+    },
+  ];
+
+  const activePlan =
+    displayedPlans.find((plan) => plan.sourceId === platformState.activePlanId) || displayedPlans[1];
+
+  async function handleAutoClaimDemo(scenarioId, riskKey) {
+    await actions.simulateRisk(riskKey, { silent: true });
+    actions.triggerScenario(scenarioId, { origin: "auto" });
+  }
 
   return (
-    <div className="page-shell">
-      <SectionHeader
-        eyebrow="Policy"
-        title="Select your protection plan"
-        description="Choose Basic or Premium, simulate risk, and watch weekly premium update instantly."
-      />
+    <motion.div
+      className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 md:px-6 md:py-8 xl:px-8"
+      variants={pageVariants}
+      initial="hidden"
+      animate="show"
+    >
+      <motion.header variants={itemVariants} className="space-y-2">
+        <p className="text-sm font-medium text-slate-500">Policy</p>
+        <h2 className="text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
+          Choose Your Plan
+        </h2>
+        <p className="text-sm leading-6 text-slate-600 md:text-base">
+          Select a plan, see premium respond to real-time monitoring, and keep protection risk-based.
+        </p>
+      </motion.header>
 
-      <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
-        <Card glow="sky">
-          <CardHeader>
+      <AnimatePresence>
+        {uiState.riskUpdating || uiState.planUpdating ? (
+          <SurfaceLoadingPanel
+            title={uiState.planUpdating ? "Activating policy" : "Updating premium"}
+            description={
+              uiState.planUpdating
+                ? "Applying your selected plan and refreshing coverage."
+                : "Refreshing premium from live risk conditions."
+            }
+          />
+        ) : null}
+      </AnimatePresence>
+
+      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <motion.section
+          variants={itemVariants}
+          className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md"
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Live policy state</div>
-              <CardTitle className="mt-2">Current cover and premium</CardTitle>
-              <CardDescription className="mt-2">
-                This section is built for the demo flow: policy active status, risk simulation, and premium updates in one place.
-              </CardDescription>
-            </div>
-            <Badge tone={derivedData.riskTone} pulse={derivedData.riskTone === "danger"}>
-              {derivedData.currentRisk?.level || "Low"}
-            </Badge>
-          </CardHeader>
-
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div className="rounded-[24px] border border-white/10 bg-slate-950/55 p-5">
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <Shield size={16} className="text-sky-300" />
-                Active policy
-              </div>
-              <div className="mt-3 font-display text-3xl font-semibold text-white">
-                {derivedData.hasActivePolicy ? derivedData.activePlan.name : "No active policy"}
-              </div>
-              <div className="mt-2 text-sm text-slate-400">
-                {derivedData.hasActivePolicy
-                  ? `Coverage ${formatINR(derivedData.totalProtectedAmount)} • Status active`
-                  : `${derivedData.displayPlan.name} is ready to activate`}
-              </div>
+              <p className="text-sm font-medium text-slate-500">Plan Selection</p>
+              <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
+                Simple insurance coverage
+              </h3>
             </div>
 
-            <div className="rounded-[24px] border border-white/10 bg-slate-950/55 p-5">
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <Wallet size={16} className="text-emerald-300" />
-                Weekly premium
-              </div>
-              <div className="mt-3 font-display text-3xl font-semibold text-white">
-                {formatINR(derivedData.dynamicPremium)}
-              </div>
-              <div className="mt-2 text-sm text-slate-400">
-                Risk score {derivedData.currentRisk?.score || 0}/100
-              </div>
-            </div>
+            <StatusBadge status="recommended" label="Smart Plan Recommended" />
           </div>
 
-          <div className="mt-6 rounded-[24px] border border-white/10 bg-slate-950/55 p-5">
-            <div className="flex items-center gap-2 text-sm text-slate-400">
-              <AlertTriangle size={16} className="text-amber-300" />
-              Simulate risk
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              {RISK_OPTIONS.map((option) => (
-                <Button
-                  key={option.id}
-                  type="button"
-                  variant={derivedData.currentRisk?.level?.toLowerCase() === option.id ? "primary" : "secondary"}
-                  onClick={() => actions.simulateRisk(option.id)}
-                >
-                  {option.label} Risk
-                </Button>
-              ))}
-            </div>
-            <div className="mt-4 text-sm leading-6 text-slate-400">
-              Demo flow tip: make risk high, watch premium increase, then trigger rainfall or AQI claim.
-            </div>
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            {displayedPlans.map((plan) => (
+              <PlanCard
+                key={plan.title}
+                title={plan.title}
+                coverageLabel={plan.coverageLabel}
+                premiumLabel={plan.premiumLabel}
+                features={plan.features}
+                isRecommended={plan.isRecommended}
+                isActive={plan.sourceId === platformState.activePlanId}
+                isLoading={uiState.planUpdating && uiState.planTarget === plan.sourceId}
+                onSelect={() => plan.sourceId && actions.selectPlan(plan.sourceId)}
+              />
+            ))}
           </div>
+        </motion.section>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            <Button type="button" variant="secondary" leftIcon={CloudRain} onClick={() => actions.triggerScenario("rainBurst")}>
-              Trigger Rain Claim
-            </Button>
-            <Button type="button" variant="secondary" leftIcon={Sparkles} onClick={() => actions.triggerScenario("airQualitySpike")}>
-              Trigger AQI Claim
-            </Button>
-          </div>
-        </Card>
+        <div className="space-y-6">
+          <motion.section
+            variants={itemVariants}
+            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-slate-500">Risk to premium</p>
+                  <InfoTooltip
+                    label="Dynamic premium information"
+                    text="Real-time monitoring updates the Smart Plan premium as risk conditions change."
+                  />
+                </div>
+                <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
+                  Dynamic premium
+                </h3>
+              </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          {platformState.plans.map((plan) => {
-            const isActive = plan.id === platformState.activePlanId;
-            const isRecommended = plan.id === platformState.recommendedPlanId;
+              <StatusBadge status={`risk_${currentRisk.toLowerCase()}`} label={`${currentRisk} Risk`} />
+            </div>
 
-            return (
-              <Card
-                key={plan.id}
-                glow={isActive ? "emerald" : isRecommended ? "sky" : "violet"}
-                interactive
-                className={isActive ? "border-emerald-400/20" : undefined}
+            <div className="mt-6 rounded-2xl bg-slate-50 p-4">
+              <div className="text-sm font-medium text-slate-500">Smart Plan premium</div>
+              <div className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
+                <CountUp
+                  end={smartPremium}
+                  duration={1.5}
+                  formattingFn={(value) => `${formatINR(Math.round(value))}/week`}
+                  preserveValue
+                />
+              </div>
+              <div className="mt-2 text-sm text-slate-600">
+                Risk: {currentRisk} -> Premium: {formatINR(smartPremium)}
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-500">
+                <AlertTriangle size={16} />
+                Update risk
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {RISK_OPTIONS.map((option) => (
+                  <SurfaceButton
+                    key={option.id}
+                    onClick={() => actions.simulateRisk(option.id)}
+                    loading={uiState.riskUpdating && uiState.riskTarget === option.id}
+                    className={`${
+                      currentRisk.toLowerCase() === option.id ||
+                      (uiState.riskUpdating && uiState.riskTarget === option.id)
+                        ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                        : ""
+                    }`}
+                    variant="secondary"
+                  >
+                    {option.label}
+                  </SurfaceButton>
+                ))}
+              </div>
+            </div>
+          </motion.section>
+
+          <motion.div variants={itemVariants}>
+            <ActivePolicyCard
+              planName={activePlan.title}
+              premiumAmount={activePlan.title === "Smart Plan" ? smartPremium : 10}
+              coverageSummary={activePlan.summary}
+              riskLevel={currentRisk}
+            />
+          </motion.div>
+
+          <motion.section
+            variants={itemVariants}
+            className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md"
+          >
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+              <ShieldCheck size={16} />
+              Automatic claim support
+            </div>
+            <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-900">
+              Claim automatically triggered due to high risk conditions
+            </h3>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Real-time monitoring watches weather and air quality, then the automated system
+              moves a claim from pending to paid when the policy conditions match.
+            </p>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <SurfaceButton
+                onClick={() => handleAutoClaimDemo("rainBurst", "high")}
+                leftIcon={CloudRain}
+                loading={uiState.claimTriggering && uiState.claimScenarioId === "rainBurst"}
+                className="w-full sm:w-auto"
               >
-                <CardHeader>
-                  <div>
-                    <div className="text-sm text-slate-400">{plan.description}</div>
-                    <CardTitle className="mt-2 text-3xl">{plan.name}</CardTitle>
-                  </div>
-                  <div className="grid h-12 w-12 place-items-center rounded-[18px] border border-white/10 bg-slate-950/55 text-white">
-                    {isRecommended ? <Sparkles size={18} /> : <Shield size={18} />}
-                  </div>
-                </CardHeader>
+                Simulate Heavy Rain
+              </SurfaceButton>
 
-                <div className="mt-5 flex flex-wrap gap-2">
-                  {isActive ? <Badge tone="success">Active</Badge> : <Badge tone="warning">Inactive</Badge>}
-                  {isRecommended ? <Badge tone="info">Recommended</Badge> : null}
-                </div>
-
-                <div className="mt-5 grid gap-4">
-                  <div className="rounded-[22px] border border-white/10 bg-slate-950/55 p-4">
-                    <div className="text-sm text-slate-400">Coverage</div>
-                    <div className="mt-2 text-2xl font-semibold text-white">
-                      {formatINR(plan.coverageAmount || plan.payoutCap * 7)}
-                    </div>
-                  </div>
-
-                  <div className="rounded-[22px] border border-white/10 bg-slate-950/55 p-4">
-                    <div className="text-sm text-slate-400">Premium</div>
-                    <div className="mt-2 text-2xl font-semibold text-white">
-                      {formatINR(plan.premiumWeekly)}
-                      <span className="ml-2 text-sm font-normal text-slate-500">/ week</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-5 space-y-3">
-                  {plan.features.map((feature) => (
-                    <div key={feature} className="flex items-start gap-3 text-sm leading-6 text-slate-300">
-                      <div className="mt-1 rounded-full bg-emerald-400/[0.12] p-1 text-emerald-300">
-                        <Check size={12} />
-                      </div>
-                      <span>{feature}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <Button
-                  type="button"
-                  onClick={() => actions.selectPlan(plan.id)}
-                  variant={isActive ? "success" : "primary"}
-                  className="mt-6 w-full"
-                >
-                  {isActive ? "Policy Active" : `Buy ${plan.name}`}
-                </Button>
-              </Card>
-            );
-          })}
+              <SurfaceButton
+                onClick={() => handleAutoClaimDemo("airQualitySpike", "medium")}
+                variant="secondary"
+                leftIcon={Wind}
+                loading={uiState.claimTriggering && uiState.claimScenarioId === "airQualitySpike"}
+                className="w-full sm:w-auto"
+              >
+                Simulate AQI Risk
+              </SurfaceButton>
+            </div>
+          </motion.section>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

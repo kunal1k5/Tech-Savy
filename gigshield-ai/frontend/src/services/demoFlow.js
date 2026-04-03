@@ -59,6 +59,19 @@ function buildOfflineUser(profile = {}) {
     zone: profile.zone || "Koramangala",
     platform: profile.platform || "Swiggy",
     weekly_income: Number(profile.weekly_income ?? profile.weeklyIncome) || 18350,
+    work_type: profile.work_type || profile.workType || null,
+    worker_id: profile.worker_id || profile.workerId || null,
+    work_proof_name: profile.work_proof_name || profile.workProofName || null,
+    work_verification_status:
+      profile.work_verification_status || profile.workVerificationStatus || "pending",
+    work_verification_flag:
+      profile.work_verification_flag || profile.workVerificationFlag || null,
+    device_id: profile.device_id || profile.deviceId || null,
+    auth_risk_score: Number(profile.auth_risk_score ?? profile.authRiskScore) || 0,
+    auth_risk_level: profile.auth_risk_level || profile.authRiskLevel || "low",
+    auth_risk_status: profile.auth_risk_status || profile.authRiskStatus || "Safe",
+    signup_time: profile.signup_time || profile.signupTime || null,
+    location: profile.location || null,
   };
 }
 
@@ -174,7 +187,11 @@ function registerOfflineWorker(profile = {}) {
   };
 }
 
-export async function requestOtp(phone) {
+export async function requestOtp(phone, options = {}) {
+  if (options.preferOfflineDemo) {
+    return requestOfflineOtp(phone);
+  }
+
   try {
     const response = await api.post("/auth/login", { phone });
     return response.data;
@@ -187,7 +204,11 @@ export async function requestOtp(phone) {
   }
 }
 
-export async function verifyOtp({ sessionId, phone, otp, profile }) {
+export async function verifyOtp({ sessionId, phone, otp, profile, preferOfflineDemo = false }) {
+  if (preferOfflineDemo) {
+    return verifyOfflineOtp({ sessionId, phone, otp, profile });
+  }
+
   try {
     const response = await api.post("/auth/verify-otp", {
       sessionId,
@@ -205,7 +226,11 @@ export async function verifyOtp({ sessionId, phone, otp, profile }) {
   }
 }
 
-export async function registerWorker(profile) {
+export async function registerWorker(profile, options = {}) {
+  if (options.preferOfflineDemo) {
+    return registerOfflineWorker(profile);
+  }
+
   try {
     const response = await api.post("/auth/register", profile);
     return response.data;

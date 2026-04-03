@@ -487,7 +487,7 @@ def run_pipeline(dataset_path: str | None = None, output_dir: str | None = None)
 
     deployment_model = fit_deployment_model(best_model, engineered_df)
 
-    model_path = output_path / "next_location_model.pkl"
+    model_path = output_path / "location_model.pkl"
     joblib.dump(deployment_model, model_path)
     reference_path = save_reference_file(output_path, cleaned_df)
     confusion_matrix_path = save_confusion_matrix(

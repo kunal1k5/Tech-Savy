@@ -1,17 +1,13 @@
-"""
-Risk Assessment API Routes
-"""
+"""Risk assessment API routes."""
 
-from fastapi import APIRouter, HTTPException
+from __future__ import annotations
+
+from fastapi import APIRouter
 from pydantic import BaseModel
-import httpx
-import os
 
-from risk_model import compute_risk_score
+from services.risk_service import assess_zone_risk, fetch_live_weather
 
 router = APIRouter()
-
-OPENWEATHERMAP_KEY = os.getenv("OPENWEATHERMAP_API_KEY", "")
 
 
 class RiskAssessRequest(BaseModel):
@@ -22,37 +18,37 @@ class RiskAssessRequest(BaseModel):
 
 @router.post("/assess")
 async def assess_risk(req: RiskAssessRequest):
-    """
-    Assess risk for a worker's zone.
+    weather = {
+        "rainfall_mm": 5.0,
+        "temperature_c": 32.0,
+        "aqi": 120,
+        "traffic_index": 3.0,
+        "source": "fallback",
+    }
 
-    Flow:
-      1. Fetch live weather data from OpenWeatherMap API
-      2. Feed features into the risk model
-      3. Return risk_score + risk_tier + feature snapshot
-    """
-    # Fetch weather data (fallback to defaults if API unavailable)
-    weather = {"rainfall_mm": 5.0, "temperature_c": 32.0, "aqi": 120, "traffic_index": 3.0}
+    try:
+        live_weather = fetch_live_weather(req.city)
+        normalized = live_weather["weather"]
+        weather = {
+            "rainfall_mm": float(normalized.get("rain", 0.0)),
+            "temperature_c": float(normalized.get("temperature", 32.0)),
+            "aqi": int(round(max(normalized.get("pm25", 0.0), normalized.get("pm10", 0.0)))),
+            "traffic_index": float(max(min((normalized.get("wind", 0.0) + normalized.get("gust", 0.0)) / 10.0, 10.0), 0.0)),
+            "source": live_weather.get("source", "weather-service"),
+        }
+    except Exception:
+        pass
 
-    if OPENWEATHERMAP_KEY:
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                resp = await client.get(
-                    "https://api.openweathermap.org/data/2.5/weather",
-                    params={"q": req.city, "appid": OPENWEATHERMAP_KEY, "units": "metric"},
-                )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    weather["temperature_c"] = data.get("main", {}).get("temp", 32.0)
-                    weather["rainfall_mm"] = data.get("rain", {}).get("1h", 0.0)
-        except Exception:
-            pass  # Use defaults
-
-    result = compute_risk_score(
+    result = assess_zone_risk(
         rainfall_mm=weather["rainfall_mm"],
         temperature_c=weather["temperature_c"],
         aqi=weather["aqi"],
         traffic_index=weather["traffic_index"],
-        zone_disruption_count=0,  # TODO: fetch from DB
+        zone_disruption_count=0,
     )
-
-    return result
+    return {
+        **result,
+        "city": req.city,
+        "zone": req.zone,
+        "weather_source": weather["source"],
+    }

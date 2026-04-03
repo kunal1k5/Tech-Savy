@@ -2,13 +2,11 @@
  * Claim Service — Claims processing with fraud detection integration.
  */
 
-const axios = require("axios");
 const ClaimModel = require("../models/claim.model");
 const PolicyModel = require("../models/policy.model");
 const { pool } = require("../database/connection");
+const aiService = require("../integrations/aiService");
 const logger = require("../utils/logger");
-
-const AI_ENGINE_URL = process.env.AI_ENGINE_URL || "http://localhost:8000";
 
 const ClaimService = {
   /**
@@ -29,14 +27,13 @@ const ClaimService = {
     // Run fraud detection
     let fraudResult;
     try {
-      const response = await axios.post(`${AI_ENGINE_URL}/api/fraud/check`, {
+      fraudResult = await aiService.checkFraud({
         claim_id: claim.id,
         worker_id: claim.worker_id,
         policy_id: claim.policy_id,
         trigger_id: claim.trigger_id,
         claim_amount: claim.claim_amount,
       });
-      fraudResult = response.data;
     } catch (error) {
       logger.error("Fraud detection service unavailable:", error.message);
       // If fraud service is down, flag for manual review

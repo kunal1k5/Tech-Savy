@@ -1,9 +1,9 @@
-const axios = require("axios");
 const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
 
+const aiService = require("../integrations/aiService");
+
 const JWT_SECRET = process.env.JWT_SECRET || "default-dev-secret";
-const AI_ENGINE_URL = process.env.AI_ENGINE_URL || "http://localhost:8000";
 const OTP_CODE = "1234";
 const OTP_TTL_MS = 5 * 60 * 1000;
 
@@ -329,13 +329,13 @@ async function resolveRiskScore(user, requestedRisk) {
   const fallback = getRiskMeta(requestedRisk).score;
 
   try {
-    const response = await axios.post(`${AI_ENGINE_URL}/api/risk/assess`, {
+    const response = await aiService.assessRisk({
       worker_id: user.id,
       city: user.city,
       zone: user.zone,
     });
 
-    const aiScore = Number(response.data?.risk_score);
+    const aiScore = Number(response?.risk_score);
     if (!Number.isFinite(aiScore)) {
       return { score: fallback, source: "demo" };
     }

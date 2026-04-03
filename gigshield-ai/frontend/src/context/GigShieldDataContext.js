@@ -204,6 +204,15 @@ export function GigShieldDataProvider({ children }) {
     const baseState = createInitialPlatformState();
     return applySessionWorker(baseState, getUserFromToken() || getDemoSession());
   });
+  const [uiState, setUiState] = useState({
+    syncing: false,
+    riskUpdating: false,
+    riskTarget: "",
+    planUpdating: false,
+    planTarget: "",
+    claimTriggering: false,
+    claimScenarioId: "",
+  });
   const timeoutIdsRef = useRef([]);
   const intervalIdsRef = useRef([]);
   const hasBootstrappedRef = useRef(false);
@@ -219,6 +228,8 @@ export function GigShieldDataProvider({ children }) {
       return;
     }
 
+    setUiState((current) => ({ ...current, syncing: true }));
+
     try {
       const [policyData, premiumData, claimsData] = await Promise.all([
         getPolicyState(),
@@ -232,7 +243,9 @@ export function GigShieldDataProvider({ children }) {
         );
       });
     } catch (error) {
-      toast.error(error.response?.data?.error || "Could not sync live demo data.");
+      toast.error(error.response?.data?.error || "Something went wrong.");
+    } finally {
+      setUiState((current) => ({ ...current, syncing: false }));
     }
   }
 
@@ -288,6 +301,8 @@ export function GigShieldDataProvider({ children }) {
   }, []);
 
   async function simulateRisk(riskKey, { silent = false } = {}) {
+    setUiState((current) => ({ ...current, riskUpdating: true, riskTarget: riskKey }));
+
     if (getToken()) {
       try {
         const premiumData = await getPremium(riskKey);
@@ -299,10 +314,12 @@ export function GigShieldDataProvider({ children }) {
         });
 
         if (!silent) {
-          toast.success(`Risk changed to ${premiumData.riskLevel}. Premium is now ${premiumData.premium} INR.`);
+          toast.success(`Premium updated to ${premiumData.premium} INR.`);
         }
       } catch (error) {
-        toast.error(error.response?.data?.error || "Could not update risk.");
+        toast.error(error.response?.data?.error || "Something went wrong.");
+      } finally {
+        setUiState((current) => ({ ...current, riskUpdating: false, riskTarget: "" }));
       }
       return;
     }
@@ -337,9 +354,13 @@ export function GigShieldDataProvider({ children }) {
     if (!silent) {
       toast.success(`${mapRiskLevel(riskKey)} risk simulated.`);
     }
+
+    setUiState((current) => ({ ...current, riskUpdating: false, riskTarget: "" }));
   }
 
   async function selectPlan(planId) {
+    setUiState((current) => ({ ...current, planUpdating: true, planTarget: planId }));
+
     if (getToken()) {
       try {
         const policyData = await buyPolicy(planId);
@@ -350,10 +371,11 @@ export function GigShieldDataProvider({ children }) {
           );
         });
 
-        const chosenPlan = policyData.plans?.find((plan) => plan.id === planId);
-        toast.success(`${chosenPlan?.name || "Policy"} is now active.`);
+        toast.success("Policy activated");
       } catch (error) {
-        toast.error(error.response?.data?.error || "Could not activate this policy.");
+        toast.error(error.response?.data?.error || "Something went wrong.");
+      } finally {
+        setUiState((current) => ({ ...current, planUpdating: false, planTarget: "" }));
       }
       return;
     }
@@ -367,8 +389,10 @@ export function GigShieldDataProvider({ children }) {
 
     const chosenPlan = platformState.plans.find((plan) => plan.id === planId);
     if (chosenPlan) {
-      toast.success(`${chosenPlan.name} is now active for your route.`);
+      toast.success("Policy activated");
     }
+
+    setUiState((current) => ({ ...current, planUpdating: false, planTarget: "" }));
   }
 
   function refreshSignals() {
@@ -385,6 +409,12 @@ export function GigShieldDataProvider({ children }) {
       return;
     }
 
+    setUiState((current) => ({
+      ...current,
+      claimTriggering: true,
+      claimScenarioId: scenarioId,
+    }));
+
     if (getToken()) {
       const loadingToastId = toast.loading(`${scenario.title} detected. Checking for auto-claim.`);
 
@@ -399,17 +429,32 @@ export function GigShieldDataProvider({ children }) {
 
         if (!response.triggered) {
           toast.error(response.message || "No claim was triggered.", { id: loadingToastId });
+          setUiState((current) => ({
+            ...current,
+            claimTriggering: false,
+            claimScenarioId: "",
+          }));
           return;
         }
 
         toast.success(response.message, { id: loadingToastId });
         schedule(() => syncBackendState(), 2100);
         schedule(() => syncBackendState(), 4100);
+        setUiState((current) => ({
+          ...current,
+          claimTriggering: false,
+          claimScenarioId: "",
+        }));
         return;
       } catch (error) {
-        toast.error(error.response?.data?.error || "Could not trigger claim.", {
+        toast.error(error.response?.data?.error || "Something went wrong.", {
           id: loadingToastId,
         });
+        setUiState((current) => ({
+          ...current,
+          claimTriggering: false,
+          claimScenarioId: "",
+        }));
         return;
       }
     }
@@ -443,6 +488,14 @@ export function GigShieldDataProvider({ children }) {
         },
       }));
     });
+
+    schedule(() => {
+      setUiState((current) => ({
+        ...current,
+        claimTriggering: false,
+        claimScenarioId: "",
+      }));
+    }, 700);
 
     schedule(() => {
       let fraudResult;
@@ -547,7 +600,7 @@ export function GigShieldDataProvider({ children }) {
           },
         }));
 
-        toast.success("Payout released. Claim history has been updated.");
+      toast.success("Payout released. Claim history has been updated.");
       }, 3600);
     }, 1400);
   }
@@ -618,6 +671,7 @@ export function GigShieldDataProvider({ children }) {
   const value = useMemo(
     () => ({
       platformState,
+      uiState,
       derivedData,
       actions: {
         refreshSignals,
@@ -627,7 +681,7 @@ export function GigShieldDataProvider({ children }) {
         triggerScenario,
       },
     }),
-    [derivedData, platformState]
+    [derivedData, platformState, uiState]
   );
 
   return (

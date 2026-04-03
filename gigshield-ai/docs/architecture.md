@@ -1,169 +1,87 @@
-# GigShield AI — System Architecture
+# GigShield Architecture
 
-## Phase-1 Architecture Diagram
+GigShield is organized as a three-layer system:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                              GIGSHIELD AI PLATFORM                              │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                 │
-│  ┌─────────────┐       ┌──────────────────┐        ┌──────────────────────┐    │
-│  │   FRONTEND   │       │   BACKEND API     │        │     AI ENGINE        │    │
-│  │  React.js    │◄─────►│   Node/Express    │◄──────►│   Python/FastAPI     │    │
-│  │  TailwindCSS │ REST  │                   │  REST  │                      │    │
-│  │              │       │  ┌─────────────┐  │        │  ┌────────────────┐  │    │
-│  │  Pages:      │       │  │ Controllers │  │        │  │ Risk Model     │  │    │
-│  │  • Landing   │       │  ├─────────────┤  │        │  │ (GBRegressor)  │  │    │
-│  │  • Register  │       │  │ Services    │  │        │  ├────────────────┤  │    │
-│  │  • Login     │       │  ├─────────────┤  │        │  │ Fraud Detector │  │    │
-│  │  • Dashboard │       │  │ Routes      │  │        │  │ (GBClassifier) │  │    │
-│  │  • Quote     │       │  ├─────────────┤  │        │  ├────────────────┤  │    │
-│  │  • Claims    │       │  │ Middleware  │  │        │  │ Premium Calc   │  │    │
-│  │  • Admin     │       │  │ (Auth/RBAC) │  │        │  │ (Rule Engine)  │  │    │
-│  │              │       │  ├─────────────┤  │        │  └────────────────┘  │    │
-│  └─────────────┘       │  │ Models (DB) │  │        └──────────────────────┘    │
-│                         │  └─────────────┘  │                                    │
-│                         └────────┬──────────┘                                    │
-│                                  │                                               │
-│                    ┌─────────────┼──────────────┐                                │
-│                    │             │               │                                │
-│              ┌─────▼─────┐ ┌────▼────┐  ┌──────▼──────┐                         │
-│              │ PostgreSQL │ │  Redis  │  │  Razorpay   │                         │
-│              │  Database  │ │  Cache  │  │  Sandbox    │                         │
-│              └────────────┘ └─────────┘  └─────────────┘                         │
-│                                                                                  │
-│  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ EXTERNAL API INTEGRATIONS  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─   │
-│                                                                                  │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────┐           │
-│  │ OpenWeatherMap    │  │ Google Maps API  │  │ Air Quality APIs     │           │
-│  │ (Weather data)    │  │ (Traffic index)  │  │ (AQI data)           │           │
-│  └──────────────────┘  └──────────────────┘  └──────────────────────┘           │
-│                                                                                  │
-└──────────────────────────────────────────────────────────────────────────────────┘
+`frontend -> backend -> ai-engine -> database`
+
+## High-Level Flow
+
+1. `frontend/` renders the worker dashboard, onboarding, policy, claims, and profile experiences.
+2. `backend/` owns workflow orchestration, auth, persistence, and business rules.
+3. `backend/src/integrations/aiService.js` is the shared bridge from Node to the Python AI layer.
+4. `ai-engine/` runs risk scoring, location prediction, fraud scoring, premium pricing, and the composite fraud orchestrator.
+5. `database/` holds the relational schema and operational tables.
+
+## AI Engine Separation
+
+The AI layer now makes model assets and runtime logic explicit:
+
+```text
+ai-engine/
+  models/
+    risk_model.pkl
+    fraud_model.pkl
+    location_model.pkl
+  services/
+    risk_service.py
+    fraud_service.py
+    premium_service.py
+    location_service.py
+  routes/
+  utils/
+  fraud_orchestrator.py
 ```
 
-## Module Interaction Flow
+This keeps `Model != Logic` visible in the repository:
 
-```
-                 ┌──────────────────────────────────────────────┐
-                 │              WORKER APPLICATION              │
-                 │   (Register → Profile → Buy Policy → Claims) │
-                 └──────────────┬───────────────────────────────┘
-                                │
-                    ┌───────────▼───────────┐
-                    │     API GATEWAY        │
-                    │  (Express Middleware)   │
-                    │  • JWT Auth             │
-                    │  • Rate Limiting        │
-                    │  • Input Validation     │
-                    └───────────┬────────────┘
-                                │
-          ┌─────────────────────┼──────────────────────┐
-          │                     │                      │
-   ┌──────▼──────┐    ┌────────▼────────┐    ┌───────▼────────┐
-   │   POLICY     │    │  RISK ENGINE    │    │   TRIGGER      │
-   │   MANAGEMENT │    │  (AI Service)   │    │   ENGINE       │
-   │              │    │                 │    │                │
-   │  • Quote     │    │  • Risk Score   │    │  • Weather     │
-   │  • Purchase  │    │  • Risk Tier    │    │    Monitoring  │
-   │  • Renewal   │    │  • Feature      │    │  • Threshold   │
-   │  • Status    │    │    Analysis     │    │    Evaluation  │
-   └──────┬───────┘    └────────┬────────┘    │  • Auto-Claim  │
-          │                     │              │    Creation    │
-          │                     │              └───────┬────────┘
-          │                     │                      │
-          │            ┌────────▼────────┐             │
-          │            │  FRAUD DETECTION │             │
-          │            │  ENGINE          │             │
-          │            │                  │◄────────────┘
-          │            │  • GPS Spoofing  │
-          │            │  • Duplicates    │
-          │            │  • Frequency     │
-          │            │  • Amount Anomaly│
-          │            └────────┬─────────┘
-          │                     │
-   ┌──────▼─────────────────────▼──────┐
-   │        CLAIMS PROCESSING          │
-   │                                   │
-   │  fraud_score < 60 → Auto-Approve  │
-   │  fraud_score 60-80 → Flag (Review)│
-   │  fraud_score > 80 → Auto-Reject   │
-   └──────────────┬────────────────────┘
-                  │
-           ┌──────▼──────┐
-           │   PAYMENT    │
-           │   SYSTEM     │
-           │  (Razorpay)  │
-           │              │
-           │  • Premium   │
-           │    Collection│
-           │  • Claim     │
-           │    Payout    │
-           └──────────────┘
+- `models/` stores serialized artifacts only.
+- `services/` contains loading, inference, scoring, and response shaping.
+- `utils/` contains shared config, model-loading, and score-mapping helpers.
+- `fraud_orchestrator.py` combines risk, location, fraud, and payout context into a final fraud score.
+- compatibility wrappers such as `risk_model.py` and `fraud_detection.py` remain thin entrypoints for older imports.
+
+## Frontend Structure
+
+The frontend now exposes a feature-based module layer in `frontend/src/modules/`:
+
+```text
+modules/
+  auth/
+  claims/
+  dashboard/
+  policy/
+  profile/
 ```
 
-## Data Flow — End-to-End
+Routes can import from modules instead of reaching directly into page files, which makes feature ownership clearer without forcing a risky full-page move during judging week.
 
-```
-1. ONBOARDING
-   Worker registers → Profile stored in DB → JWT issued
+## Backend Structure
 
-2. RISK ASSESSMENT
-   Worker requests quote → Backend calls AI Engine →
-   AI Engine fetches weather/AQI data → Runs Risk Model →
-   Returns risk_score + risk_tier → Stored in risk_assessments table
+Important backend responsibilities:
 
-3. POLICY PURCHASE
-   Quote displayed to worker → Worker pays via Razorpay →
-   Payment verified → Weekly policy created in DB
+- `controllers/` handle HTTP transport concerns.
+- `services/` implement domain workflows.
+- `integrations/aiService.js` centralizes all backend calls to Flask/FastAPI.
+- `models/` and `database/` handle persistence access.
 
-4. CONTINUOUS MONITORING
-   Cron job / webhook fetches weather data per zone →
-   Trigger Service evaluates against thresholds →
-   If threshold breached → Parametric trigger fired
+## Runtime Topology
 
-5. AUTO-CLAIM PROCESSING
-   Trigger fires → All active policies in zone identified →
-   Claims auto-created → Fraud Engine scores each claim →
-   Low fraud → Auto-approve → Payout via Razorpay
-   High fraud → Flag for admin review
+For local development, Docker Compose runs:
 
-6. ADMIN OVERSIGHT
-   Admin dashboard shows real-time stats →
-   Flagged claims listed for manual review →
-   Recent triggers and payout summaries visible
-```
+- `frontend` on `:3000`
+- `backend` on `:5000`
+- `ai-engine` on `:8000`
+- `postgres` on `:5432`
+- `redis` on `:6379`
 
-## Technology Decisions
+## Key Design Choice
 
-| Component       | Technology          | Rationale                                            |
-|----------------|---------------------|------------------------------------------------------|
-| Frontend       | React + TailwindCSS | Fast prototyping, component-based, responsive        |
-| Backend API    | Node.js + Express   | Non-blocking I/O, rich ecosystem, fast development   |
-| AI Engine      | Python + FastAPI    | Best-in-class ML libraries, async performance        |
-| Database       | PostgreSQL          | ACID compliance, JSONB support, production-grade     |
-| Cache          | Redis               | Sub-ms latency for weather cache, session storage    |
-| Payments       | Razorpay            | Indian market leader, sandbox available, INR native  |
-| ML Models      | scikit-learn        | Phase-1 simplicity, upgradeable to TensorFlow later  |
-| Containerisation | Docker Compose    | One-command dev setup, production-ready              |
+The most important architectural upgrade is that fraud review is no longer a single-model story.
+The orchestrator can combine:
 
-## Security Architecture
+- behavioral fraud signals
+- route consistency from the location model
+- environment risk context
+- premium and payout pressure context
 
-```
-┌──────────────────────────────────────────────┐
-│               SECURITY LAYERS                 │
-├──────────────────────────────────────────────┤
-│                                              │
-│  1. Transport: HTTPS / TLS (production)      │
-│  2. Auth: JWT with bcrypt password hashing   │
-│  3. RBAC: Role-based access control          │
-│  4. Input: Joi schema validation             │
-│  5. Rate Limiting: 100 req / 15 min          │
-│  6. Headers: Helmet.js security headers      │
-│  7. CORS: Whitelist frontend origin          │
-│  8. SQL: Parameterised queries (no ORMs)     │
-│  9. Payments: Razorpay signature verification│
-│ 10. Fraud: ML-powered claim verification     │
-│                                              │
-└──────────────────────────────────────────────┘
-```
+That gives the project a clearer production-grade narrative for judges and reviewers.

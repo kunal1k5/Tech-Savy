@@ -1,39 +1,45 @@
-import React, { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
-import { ArrowRight, Shield, ShieldCheck, Smartphone } from "lucide-react";
+import React, { useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import Badge from "../components/ui/Badge";
-import Button from "../components/ui/Button";
-import Card from "../components/ui/Card";
+import AuthField from "../components/auth/AuthField";
+import AuthShell from "../components/auth/AuthShell";
+import OtpInputGroup from "../components/auth/OtpInputGroup";
+import SurfaceButton from "../components/ui/SurfaceButton";
 import { requestOtp, verifyOtp } from "../services/demoFlow";
 import { saveAuthSession } from "../utils/auth";
+import {
+  assessAndSaveAuthRisk,
+  recordLoginAttempt,
+  sanitizePhoneNumber,
+} from "../utils/authRisk";
 
-function sanitizePhone(value) {
-  return value.replace(/\D/g, "").slice(0, 10);
+const OTP_LENGTH = 4;
+
+function wait(durationMs) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, durationMs);
+  });
 }
 
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const redirectPath = location.state?.from || "/dashboard";
+  const formStartedAtRef = useRef(Date.now());
   const [step, setStep] = useState(1);
   const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState(new Array(4).fill(""));
+  const [otp, setOtp] = useState(new Array(OTP_LENGTH).fill(""));
   const [sessionId, setSessionId] = useState("");
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const inputRefs = useRef([]);
-
-  useEffect(() => {
-    if (step === 2 && inputRefs.current[0]) {
-      inputRefs.current[0].focus();
-    }
-  }, [step]);
+  const [message, setMessage] = useState("");
+  const [isVerificationNoticeVisible, setIsVerificationNoticeVisible] = useState(false);
 
   async function handleSendOtp(event) {
     event.preventDefault();
-    if (phone.length !== 10) {
+    const sanitizedPhone = sanitizePhoneNumber(phone);
+
+    if (sanitizedPhone.length !== 10) {
       setError("Enter a valid 10-digit mobile number.");
       return;
     }
@@ -43,16 +49,15 @@ export default function Login() {
     setMessage("");
 
     try {
-      const response = await requestOtp(phone);
+      recordLoginAttempt(sanitizedPhone);
+      const response = await requestOtp(sanitizedPhone, { preferOfflineDemo: true });
+
+      setPhone(sanitizedPhone);
       setSessionId(response.sessionId);
       setStep(2);
-      setMessage(
-        response.fallbackMode === "offline_demo"
-          ? "API is offline. Switched to local demo mode. Use OTP 1234 to continue."
-          : "OTP sent. Use 1234 to continue."
-      );
+      setMessage("OTP sent. Use 1234 to continue.");
     } catch (requestError) {
-      setError(requestError.response?.data?.error || "Could not send OTP. Try again.");
+      setError(requestError.response?.data?.error || "Could not send OTP right now.");
     } finally {
       setLoading(false);
     }
@@ -61,8 +66,9 @@ export default function Login() {
   async function handleVerify(event) {
     event.preventDefault();
     const combinedOtp = otp.join("");
+    const sanitizedPhone = sanitizePhoneNumber(phone);
 
-    if (combinedOtp.length !== 4) {
+    if (combinedOtp.length !== OTP_LENGTH) {
       setError("Enter all 4 OTP digits to continue.");
       return;
     }
@@ -70,257 +76,184 @@ export default function Login() {
     setLoading(true);
     setError("");
     setMessage("");
+    setIsVerificationNoticeVisible(true);
 
     try {
+      const authRiskSnapshot = await assessAndSaveAuthRisk({
+        phone: sanitizedPhone,
+        flow: "login",
+        formStartedAt: formStartedAtRef.current,
+      });
+
       const response = await verifyOtp({
         sessionId,
-        phone,
+        phone: sanitizedPhone,
         otp: combinedOtp,
+        preferOfflineDemo: true,
+        profile: {
+          deviceId: authRiskSnapshot.deviceId,
+          authRiskScore: authRiskSnapshot.riskScore,
+          authRiskLevel: authRiskSnapshot.riskLevel,
+          authRiskStatus: authRiskSnapshot.riskStatus,
+          location: authRiskSnapshot.location,
+        },
       });
-      saveAuthSession(response);
+
+      saveAuthSession({
+        ...response,
+        user: {
+          ...response.user,
+          deviceId: authRiskSnapshot.deviceId,
+          authRiskScore: authRiskSnapshot.riskScore,
+          authRiskLevel: authRiskSnapshot.riskLevel,
+          authRiskStatus: authRiskSnapshot.riskStatus,
+        },
+      });
+
+      await wait(650);
       navigate(redirectPath, { replace: true });
     } catch (verifyError) {
+      recordLoginAttempt(sanitizedPhone);
       setError(verifyError.response?.data?.error || "OTP verification failed.");
+      setIsVerificationNoticeVisible(false);
     } finally {
       setLoading(false);
     }
   }
 
-  function handleOtpChange(event, index) {
-    const rawValue = event.target.value.replace(/\D/g, "");
-    if (!rawValue) {
-      setOtp((current) => current.map((digit, digitIndex) => (digitIndex === index ? "" : digit)));
-      return;
-    }
-
-    if (rawValue.length > 1) {
-      const nextOtp = [...otp];
-      rawValue
-        .slice(0, 4)
-        .split("")
-        .forEach((digit, digitIndex) => {
-          if (index + digitIndex < 4) {
-            nextOtp[index + digitIndex] = digit;
-          }
-        });
-      setOtp(nextOtp);
-      inputRefs.current[Math.min(index + rawValue.length, 3)]?.focus();
-      return;
-    }
-
-    const nextOtp = [...otp];
-    nextOtp[index] = rawValue;
-    setOtp(nextOtp);
-
-    if (index < 3) {
-      inputRefs.current[index + 1]?.focus();
-    }
-  }
-
-  function handleOtpKeyDown(event, index) {
-    if (event.key === "Backspace" && !otp[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
-  }
-
-  function handleOtpPaste(event) {
-    event.preventDefault();
-    const pastedDigits = event.clipboardData.getData("text/plain").replace(/\D/g, "").slice(0, 4);
-    if (!pastedDigits) {
-      return;
-    }
-
-    const nextOtp = new Array(4).fill("");
-    pastedDigits.split("").forEach((digit, index) => {
-      nextOtp[index] = digit;
-    });
-    setOtp(nextOtp);
-    inputRefs.current[Math.min(pastedDigits.length, 4) - 1]?.focus();
-  }
-
   async function handleResend() {
+    const sanitizedPhone = sanitizePhoneNumber(phone);
+
     try {
-      const response = await requestOtp(phone);
+      recordLoginAttempt(sanitizedPhone);
+      const response = await requestOtp(sanitizedPhone, { preferOfflineDemo: true });
       setSessionId(response.sessionId);
-      setOtp(new Array(4).fill(""));
+      setOtp(new Array(OTP_LENGTH).fill(""));
       setError("");
-      setMessage(
-        response.fallbackMode === "offline_demo"
-          ? "Fresh local demo OTP ready. Continue with 1234."
-          : "Fresh OTP sent. Continue with 1234."
-      );
-      inputRefs.current[0]?.focus();
+      setMessage("A new OTP is ready. Use 1234 to continue.");
     } catch (requestError) {
-      setError(requestError.response?.data?.error || "Could not resend OTP.");
+      setError(requestError.response?.data?.error || "Could not resend OTP right now.");
     }
+  }
+
+  function handleChangeNumber() {
+    setStep(1);
+    setOtp(new Array(OTP_LENGTH).fill(""));
+    setSessionId("");
+    setError("");
+    setMessage("");
+    setIsVerificationNoticeVisible(false);
+    formStartedAtRef.current = Date.now();
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-8 text-slate-50">
-      <div className="pointer-events-none absolute inset-0 fintech-grid opacity-30" />
-      <div className="pointer-events-none absolute left-[10%] top-[10%] h-80 w-80 rounded-full bg-sky-500/[0.16] blur-[150px]" />
-      <div className="pointer-events-none absolute right-[10%] bottom-[8%] h-80 w-80 rounded-full bg-violet-500/[0.16] blur-[150px]" />
-
-      <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-6xl">
-        <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-          <Card glow="violet" className="hidden lg:block">
-            <div className="flex items-center gap-3">
-              <div className="grid h-12 w-12 place-items-center rounded-[20px] border border-sky-400/25 bg-sky-400/10">
-                <Shield className="fill-sky-300/15 text-sky-200" size={20} />
-              </div>
-              <div>
-                <div className="font-display text-2xl font-semibold text-white">GigShield</div>
-                <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
-                  Secure demo access
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-12 space-y-6">
-              <Badge tone="info" className="w-fit">OTP sign-in flow</Badge>
-              <div>
-                <h1 className="font-display text-5xl font-semibold leading-tight text-white">
-                  Fast sign-in that still feels premium.
-                </h1>
-                <p className="mt-4 text-base leading-8 text-slate-300">
-                  OTP entry is cleaner, faster, and easier to demo with auto-advancing digits, paste support, and clear feedback.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                {[
-                  "Responsive auth shell with polished feedback states",
-                  "Auto-advancing OTP input built for demo speed",
-                  "Demo session creation so protected routes work instantly",
-                ].map((item) => (
-                  <div key={item} className="rounded-[22px] border border-white/10 bg-slate-950/55 px-4 py-4 text-sm text-slate-300">
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Card>
-
-          <Card glow="sky">
-            <div className="mx-auto max-w-md">
-              <div className="mb-8 flex items-start justify-between gap-4">
+    <AuthShell
+      eyebrow="Login"
+      title="Sign in to GigShield"
+      description="Enter your mobile number and a 4-digit OTP to continue into your protected dashboard."
+      note="Fast sign-in, clean feedback, and silent verification checks run in the background while you move forward."
+      footer={
+        <>
+          Need an account?{" "}
+          <Link to="/register" className="font-medium text-blue-600 transition-colors duration-200 hover:text-blue-700">
+            Create one here
+          </Link>
+          .
+        </>
+      }
+    >
+      <form onSubmit={step === 1 ? handleSendOtp : handleVerify} className="space-y-6">
+        <AnimatePresence mode="wait" initial={false}>
+          {step === 1 ? (
+            <motion.div
+              key="phone-step"
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 12 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+            >
+              <AuthField
+                id="mobile-number"
+                label="Mobile Number"
+                value={phone}
+                onChange={(value) => setPhone(sanitizePhoneNumber(value))}
+                placeholder="9876543210"
+                inputMode="numeric"
+                autoComplete="tel"
+                maxLength={10}
+                autoFocus
+                prefix="+91"
+                disabled={loading}
+                helperText="Use any 10-digit number for the demo. OTP is fixed to 1234."
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="otp-step"
+              initial={{ opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -12 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              className="space-y-4"
+            >
+              <div className="flex items-center justify-between gap-4">
                 <div>
-                  <Badge tone="violet" className="w-fit">Secure sign in</Badge>
-                  <h2 className="mt-4 font-display text-4xl font-semibold text-white">Welcome back</h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-400">
-                    Sign in with OTP to continue into the GigShield demo workspace.
-                  </p>
+                  <p className="text-sm font-medium text-slate-700">OTP Verification</p>
+                  <p className="mt-1 text-sm text-slate-500">Code sent to +91 {phone}</p>
                 </div>
-                <Link to="/" className="text-sm text-slate-400 transition hover:text-white">
-                  Back
-                </Link>
-              </div>
 
-              <form onSubmit={step === 1 ? handleSendOtp : handleVerify} className="space-y-6">
-                {step === 1 ? (
-                  <motion.div initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }}>
-                    <label className="block text-sm font-medium text-slate-300">Mobile number</label>
-                    <div className="relative mt-3 rounded-[24px] border border-white/10 bg-slate-950/55 px-4 py-4">
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-500">+91</div>
-                      <input
-                        type="tel"
-                        value={phone}
-                        onChange={(event) => setPhone(sanitizePhone(event.target.value))}
-                        placeholder="9876543210"
-                        className="w-full bg-transparent py-1 pl-10 pr-10 text-white placeholder-slate-500 outline-none"
-                        autoFocus
-                      />
-                      <Smartphone className="absolute right-4 top-4.5 text-slate-500" size={18} />
-                    </div>
-                    <p className="mt-3 text-sm text-slate-500">
-                      Demo note: enter any valid mobile number, then use OTP 1234.
-                    </p>
-                  </motion.div>
-                ) : (
-                  <motion.div initial={{ opacity: 0, x: 14 }} animate={{ opacity: 1, x: 0 }}>
-                    <div className="flex items-center justify-between">
-                      <label className="block text-sm font-medium text-slate-300">Enter OTP</label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setStep(1);
-                          setSessionId("");
-                          setOtp(new Array(4).fill(""));
-                          setError("");
-                          setMessage("");
-                        }}
-                        className="text-sm text-sky-300 transition hover:text-sky-200"
-                      >
-                        Change number
-                      </button>
-                    </div>
-                    <div className="mt-4 flex justify-between gap-3">
-                      {otp.map((digit, index) => (
-                        <input
-                          key={index}
-                          ref={(ref) => {
-                            inputRefs.current[index] = ref;
-                          }}
-                          type="text"
-                          inputMode="numeric"
-                          maxLength={1}
-                          value={digit}
-                          onChange={(event) => handleOtpChange(event, index)}
-                          onKeyDown={(event) => handleOtpKeyDown(event, index)}
-                          onPaste={handleOtpPaste}
-                          className="h-16 w-16 rounded-[22px] border border-white/10 bg-slate-950/55 text-center text-xl font-semibold text-white outline-none transition focus:border-emerald-400/30 focus:ring-2 focus:ring-emerald-400/20"
-                          aria-label={`OTP digit ${index + 1}`}
-                        />
-                      ))}
-                    </div>
-                    <div className="mt-4 flex items-center justify-between text-sm">
-                      <span className="text-slate-500">Use static OTP 1234 for the demo.</span>
-                      <button
-                        type="button"
-                        onClick={handleResend}
-                        className="text-sky-300 transition hover:text-sky-200"
-                      >
-                        Resend OTP
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-
-                {message ? (
-                  <div className="rounded-[22px] border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
-                    {message}
-                  </div>
-                ) : null}
-
-                {error ? (
-                  <div className="rounded-[22px] border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
-                    {error}
-                  </div>
-                ) : null}
-
-                <Button
-                  type="submit"
-                  variant="primary"
-                  block
-                  size="lg"
-                  loading={loading}
-                  rightIcon={step === 1 ? ArrowRight : ShieldCheck}
+                <button
+                  type="button"
+                  onClick={handleChangeNumber}
+                  className="text-sm font-medium text-slate-500 transition-colors duration-200 hover:text-slate-900"
                 >
-                  {step === 1 ? "Send OTP" : "Verify and continue"}
-                </Button>
-              </form>
-
-              <div className="mt-8 text-center text-sm text-slate-500">
-                Need a demo account?{" "}
-                <Link to="/register" className="text-sky-300 transition hover:text-sky-200">
-                  Create one here
-                </Link>
-                .
+                  Change number
+                </button>
               </div>
-            </div>
-          </Card>
-        </div>
-      </motion.div>
-    </div>
+
+              <OtpInputGroup
+                value={otp}
+                onChange={setOtp}
+                autoFocus={step === 2}
+                disabled={loading}
+              />
+
+              <div className="flex items-center justify-between gap-4 text-sm">
+                <span className="text-slate-500">Use static OTP 1234.</span>
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  className="font-medium text-blue-600 transition-colors duration-200 hover:text-blue-700"
+                >
+                  Resend OTP
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {isVerificationNoticeVisible ? (
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+            Verification in progress...
+          </div>
+        ) : null}
+
+        {message ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            {message}
+          </div>
+        ) : null}
+
+        {error ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        ) : null}
+
+        <SurfaceButton type="submit" className="w-full" loading={loading}>
+          {step === 1 ? "Send OTP" : "Verify and continue"}
+        </SurfaceButton>
+      </form>
+    </AuthShell>
   );
 }

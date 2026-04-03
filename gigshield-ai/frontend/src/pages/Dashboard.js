@@ -1,374 +1,427 @@
 import React from "react";
-import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import CountUp from "react-countup";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
-  Clock3,
-  MapPinned,
+  BadgeCheck,
+  FileText,
   ShieldCheck,
   Wallet,
 } from "lucide-react";
-import Card from "../components/ui/Card";
-import Badge from "../components/ui/Badge";
-import Button, { buttonStyles } from "../components/ui/Button";
-import EmptyState from "../components/ui/EmptyState";
-import { ScanPanel } from "../components/ui/Loader";
+import InfoTooltip from "../components/ui/InfoTooltip";
+import SurfaceLoadingPanel from "../components/ui/SurfaceLoadingPanel";
+import SurfaceScanPanel from "../components/ui/SurfaceScanPanel";
 import { useGigShieldData } from "../context/GigShieldDataContext";
-import { getFraudStatusLabel, getStatusLabel } from "../data/mockPlatform";
 import { cn } from "../utils/cn";
 import { formatINR } from "../utils/helpers";
 
-const sectionVariants = {
-  hidden: { opacity: 0, y: 18 },
+const containerVariants = {
+  hidden: { opacity: 0, y: 16 },
   show: {
     opacity: 1,
     y: 0,
     transition: {
-      duration: 0.38,
+      duration: 0.35,
       ease: "easeOut",
       staggerChildren: 0.08,
-      delayChildren: 0.04,
     },
   },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 22, scale: 0.97 },
+  hidden: { opacity: 0, y: 18 },
   show: {
     opacity: 1,
     y: 0,
-    scale: 1,
-    transition: { duration: 0.38, ease: "easeOut" },
+    transition: { duration: 0.32, ease: "easeOut" },
   },
 };
 
-function getRiskTone(level) {
-  if (level === "High") {
-    return "danger";
-  }
+const riskStyles = {
+  Low: {
+    pill: "bg-emerald-50 text-emerald-700",
+    dot: "bg-emerald-500",
+    accent: "text-emerald-700",
+  },
+  Medium: {
+    pill: "bg-amber-50 text-amber-700",
+    dot: "bg-amber-500",
+    accent: "text-amber-700",
+  },
+  High: {
+    pill: "bg-red-50 text-red-700",
+    dot: "bg-red-500",
+    accent: "text-red-700",
+  },
+};
 
-  if (level === "Medium") {
-    return "warning";
-  }
-
-  return "success";
+function getFirstName(name = "") {
+  return name.trim().split(" ")[0] || "there";
 }
 
-function getClaimTone(status) {
+function getClaimStatus(status) {
   if (status === "paid") {
-    return "success";
+    return { label: "Paid", className: "bg-emerald-50 text-emerald-700" };
   }
 
   if (status === "manual_review") {
-    return "danger";
+    return { label: "Manual Review", className: "bg-red-50 text-red-700" };
   }
 
-  if (status === "approved") {
-    return "info";
-  }
-
-  return "warning";
+  return { label: "Processing", className: "bg-amber-50 text-amber-700" };
 }
 
-function MetricCard({
-  label,
-  value,
-  countValue,
-  formatValue,
-  subtitle,
-  tone = "default",
-  icon: Icon,
-  featured = false,
-  pulse = false,
-}) {
-  const toneStyles = {
-    success: "border-emerald-400/20",
-    warning: "border-amber-400/20",
-    danger: "border-rose-400/20",
-    info: "border-sky-400/20",
-    default: "border-white/10",
-  };
+function getFraudState(status, flags = []) {
+  if (status === "flagged") {
+    return {
+      score: Math.min(96, 82 + flags.length * 4),
+      label: "Suspicious",
+      className: "bg-red-50 text-red-700",
+      dot: "bg-red-500",
+      bar: "bg-red-500",
+      tone: "danger",
+    };
+  }
 
+  if (status === "in_progress") {
+    return {
+      score: 58,
+      label: "Warning",
+      className: "bg-amber-50 text-amber-700",
+      dot: "bg-amber-500",
+      bar: "bg-amber-500",
+      tone: "warning",
+    };
+  }
+
+  return {
+    score: Math.max(12, 22 - flags.length * 2),
+    label: "Safe",
+    className: "bg-emerald-50 text-emerald-700",
+    dot: "bg-emerald-500",
+    bar: "bg-emerald-500",
+    tone: "success",
+  };
+}
+
+function getRiskAnimation(level) {
+  if (level === "High") {
+    return {
+      animate: { opacity: [1, 0.6, 1], scale: [1, 1.35, 1] },
+      transition: { repeat: Infinity, duration: 1.5, ease: "easeInOut" },
+    };
+  }
+
+  if (level === "Medium") {
+    return {
+      animate: { opacity: [0.85, 1, 0.85], scale: [1, 1.14, 1] },
+      transition: { repeat: Infinity, duration: 2.3, ease: "easeInOut" },
+    };
+  }
+
+  return {
+    animate: undefined,
+    transition: undefined,
+  };
+}
+
+function DashboardCard({ children, className }) {
   return (
-    <motion.div
-      className="rounded-[26px]"
-      animate={
-        pulse
-          ? {
-              boxShadow: [
-                "0 0 0 rgba(244,63,94,0)",
-                "0 0 26px rgba(244,63,94,0.28)",
-                "0 0 0 rgba(244,63,94,0)",
-              ],
-            }
-          : undefined
-      }
-      transition={pulse ? { duration: 1.5, repeat: Infinity, ease: "easeInOut" } : undefined}
+    <motion.section
+      variants={itemVariants}
+      whileHover={{ y: -2, scale: 1.02 }}
+      transition={{ type: "spring", stiffness: 320, damping: 26 }}
+      className={cn("rounded-2xl border border-slate-200 bg-white p-6 shadow-md", className)}
     >
-      <Card
-        glow={tone === "danger" ? "rose" : tone === "warning" ? "amber" : tone === "success" ? "emerald" : "sky"}
-        interactive
-        className={cn(toneStyles[tone] || toneStyles.default, pulse && "risk-pulse")}
-      >
-        {featured ? (
-          <motion.div
-            className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-white/10 to-transparent"
-            animate={{ x: ["0%", "260%"] }}
-            transition={{ duration: 2.8, repeat: Infinity, repeatDelay: 1.4, ease: "easeInOut" }}
-          />
-        ) : null}
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-2">
-            <div className="text-sm font-medium text-slate-400">{label}</div>
-            <div
-              className={`font-display font-semibold tracking-tight text-white ${
-                featured ? "text-4xl md:text-5xl" : "text-3xl md:text-4xl"
-              }`}
-            >
-              {typeof countValue === "number" ? (
-                <CountUp
-                  end={countValue}
-                  duration={1.5}
-                  formattingFn={formatValue}
-                  preserveValue
-                />
-              ) : (
-                value
-              )}
-            </div>
-            <div className="text-sm leading-6 text-slate-400">{subtitle}</div>
-          </div>
-          {Icon ? (
-            <div className="rounded-[18px] border border-white/10 bg-slate-900/80 p-3 text-white">
-              <Icon size={featured ? 22 : 20} />
-            </div>
-          ) : null}
-        </div>
-        {tone !== "default" ? (
-          <div className="mt-5">
-            <Badge tone={tone} pulse={pulse}>
-              {label}
-            </Badge>
-          </div>
-        ) : null}
-      </Card>
-    </motion.div>
+      {children}
+    </motion.section>
+  );
+}
+
+function CurrencyValue({ value, className }) {
+  return (
+    <div className={cn("text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl", className)}>
+      <CountUp
+        end={value}
+        duration={1.5}
+        formattingFn={(currentValue) => formatINR(Math.round(currentValue))}
+        preserveValue
+      />
+    </div>
   );
 }
 
 export default function Dashboard() {
-  const { platformState, derivedData, actions } = useGigShieldData();
-  const latestClaim = derivedData.latestClaim;
-  const riskLevel = derivedData.currentRisk?.level || "Safe";
-  const riskTone = getRiskTone(riskLevel);
-
-  const activityItems = [
-    {
-      label: derivedData.hasActivePolicy ? "Active policy" : "Recommended policy",
-      value: `${derivedData.displayPlan.name} • ${formatINR(derivedData.dynamicPremium)}/week`,
-      tone: derivedData.hasActivePolicy ? "success" : "info",
-    },
-    {
-      label: "Risk update",
-      value: platformState.liveMonitor.headline,
-      tone: riskTone,
-    },
-    {
-      label: "Fraud check",
-      value: getFraudStatusLabel(platformState.fraudWatch.status),
-      tone: derivedData.fraudTone,
-    },
-    {
-      label: "Latest claim",
-      value: latestClaim ? getStatusLabel(latestClaim.status) : "No claim yet",
-      tone: latestClaim ? getClaimTone(latestClaim.status) : "info",
-    },
-  ];
+  const { platformState, derivedData, uiState } = useGigShieldData();
+  const workerFirstName = getFirstName(platformState.worker.name);
+  const currentRisk = derivedData.currentRisk?.level || "Low";
+  const currentRiskStyle = riskStyles[currentRisk] || riskStyles.Low;
+  const riskAnimation = getRiskAnimation(currentRisk);
+  const activePlan = derivedData.activePlan || derivedData.displayPlan;
+  const recentClaims = platformState.claims.slice(0, 2);
+  const fraudState = getFraudState(
+    platformState.fraudWatch.status,
+    platformState.fraudWatch.activeFlags
+  );
 
   return (
     <motion.div
-      className="page-shell"
-      initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
+      className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 md:px-6 md:py-8 xl:px-8"
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
     >
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.32, ease: "easeOut" }}
-        className="space-y-2"
-      >
-        <h1 className="font-display text-3xl font-semibold text-white md:text-4xl">
-          Hi {platformState.worker.name.split(" ")[0]}
-        </h1>
-        <div className="flex items-center gap-2 text-base text-slate-400">
-          <MapPinned size={16} className="text-sky-300" />
-          <span>
-            {platformState.worker.area}, {platformState.worker.city}
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-2 pt-1">
-          <Badge tone={derivedData.hasActivePolicy ? "success" : "info"}>
-            {derivedData.hasActivePolicy ? derivedData.activePlan.name : `${derivedData.displayPlan.name} recommended`}
-          </Badge>
-          <Badge tone="success">Premium {formatINR(derivedData.dynamicPremium)}/week</Badge>
-        </div>
-      </motion.div>
+      <motion.header variants={itemVariants} className="space-y-2">
+        <h2 className="text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
+          Hi, {workerFirstName} 👋
+        </h2>
+        <p className="text-sm text-slate-600 md:text-base">Here&apos;s your activity overview</p>
+      </motion.header>
 
-      <motion.div
-        variants={sectionVariants}
-        initial="hidden"
-        animate="show"
-        className="grid gap-4 xl:grid-cols-[1.45fr_1fr_0.95fr]"
-      >
-        <motion.div variants={itemVariants}>
-          <MetricCard
-            label="Your Earnings"
-            countValue={platformState.worker.weeklyIncome}
-            formatValue={(val) => formatINR(Math.round(val))}
-            subtitle={`Average weekly income. Active today: ${platformState.worker.activeHoursToday} hours.`}
-            icon={Wallet}
-            tone="success"
-            featured
+      <AnimatePresence>
+        {uiState.syncing ? (
+          <SurfaceLoadingPanel
+            title="Refreshing dashboard"
+            description="Updating monitoring signals, premium changes, and claim activity."
           />
-        </motion.div>
+        ) : null}
+      </AnimatePresence>
 
-        <motion.div variants={itemVariants}>
-          <MetricCard
-            label="Today's Loss"
-            countValue={derivedData.latestLossAmount}
-            formatValue={(val) => formatINR(Math.round(val))}
-            subtitle={`${derivedData.hoursLostToday} hours lost today.`}
-            icon={Clock3}
-            tone="warning"
-          />
-        </motion.div>
-
-        <motion.div variants={itemVariants}>
-          <MetricCard
-            label="Risk Level"
-            value={riskLevel}
-            subtitle={`${derivedData.currentRisk?.zone || "Your area"} is currently being watched.`}
-            icon={AlertTriangle}
-            tone={riskTone}
-            pulse={riskTone === "danger"}
-          />
-        </motion.div>
-      </motion.div>
-
-      <motion.div
-        variants={sectionVariants}
-        initial="hidden"
-        animate="show"
-        transition={{ delay: 0.1 }}
-        className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]"
-      >
-        <motion.div variants={itemVariants}>
-          <Card interactive>
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h2 className="font-display text-2xl font-semibold text-white">Claims</h2>
-                <p className="mt-1 text-sm text-slate-400">See your recent claims and payout status.</p>
-              </div>
-              <Link to="/claims" className={cn(buttonStyles({ variant: "secondary", size: "sm" }))}>
-                View all
-              </Link>
+      <section className="grid gap-6 xl:grid-cols-[1.4fr_0.8fr_0.8fr]">
+        <DashboardCard className="overflow-hidden">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-slate-500">Protected Income</p>
+              <CurrencyValue value={platformState.worker.weeklyIncome} className="mt-4 text-blue-600" />
+              <p className="mt-2 text-sm text-slate-500">This week</p>
             </div>
 
-            {platformState.claims.length ? (
-              <div className="mt-5 space-y-3">
-                {platformState.claims.slice(0, 3).map((claim, index) => (
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
+              <Wallet size={20} />
+            </div>
+          </div>
+
+          <div className="mt-8 flex items-center gap-2 text-sm text-slate-600">
+            <span className="h-2 w-2 rounded-full bg-blue-500" />
+            Risk-based protection is active under your current plan
+          </div>
+        </DashboardCard>
+
+        <DashboardCard>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-slate-500">Loss Detected</p>
+              <CurrencyValue value={derivedData.latestLossAmount} className="mt-4" />
+              <p className="mt-2 text-sm text-slate-500">Due to disruption</p>
+            </div>
+
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+              <AlertTriangle size={20} />
+            </div>
+          </div>
+        </DashboardCard>
+
+        <DashboardCard>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-slate-500">Current Risk</p>
+              <div className="mt-4 flex items-center gap-3">
+                <motion.span
+                  className={cn("h-3 w-3 rounded-full", currentRiskStyle.dot)}
+                  animate={riskAnimation.animate}
+                  transition={riskAnimation.transition}
+                />
+                <div className={cn("text-3xl font-semibold tracking-tight md:text-4xl", currentRiskStyle.accent)}>
+                  {currentRisk}
+                </div>
+              </div>
+              <p className="mt-2 text-sm text-slate-500">
+                {derivedData.currentRisk?.zone || platformState.worker.area}
+              </p>
+            </div>
+
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold",
+                currentRiskStyle.pill
+              )}
+            >
+              {currentRisk}
+            </span>
+          </div>
+        </DashboardCard>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+        <DashboardCard>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-slate-500">Active Policy</p>
+              <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+                {activePlan?.name || "No active plan"}
+              </h3>
+            </div>
+
+            <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+              Active
+            </span>
+          </div>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-sm font-medium text-slate-500">Premium</p>
+              <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
+                <CountUp
+                  end={derivedData.dynamicPremium}
+                  duration={1.5}
+                  formattingFn={(value) => formatINR(Math.round(value))}
+                  preserveValue
+                />
+                <span className="ml-1 text-sm font-medium text-slate-500">/week</span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="text-sm font-medium text-slate-500">Coverage status</p>
+              <div className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <ShieldCheck size={16} className="text-emerald-600" />
+                Active coverage
+              </div>
+            </div>
+          </div>
+        </DashboardCard>
+
+        <DashboardCard>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-slate-500">Claims Preview</p>
+              <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-900">
+                Recent claims
+              </h3>
+            </div>
+
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+              <FileText size={18} />
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-3">
+            {recentClaims.length ? (
+              recentClaims.map((claim) => {
+                const claimStatus = getClaimStatus(claim.status);
+
+                return (
                   <motion.div
                     key={claim.id}
-                    initial={{ opacity: 0, x: -24 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.18 + index * 0.08, duration: 0.34, ease: "easeOut" }}
-                    whileHover={{ x: 4, scale: 1.015 }}
-                    className="rounded-[20px] border border-white/10 bg-slate-900/75 px-4 py-4"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.26, ease: "easeOut" }}
+                    className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-4"
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <div className="truncate text-base font-semibold text-white">{claim.headline}</div>
-                        <div className="mt-1 text-sm text-slate-400">{claim.area}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-semibold text-white">{formatINR(claim.amount)}</div>
-                        <div className="mt-2">
-                          <Badge tone={getClaimTone(claim.status)}>{getStatusLabel(claim.status)}</Badge>
-                        </div>
-                      </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900">
+                        {claim.headline}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">{formatINR(claim.amount)}</p>
                     </div>
+
+                    <span
+                      className={cn(
+                        "inline-flex rounded-full px-3 py-1.5 text-xs font-semibold",
+                        claimStatus.className
+                      )}
+                    >
+                      {claimStatus.label}
+                    </span>
                   </motion.div>
-                ))}
-              </div>
+                );
+              })
             ) : (
-              <div className="mt-5">
-                <EmptyState
-                  icon={ShieldCheck}
-                  title="No claims yet"
-                  description="A new claim will show here when a disruption affects your work."
-                  action={
-                    <Button type="button" variant="primary" onClick={() => actions.triggerScenario("rainBurst")}>
-                      Check now
-                    </Button>
-                  }
-                />
+              <div className="rounded-2xl bg-slate-50 px-4 py-5 text-sm text-slate-500">
+                No recent claims yet.
               </div>
             )}
-          </Card>
-        </motion.div>
+          </div>
+        </DashboardCard>
+      </section>
 
-        <motion.div variants={itemVariants}>
-          <Card interactive>
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h2 className="font-display text-2xl font-semibold text-white">Activity</h2>
-                <p className="mt-1 text-sm text-slate-400">Quick status for risk, fraud, and claims.</p>
-              </div>
-              <Badge tone={riskTone} pulse={riskTone === "danger"}>
-                {riskLevel}
-              </Badge>
-            </div>
-
-            <div className="mt-5">
-              <ScanPanel
-                status={platformState.fraudWatch.status === "flagged" ? "Suspicious" : "Verified"}
-                label={platformState.fraudWatch.summary}
-                tone={derivedData.fraudTone}
+      <DashboardCard>
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-slate-500">Fraud Intelligence</p>
+              <InfoTooltip
+                label="Fraud intelligence information"
+                text="Automated system checks route continuity, repeated claims, and document signals before payout."
               />
             </div>
+            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+              Claim trust overview
+            </h3>
+          </div>
 
-            <div className="mt-5 space-y-3">
-              {activityItems.map((item, index) => (
+          <span
+            className={cn(
+              "inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold",
+              fraudState.className
+            )}
+          >
+            <span className={cn("h-2 w-2 rounded-full", fraudState.dot)} />
+            {fraudState.label}
+          </span>
+        </div>
+
+        <div className="mt-6 grid gap-4 md:grid-cols-[220px_220px_minmax(0,1fr)]">
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-sm font-medium text-slate-500">Risk Score</p>
+            <div className="mt-3 text-3xl font-semibold tracking-tight text-slate-900">
+              <CountUp end={fraudState.score} duration={1} preserveValue />
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <p className="text-sm font-medium text-slate-500">Status</p>
+            <div className="mt-3">
+              <span
+                className={cn(
+                  "inline-flex rounded-full px-3 py-1.5 text-xs font-semibold",
+                  fraudState.className
+                )}
+              >
+                {fraudState.label}
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <SurfaceScanPanel
+              title="Real-time monitoring"
+              description={platformState.fraudWatch.summary}
+              tone={fraudState.tone}
+              badgeLabel={fraudState.label === "Safe" ? "Verified" : fraudState.label}
+            />
+
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+                <BadgeCheck size={16} />
+                Automated system
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                {platformState.fraudWatch.latestAudit || platformState.fraudWatch.summary}
+              </p>
+
+              <div className="mt-4 h-2 rounded-full bg-slate-200">
                 <motion.div
-                  key={item.label}
-                  initial={{ opacity: 0, x: 24 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.2 + index * 0.08, duration: 0.34, ease: "easeOut" }}
-                  whileHover={{ x: 4, scale: 1.01 }}
-                  className="flex items-center justify-between gap-4 rounded-[20px] border border-white/10 bg-slate-900/75 px-4 py-4"
-                >
-                  <div>
-                    <div className="text-sm text-slate-400">{item.label}</div>
-                    <div className="mt-1 text-base font-medium text-white">{item.value}</div>
-                  </div>
-                  <Badge tone={item.tone}>{item.label}</Badge>
-                </motion.div>
-              ))}
+                  className={cn("h-2 rounded-full", fraudState.bar)}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${fraudState.score}%` }}
+                  transition={{ duration: 0.6, ease: "easeOut" }}
+                />
+              </div>
             </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <Button type="button" variant="secondary" onClick={actions.refreshSignals}>
-                Cycle risk
-              </Button>
-              <Button type="button" variant="secondary" onClick={actions.runFraudDrill}>
-                Check fraud
-              </Button>
-            </div>
-          </Card>
-        </motion.div>
-      </motion.div>
+          </div>
+        </div>
+      </DashboardCard>
     </motion.div>
   );
 }
