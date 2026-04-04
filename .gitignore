@@ -21,6 +21,11 @@ gigpredict-ai/frontend/build-*/
 gigpredict-ai/frontend/build-submission/
 gigpredict-ai/frontend/build-temp/
 gigpredict-ai/frontend/build-verification/
+gigshield-ai/frontend/build/
+gigshield-ai/frontend/build-*/
+gigshield-ai/frontend/build-submission/
+gigshield-ai/frontend/build-temp/
+gigshield-ai/frontend/build-verification/
 gigpredict-ai/backend/coverage/
 gigpredict-ai/backend/uploads/
 

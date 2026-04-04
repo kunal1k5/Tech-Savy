@@ -139,7 +139,7 @@ app.get("/api/health", (_req, res) => {
     res,
     {
       status: "ok",
-      service: "gigpredict-ai-backend",
+      service: "gigshield-ai-backend",
       timestamp: new Date().toISOString(),
     },
     "Health check passed."

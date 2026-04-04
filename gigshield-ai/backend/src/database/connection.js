@@ -13,7 +13,7 @@ const pool = new Pool({
   port: parseInt(process.env.DB_PORT, 10) || 5432,
   database: process.env.DB_NAME || "gigpredict_ai",
   user: process.env.DB_USER || "postgres",
-  password: process.env.DB_PASSWORD || "postgres",
+  password: process.env.DB_PASSWORD || process.env.DB_PASS || "postgres",
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,

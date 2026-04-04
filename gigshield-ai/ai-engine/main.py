@@ -1,4 +1,4 @@
-"""FastAPI entrypoint for GigPredict AI services."""
+"""FastAPI entrypoint for GigShield AI services."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from services.risk_service import (
 )
 
 app = FastAPI(
-    title="GigPredict AI Engine",
+    title="GigShield AI Engine",
     description="Risk scoring, premium pricing, location consistency, and fraud orchestration",
     version="2.0.0",
 )
@@ -49,7 +49,7 @@ def _raise_http(error: Exception) -> None:
 def health():
     return {
         "status": "ok",
-        "service": "gigpredict-ai-engine",
+        "service": "gigshield-ai-engine",
         "risk_model": get_risk_service_health(),
         "fraud_model": get_fraud_service_health(),
         "next_location_model": get_location_model_health(),

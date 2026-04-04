@@ -5,7 +5,19 @@
  * registers all route modules, and starts listening.
  */
 
-require("dotenv").config({ path: require("path").resolve(__dirname, "../../.env") });
+const fs = require("fs");
+const path = require("path");
+const dotenv = require("dotenv");
+
+// Prefer backend/.env so startup does not depend on the repo folder name.
+[
+  path.resolve(__dirname, "../.env"),
+  path.resolve(__dirname, "../../.env"),
+].forEach((envPath) => {
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+  }
+});
 
 const app = require("./app");
 const { pool, testConnection } = require("./database/connection");
@@ -23,7 +35,7 @@ async function startServer() {
   }
 
   app.listen(PORT, () => {
-    logger.info(`GigPredict AI backend running on port ${PORT}`);
+    logger.info(`GigShield AI backend running on port ${PORT}`);
     logger.info(`   Environment: ${process.env.NODE_ENV || "development"}`);
   });
 }

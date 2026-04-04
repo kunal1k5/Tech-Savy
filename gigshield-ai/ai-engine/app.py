@@ -1,4 +1,4 @@
-"""Flask adapter for GigPredict AI services."""
+"""Flask adapter for GigShield AI services."""
 
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ def create_app() -> Flask:
         return jsonify(
             {
                 "status": "ok",
-                "service": "gigpredict-ai-flask-adapter",
+                "service": "gigshield-ai-flask-adapter",
                 "risk_model": get_risk_service_health(),
                 "fraud_model": get_fraud_service_health(),
                 "next_location_model": get_location_model_health(),

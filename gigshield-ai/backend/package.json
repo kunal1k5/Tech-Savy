@@ -1,5 +1,5 @@
 {
-  "name": "gigpredict-ai-backend",
+  "name": "gigshield-ai-backend",
   "version": "1.0.0",
   "description": "GigPredict AI — Backend API for parametric insurance platform",
   "main": "src/server.js",

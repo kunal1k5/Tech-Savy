@@ -168,7 +168,7 @@ export default function Register() {
   return (
     <AuthShell
       eyebrow="Signup"
-      title="Create your GigPredict AI account"
+      title="Create your GigShield AI account"
       description="Set up your profile and verify your work details to join the decision intelligence network."
       note="We are not an insurance platform - we are an AI Decision Intelligence System and real-time protection system for gig workers."
       footer={

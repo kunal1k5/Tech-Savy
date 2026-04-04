@@ -3,7 +3,7 @@ const axios = require("axios");
 const logger = require("../utils/logger");
 
 const AI_ENGINE_URL = (process.env.AI_ENGINE_URL || "http://localhost:8000").replace(/\/$/, "");
-const AI_ENGINE_TIMEOUT_MS = Number(process.env.AI_ENGINE_TIMEOUT_MS || 2500);
+const AI_ENGINE_TIMEOUT_MS = Number(process.env.AI_ENGINE_TIMEOUT_MS || 10000);
 
 const client = axios.create({
   baseURL: AI_ENGINE_URL,

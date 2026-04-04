@@ -92,7 +92,7 @@ export default function Landing() {
               <Shield size={18} />
             </div>
             <div>
-              <p className="text-base font-semibold text-slate-900">GigPredict AI</p>
+              <p className="text-base font-semibold text-slate-900">GigShield AI</p>
               <p className="text-xs text-slate-500">Decision intelligence</p>
             </div>
           </div>
