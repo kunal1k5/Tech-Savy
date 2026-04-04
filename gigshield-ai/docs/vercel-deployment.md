@@ -8,7 +8,7 @@ Use these settings in Vercel:
 
 | Setting | Value |
 | --- | --- |
-| Root Directory | `gigpredict-ai/frontend` |
+| Root Directory | `gigshield-ai/frontend` |
 | Framework | Create React App |
 | Build Command | default |
 | Output Directory | default |
@@ -22,7 +22,7 @@ Why this works:
 Quick steps:
 1. Push the repo to GitHub, GitLab, or Bitbucket.
 2. Import the repo in Vercel.
-3. Set the Root Directory to `gigpredict-ai/frontend`.
+3. Set the Root Directory to `gigshield-ai/frontend`.
 4. Click Deploy.
 
 If you later want live registration, admin APIs, database access, or AI scoring, then deploy the backend and AI engine separately.
@@ -33,9 +33,9 @@ This repository is a monorepo, so the cleanest full-stack Vercel setup is to cre
 
 | Project | Root Directory | Purpose |
 | --- | --- | --- |
-| Frontend | `gigpredict-ai/frontend` | React client |
-| Backend | `gigpredict-ai/backend` | Express API |
-| AI Engine | `gigpredict-ai/ai-engine` | FastAPI risk and fraud service |
+| Frontend | `gigshield-ai/frontend` | React client |
+| Backend | `gigshield-ai/backend` | Express API |
+| AI Engine | `gigshield-ai/ai-engine` | FastAPI risk and fraud service |
 
 ## Recommended deploy order
 
@@ -45,7 +45,7 @@ This repository is a monorepo, so the cleanest full-stack Vercel setup is to cre
 
 ## Frontend project
 
-- Root Directory: `gigpredict-ai/frontend`
+- Root Directory: `gigshield-ai/frontend`
 - Framework: Create React App
 - Build Command: default
 - Output Directory: default
@@ -61,7 +61,7 @@ Notes:
 
 ## Backend project
 
-- Root Directory: `gigpredict-ai/backend`
+- Root Directory: `gigshield-ai/backend`
 - Framework: Express
 - Build Command: default
 - Required environment variables:
@@ -89,7 +89,7 @@ Notes:
 
 ## AI engine project
 
-- Root Directory: `gigpredict-ai/ai-engine`
+- Root Directory: `gigshield-ai/ai-engine`
 - Framework: FastAPI
 - Build Command: default
 - Optional environment variables:

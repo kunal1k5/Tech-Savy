@@ -1109,7 +1109,7 @@ export default function Dashboard() {
               Real-Time Monitoring
             </p>
             <h2 className="text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
-              GigShield AI Command Center
+              GigPredict AI Command Center
             </h2>
             <p className="text-sm leading-6 text-slate-500 md:text-base">
               We are not an insurance platform - we are an AI Decision Intelligence System and real-time protection system for gig workers.

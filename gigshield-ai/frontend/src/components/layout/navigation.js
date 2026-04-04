@@ -55,5 +55,5 @@ export function getPageTitle(pathname) {
   }
 
   const matchingItem = NAV_ITEMS.find((item) => item.matches(pathname));
-  return matchingItem?.label || "GigShield AI";
+  return matchingItem?.label || "GigPredict AI";
 }

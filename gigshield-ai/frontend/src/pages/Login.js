@@ -181,7 +181,7 @@ export default function Login() {
   return (
     <AuthShell
       eyebrow="Login"
-      title="Sign in to GigShield AI"
+      title="Sign in to GigPredict AI"
       description="Enter your mobile number and a 4-digit OTP to continue into your real-time decision workspace."
       note="Fast sign-in, clean feedback, and silent trust checks run in the background while you move forward."
       footer={

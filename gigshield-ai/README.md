@@ -34,13 +34,13 @@ GigPredict AI turns the claim journey into a connected decision intelligence loo
 - Frontend: React, React Router, Framer Motion, Axios, Tailwind utility styling
 - Backend: Node.js, Express, Joi, Multer, Winston, Jest, Supertest
 - AI Engine: Python service layer for risk and fraud-related inference utilities
-- Database: PostgreSQL schema in [`database/schema.sql`](/f:/guide/gigpredict-ai/database/schema.sql)
+- Database: PostgreSQL schema in [`database/schema.sql`](/f:/guide/gigshield-ai/database/schema.sql)
 - DevOps: Docker Compose, environment-based configuration
 
 ## Project Structure
 
 ```text
-gigpredict-ai/
+gigshield-ai/
   ai-engine/      Python AI services
   backend/        Express API and orchestration layer
   database/       SQL schema
@@ -82,7 +82,7 @@ Error responses use:
 - `POST /api/upload-proof`
 - `POST /api/reverify-claim`
 
-Detailed examples live in [`docs/api-reference.md`](/f:/guide/gigpredict-ai/docs/api-reference.md).
+Detailed examples live in [`docs/api-reference.md`](/f:/guide/gigshield-ai/docs/api-reference.md).
 
 ## Local Setup
 
@@ -91,7 +91,7 @@ Detailed examples live in [`docs/api-reference.md`](/f:/guide/gigpredict-ai/docs
 Copy the sample env file and fill the required values:
 
 ```powershell
-cd F:\guide\gigpredict-ai
+cd F:\guide\gigshield-ai
 copy .env.example .env
 copy backend\.env.example backend\.env
 ```
@@ -108,12 +108,12 @@ Important variables:
 ### 2. Install dependencies
 
 ```powershell
-cd F:\guide\gigpredict-ai\backend
+cd F:\guide\gigshield-ai\backend
 npm install
 ```
 
 ```powershell
-cd F:\guide\gigpredict-ai\frontend
+cd F:\guide\gigshield-ai\frontend
 npm install
 ```
 
@@ -122,21 +122,21 @@ npm install
 Backend:
 
 ```powershell
-cd F:\guide\gigpredict-ai\backend
+cd F:\guide\gigshield-ai\backend
 node server.js
 ```
 
 Frontend:
 
 ```powershell
-cd F:\guide\gigpredict-ai\frontend
+cd F:\guide\gigshield-ai\frontend
 npm start
 ```
 
 AI engine:
 
 ```powershell
-cd F:\guide\gigpredict-ai\ai-engine
+cd F:\guide\gigshield-ai\ai-engine
 python -m pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
@@ -144,7 +144,7 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 ### Optional Docker startup
 
 ```powershell
-cd F:\guide\gigpredict-ai
+cd F:\guide\gigshield-ai
 docker compose up --build
 ```
 
@@ -163,14 +163,14 @@ docker compose up --build
 Backend:
 
 ```powershell
-cd F:\guide\gigpredict-ai\backend
+cd F:\guide\gigshield-ai\backend
 npx jest --runInBand
 ```
 
 Frontend:
 
 ```powershell
-cd F:\guide\gigpredict-ai\frontend
+cd F:\guide\gigshield-ai\frontend
 $env:CI='true'; npm test -- --watchAll=false --runInBand
 npm run build
 ```
@@ -189,8 +189,8 @@ The dispute/proof/re-verification workflow is still backed by in-memory storage 
 
 ## Useful Docs
 
-- [API Summary](/f:/guide/gigpredict-ai/docs/api.md)
-- [API Reference](/f:/guide/gigpredict-ai/docs/api-reference.md)
+- [API Summary](/f:/guide/gigshield-ai/docs/api.md)
+- [API Reference](/f:/guide/gigshield-ai/docs/api-reference.md)
 
 ## GitHub Submission
 

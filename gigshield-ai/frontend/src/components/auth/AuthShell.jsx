@@ -23,7 +23,7 @@ export default function AuthShell({
         >
           <div className="mb-5 flex items-center justify-between gap-4">
             <Link to="/" className="text-lg font-semibold tracking-tight text-slate-900">
-              GigShield AI
+              GigPredict AI
             </Link>
             <Link
               to={backTo}
