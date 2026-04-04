@@ -71,7 +71,9 @@ Error responses:
 ## Integration Notes
 
 - The dashboard uses the backend as the single source of truth for the AI decision workflow.
-- `POST /auto-claim` now confirms both active work and income loss before triggering a payout.
+- `POST /auto-claim` now triggers only when risk is `HIGH`, active work is confirmed, income loss is confirmed, and duration is above 30 minutes.
+- `POST /fraud-check` and `POST /ai-decision` now add anomaly scoring for low-risk triggered claims, too many claims, and suspicious claim patterns.
+- Core decision responses now include human-readable `reason` text plus `riskReason`, and where applicable `fraudReason` or `claimReason`.
 - Trust score is standardized as `100 - fraudScore` and returned with fraud and AI decision responses.
 - The dispute flow depends on a previously created dispute record and uploaded proof files.
 - `POST /reverify-claim` reads the uploaded dispute proof, simulates location/time/activity checks, and returns the final claim outcome.

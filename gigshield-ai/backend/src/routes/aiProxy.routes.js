@@ -6,7 +6,7 @@ const {
   proxyWeatherLookup,
 } = require("../services/aiProxy.service");
 const logger = require("../utils/logger");
-const { sendSuccess } = require("../utils/apiResponse");
+const { sendHandledError, sendSuccess } = require("../utils/apiResponse");
 
 const router = Router();
 
@@ -16,7 +16,7 @@ router.get("/weather/live", async (req, res, next) => {
     return sendSuccess(res, result, "Live weather lookup completed successfully.");
   } catch (error) {
     logger.error(`Weather proxy route failed: ${error.message}`);
-    return next(error);
+    return sendHandledError(res, error.statusCode || 500);
   }
 });
 
@@ -26,7 +26,7 @@ router.post("/predict", async (req, res, next) => {
     return sendSuccess(res, result, "Risk prediction completed successfully.");
   } catch (error) {
     logger.error(`Risk proxy route failed: ${error.message}`);
-    return next(error);
+    return sendHandledError(res, error.statusCode || 500);
   }
 });
 
@@ -36,7 +36,7 @@ router.post("/predict/live", async (req, res, next) => {
     return sendSuccess(res, result, "Live risk prediction completed successfully.");
   } catch (error) {
     logger.error(`Live risk proxy route failed: ${error.message}`);
-    return next(error);
+    return sendHandledError(res, error.statusCode || 500);
   }
 });
 

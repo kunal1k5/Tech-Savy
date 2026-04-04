@@ -16,6 +16,8 @@ describe("POST /api/risk-premium", () => {
       data: {
         risk: "LOW",
         premium: 10,
+        riskReason: "AQI, rain, and wind stayed within safe thresholds",
+        reason: "AQI, rain, and wind stayed within safe thresholds",
       },
       message: "Risk and premium calculated successfully.",
     });
@@ -34,6 +36,8 @@ describe("POST /api/risk-premium", () => {
       data: {
         risk: "MEDIUM",
         premium: 20,
+        riskReason: "AQI above 150",
+        reason: "AQI above 150",
       },
       message: "Risk and premium calculated successfully.",
     });
@@ -52,22 +56,49 @@ describe("POST /api/risk-premium", () => {
       data: {
         risk: "HIGH",
         premium: 30,
+        riskReason: "rain above 20 mm",
+        reason: "rain above 20 mm",
       },
       message: "Risk and premium calculated successfully.",
     });
   });
 
-  it("validates missing fields", async () => {
+  it("defaults missing fields to safe zero values", async () => {
     const response = await request(app).post("/api/risk-premium").send({
       aqi: 140,
       rain: 24,
     });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(200);
     expect(response.body).toEqual({
-      success: false,
-      data: null,
-      message: "Missing required fields: wind",
+      success: true,
+      data: {
+        risk: "HIGH",
+        premium: 30,
+        riskReason: "rain above 20 mm",
+        reason: "rain above 20 mm",
+      },
+      message: "Risk and premium calculated successfully.",
+    });
+  });
+
+  it("clamps invalid and extreme weather inputs safely", async () => {
+    const response = await request(app).post("/api/risk-premium").send({
+      aqi: 9999,
+      rain: -10,
+      wind: 1000,
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      data: {
+        risk: "HIGH",
+        premium: 30,
+        riskReason: "AQI above 300 + wind above 30 km/h",
+        reason: "AQI above 300 + wind above 30 km/h",
+      },
+      message: "Risk and premium calculated successfully.",
     });
   });
 });

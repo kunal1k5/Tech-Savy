@@ -9,7 +9,7 @@ function sendSuccess(res, data = {}, message = "Request completed successfully."
 function sendError(res, statusCode = 500, message = "Internal Server Error", options = {}) {
   const payload = {
     success: false,
-    data: null,
+    data: options.data && typeof options.data === "object" && !Array.isArray(options.data) ? options.data : {},
     message,
   };
 
@@ -24,7 +24,15 @@ function sendError(res, statusCode = 500, message = "Internal Server Error", opt
   return res.status(statusCode).json(payload);
 }
 
+function sendHandledError(res, statusCode = 500, details) {
+  return sendError(res, statusCode, "Handled safely", {
+    data: {},
+    ...(details !== undefined ? { details } : {}),
+  });
+}
+
 module.exports = {
   sendError,
+  sendHandledError,
   sendSuccess,
 };

@@ -5,9 +5,15 @@
  * context validation into one final fraud score and status.
  */
 
+const { buildFraudReason, buildRiskReason, joinReasonParts } = require("../utils/explanations");
+
 const BEHAVIOR_SIGNAL_SCORE = 20;
 const LOCATION_MISMATCH_SCORE = 30;
 const CONTEXT_INVALID_SCORE = 40;
+const LOW_RISK_TRIGGERED_CLAIM_SCORE = 50;
+const TOO_MANY_CLAIMS_SCORE = 25;
+const SUSPICIOUS_PATTERN_SCORE = 30;
+const TOO_MANY_CLAIMS_THRESHOLD = 5;
 
 const BEHAVIOR_STATUS_SCORES = {
   NORMAL: 0,
@@ -72,6 +78,52 @@ function normalizeLocationMatch(value, fallbackValue = true) {
   }
 
   return fallbackValue;
+}
+
+function normalizeBooleanFlag(value, defaultValue = false) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") {
+      return true;
+    }
+    if (normalized === "false") {
+      return false;
+    }
+  }
+
+  if (value === undefined || value === null || value === "") {
+    return defaultValue;
+  }
+
+  return Boolean(value);
+}
+
+function normalizeSuspiciousPattern(value, defaultValue = false) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+
+    if (!normalized || ["false", "none", "normal", "clean", "safe", "legit"].includes(normalized)) {
+      return false;
+    }
+
+    if (["true", "suspicious", "abnormal", "anomalous", "fake", "detected"].includes(normalized)) {
+      return true;
+    }
+  }
+
+  if (value === undefined || value === null || value === "") {
+    return defaultValue;
+  }
+
+  return Boolean(value);
 }
 
 function normalizeNonNegativeNumber(value) {
@@ -180,6 +232,58 @@ function resolveBehaviorSignal(payload) {
   };
 }
 
+function resolveAnomalySignal(payload, risk, behavior) {
+  const nestedBehavior =
+    payload?.behavior && typeof payload.behavior === "object" && !Array.isArray(payload.behavior)
+      ? payload.behavior
+      : {};
+
+  const claimTriggered = normalizeBooleanFlag(
+    payload.claimTriggered ??
+      payload.claim_triggered ??
+      payload.auto_claim_triggered ??
+      nestedBehavior.claim_triggered,
+    false
+  );
+  const suspiciousPattern = normalizeSuspiciousPattern(
+    payload.suspiciousPattern ??
+      payload.suspicious_pattern ??
+      payload.claimPattern ??
+      payload.claim_pattern ??
+      payload.pattern ??
+      nestedBehavior.suspicious_pattern ??
+      nestedBehavior.claim_pattern,
+    false
+  );
+
+  let anomalyScore = 0;
+  const issues = [];
+
+  if (risk === "LOW" && claimTriggered) {
+    anomalyScore += LOW_RISK_TRIGGERED_CLAIM_SCORE;
+    issues.push("low_risk_claim_triggered");
+  }
+
+  if (behavior.claimsCount > TOO_MANY_CLAIMS_THRESHOLD) {
+    anomalyScore += TOO_MANY_CLAIMS_SCORE;
+    issues.push("too_many_claims");
+  }
+
+  if (suspiciousPattern) {
+    anomalyScore += SUSPICIOUS_PATTERN_SCORE;
+    issues.push("suspicious_pattern");
+  }
+
+  return {
+    claimTriggered,
+    suspiciousPattern,
+    anomaly_score: anomalyScore,
+    detail: anomalyScore > 0 ? "Detected" : "Normal",
+    suspicious: anomalyScore > 0,
+    issues,
+  };
+}
+
 function resolveLocationSignal(payload) {
   const nestedLocation =
     payload?.location && typeof payload.location === "object" && !Array.isArray(payload.location)
@@ -227,11 +331,25 @@ function resolveContextSignal(payload) {
   };
 }
 
-function calculateFraudContributions({ behavior, location, context }) {
+function calculateFraudContributions({ behavior, location, context, anomaly }) {
   return {
     behavior: behavior.behavior_score,
     location: location.match ? 0 : LOCATION_MISMATCH_SCORE,
     context: context.context_valid ? 0 : CONTEXT_INVALID_SCORE,
+    anomaly: anomaly.anomaly_score,
+  };
+}
+
+function resolveRiskSignals(payload = {}) {
+  const nestedWeather =
+    payload?.weather && typeof payload.weather === "object" && !Array.isArray(payload.weather)
+      ? payload.weather
+      : {};
+
+  return {
+    aqi: payload.aqi ?? nestedWeather.aqi,
+    rain: payload.rain ?? payload.rainfall ?? nestedWeather.rain ?? nestedWeather.rainfall,
+    wind: payload.wind ?? nestedWeather.wind ?? nestedWeather.wind_kph,
   };
 }
 
@@ -241,18 +359,30 @@ async function runFraudOrchestrator(data) {
   const behavior = resolveBehaviorSignal(payload);
   const location = resolveLocationSignal(payload);
   const context = resolveContextSignal(payload);
+  const anomaly = resolveAnomalySignal(payload, risk, behavior);
   const contributions = calculateFraudContributions({
     behavior,
     location,
     context,
+    anomaly,
   });
-  const fraudScore = contributions.behavior + contributions.location + contributions.context;
+  const fraudScore = Object.values(contributions).reduce((total, score) => total + score, 0);
   const status = getFraudStatus(fraudScore);
   const issues = [
     ...behavior.issues,
     ...(location.suspicious ? ["location_mismatch"] : []),
     ...(context.suspicious ? ["invalid_context"] : []),
+    ...anomaly.issues,
   ];
+  const riskReason = buildRiskReason({
+    risk,
+    ...resolveRiskSignals(payload),
+  });
+  const fraudReason = buildFraudReason(issues);
+  const reason = joinReasonParts(
+    [riskReason, fraudReason],
+    "Fraud decision explanation unavailable."
+  );
 
   return {
     risk,
@@ -268,10 +398,17 @@ async function runFraudOrchestrator(data) {
     locationMatch: location.match,
     claimsCount: behavior.claimsCount,
     loginAttempts: behavior.loginAttempts,
+    claimTriggered: anomaly.claimTriggered,
+    suspiciousPattern: anomaly.suspiciousPattern,
+    anomaly_score: anomaly.anomaly_score,
+    riskReason,
+    fraudReason,
+    reason,
     details: {
       behavior: behavior.detail,
       location: location.detail,
       context: context.detail,
+      anomaly: anomaly.detail,
     },
     contributions,
     issues,
@@ -296,12 +433,19 @@ async function runFraudOrchestrator(data) {
         context_valid: context.context_valid,
         suspicious: context.suspicious,
       },
+      anomaly: {
+        claim_triggered: anomaly.claimTriggered,
+        suspicious_pattern: anomaly.suspiciousPattern,
+        anomaly_score: anomaly.anomaly_score,
+        suspicious: anomaly.suspicious,
+        issues: anomaly.issues,
+      },
     },
     engine: {
       name: "Fraud Intelligence Engine",
-      summary: "We combine behavior, location, and contextual intelligence to detect fraud in real-time.",
+      summary: "We combine behavior, location, context, and anomaly intelligence to detect fraud in real-time.",
     },
-    suspicious: status === "FRAUD",
+    suspicious: status === "FRAUD" || anomaly.suspicious,
     behavior_label: titleCase(behavior.detail),
   };
 }
@@ -310,12 +454,19 @@ module.exports = {
   BEHAVIOR_SIGNAL_SCORE,
   BEHAVIOR_STATUS_SCORES,
   CONTEXT_INVALID_SCORE,
+  LOW_RISK_TRIGGERED_CLAIM_SCORE,
   LOCATION_MISMATCH_SCORE,
+  SUSPICIOUS_PATTERN_SCORE,
+  TOO_MANY_CLAIMS_SCORE,
+  TOO_MANY_CLAIMS_THRESHOLD,
   calculateFraudContributions,
   getFraudStatus,
+  normalizeBooleanFlag,
   normalizeContextValidity,
   normalizeLocationMatch,
   normalizeRiskLevel,
+  normalizeSuspiciousPattern,
+  resolveAnomalySignal,
   resolveBehaviorSignal,
   resolveContextSignal,
   resolveLocationSignal,

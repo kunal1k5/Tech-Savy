@@ -23,6 +23,11 @@ function titleCase(value) {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
+function normalizeText(value) {
+  const normalized = String(value || "").trim();
+  return normalized || null;
+}
+
 function deriveLocationCheck(match, locationSignal) {
   if (match === true) {
     return "Match";
@@ -92,6 +97,9 @@ function buildSystemResponse(data = {}) {
     match,
     predicted_location: data.predicted_location || null,
     actual_location: data.actual_location || null,
+    riskReason: normalizeText(data.riskReason),
+    fraudReason: normalizeText(data.fraudReason),
+    reason: normalizeText(data.reason),
     suspicious:
       explicitSuspicious ??
       deriveSuspicious({

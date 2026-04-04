@@ -2,7 +2,7 @@ const { Router } = require("express");
 
 const logger = require("../utils/logger");
 const { getRiskPremium } = require("../services/riskPremium.service");
-const { sendSuccess } = require("../utils/apiResponse");
+const { sendHandledError, sendSuccess } = require("../utils/apiResponse");
 
 const router = Router();
 
@@ -12,7 +12,7 @@ router.post("/risk-premium", (req, res, next) => {
     return sendSuccess(res, result, "Risk and premium calculated successfully.");
   } catch (error) {
     logger.error(`Risk premium route failed: ${error.message}`);
-    return next(error);
+    return sendHandledError(res, error.statusCode || 500);
   }
 });
 

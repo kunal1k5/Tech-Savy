@@ -25,6 +25,7 @@ router.post("/fraud-check", async (req, res, next) => {
         Boolean(result.intelligence?.behavior?.suspicious) ||
         Boolean(result.intelligence?.location?.suspicious) ||
         Boolean(result.intelligence?.context?.suspicious) ||
+        Boolean(result.intelligence?.anomaly?.suspicious) ||
         result.status === "FRAUD",
       source: "fraud-orchestrator",
     });
@@ -40,6 +41,10 @@ router.post("/fraud-check", async (req, res, next) => {
         locationMatch: result.locationMatch,
         claimsCount: result.claimsCount,
         loginAttempts: result.loginAttempts,
+        claimTriggered: result.claimTriggered,
+        suspiciousPattern: result.suspiciousPattern,
+        anomalyScore: result.anomaly_score,
+        anomaly_score: result.anomaly_score,
       },
       "Fraud check completed successfully."
     );

@@ -49,6 +49,7 @@ export const DEFAULT_AUTO_CLAIM_INPUT = {
   risk: "LOW",
   isWorking: true,
   ordersCompleted: 1,
+  duration: 60,
   workingMinutes: 60,
   earnings: 150,
   hoursLost: 1,

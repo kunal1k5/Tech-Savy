@@ -33,7 +33,9 @@ Response:
   "success": true,
   "data": {
     "risk": "HIGH",
-    "premium": 30
+    "premium": 30,
+    "riskReason": "AQI above 300 + rain above 20 mm + wind above 30 km/h",
+    "reason": "AQI above 300 + rain above 20 mm + wind above 30 km/h"
   },
   "message": "Risk and premium calculated successfully."
 }
@@ -48,6 +50,7 @@ Request:
   "risk": "HIGH",
   "isWorking": true,
   "ordersCompleted": 0,
+  "duration": 180,
   "workingMinutes": 180,
   "earnings": 0,
   "hoursLost": 3,
@@ -68,17 +71,22 @@ Response:
     "isWorking": true,
     "incomeLoss": true,
     "incomeLossReason": "NO_ORDERS_COMPLETED",
+    "riskReason": "Risk level is HIGH",
+    "claimReason": "active work confirmed + no orders completed + duration above 30 minutes",
+    "reason": "Risk level is HIGH + active work confirmed + no orders completed + duration above 30 minutes",
     "ordersCompleted": 0,
+    "duration": 180,
     "workingMinutes": 180,
     "earnings": 0,
     "eligibility": {
       "riskEligible": true,
       "activeWorkConfirmed": true,
-      "incomeLossDetected": true
+      "incomeLossDetected": true,
+      "durationThresholdMet": true
     },
     "hoursLost": 3,
     "hourlyRate": 150,
-    "message": "Claim auto-triggered after confirming active work and income loss."
+    "message": "Claim auto-triggered after confirming high risk, active work, income loss, and duration threshold."
   },
   "message": "Auto-claim decision generated successfully."
 }
@@ -98,6 +106,15 @@ Request:
 }
 ```
 
+Optional anomaly inputs:
+
+```json
+{
+  "claimTriggered": true,
+  "suspiciousPattern": true
+}
+```
+
 Response:
 
 ```json
@@ -110,6 +127,9 @@ Response:
     "trustScore": 0,
     "trust_score": 0,
     "status": "FRAUD",
+    "riskReason": "Risk level is HIGH",
+    "fraudReason": "high claim frequency + excessive login attempts + location mismatch + invalid context",
+    "reason": "Risk level is HIGH + high claim frequency + excessive login attempts + location mismatch + invalid context",
     "locationMatch": false,
     "claimsCount": 4,
     "loginAttempts": 5
@@ -134,6 +154,15 @@ Request:
 }
 ```
 
+Optional anomaly inputs:
+
+```json
+{
+  "claimTriggered": true,
+  "suspiciousPattern": true
+}
+```
+
 Response:
 
 ```json
@@ -146,7 +175,10 @@ Response:
     "trust_score": 0,
     "status": "FRAUD",
     "decision": "FRAUD",
-    "nextAction": "REJECT_CLAIM"
+    "nextAction": "REJECT_CLAIM",
+    "riskReason": "AQI above 300 + rain above 20 mm + wind above 30 km/h",
+    "fraudReason": "high claim frequency + excessive login attempts + location mismatch + invalid context",
+    "reason": "AQI above 300 + rain above 20 mm + wind above 30 km/h + high claim frequency + excessive login attempts + location mismatch + invalid context"
   },
   "message": "AI decision generated successfully."
 }

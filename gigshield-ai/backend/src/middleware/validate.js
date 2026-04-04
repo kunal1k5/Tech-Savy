@@ -5,7 +5,7 @@
  * Returns 400 with clear error messages on validation failure.
  */
 
-const { sendError } = require("../utils/apiResponse");
+const { sendHandledError } = require("../utils/apiResponse");
 
 function validate(schema, property = "body") {
   return (req, res, next) => {
@@ -16,7 +16,7 @@ function validate(schema, property = "body") {
 
     if (error) {
       const messages = error.details.map((d) => d.message);
-      return sendError(res, 400, "Validation failed", { details: messages });
+      return sendHandledError(res, 400, { details: messages });
     }
 
     req[property] = value;

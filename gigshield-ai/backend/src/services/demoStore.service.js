@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
 
 const aiService = require("../integrations/aiService");
+const { clampNumber, ensureObject } = require("../utils/inputSafety");
 
 const JWT_SECRET = process.env.JWT_SECRET || "default-dev-secret";
 const OTP_CODE = "1234";
@@ -68,6 +69,16 @@ let claimSequence = 3001;
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function sanitizeClaimTriggerPayload(payload = {}) {
+  const safePayload = ensureObject(payload);
+
+  return {
+    ...safePayload,
+    rainfall: clampNumber(safePayload?.rainfall, { min: 0, max: 100, defaultValue: 0 }),
+    aqi: clampNumber(safePayload?.aqi, { min: 0, max: 500, defaultValue: 0 }),
+  };
 }
 
 function createHistory(stage, detail, tone = "default") {
@@ -326,35 +337,37 @@ function buildFraudWatch(claims) {
 
 function buildClaimAmount(state, payload) {
   const activeCoverage = buildActivePolicy(state)?.coverage || 3000;
-  const rainfall = Number(payload.rainfall || 0);
-  const aqi = Number(payload.aqi || 0);
+  const safePayload = sanitizeClaimTriggerPayload(payload);
+  const rainfall = safePayload.rainfall;
+  const aqi = safePayload.aqi;
   const riskMultiplier = state.risk.key === "high" ? 1.15 : state.risk.key === "medium" ? 1.05 : 1;
   const baseAmount = Math.max(rainfall * 4.5, aqi * 0.75, 280);
   return Math.min(Math.round(baseAmount * riskMultiplier), activeCoverage);
 }
 
 function buildClaim(state, payload) {
+  const safePayload = sanitizeClaimTriggerPayload(payload);
   const eventType =
-    payload.mode === "fraud_drill"
+    safePayload.mode === "fraud_drill"
       ? "Fraud Drill"
-      : Number(payload.rainfall || 0) > 50
+      : safePayload.rainfall > 50
         ? "Rainfall"
         : "AQI";
   const triggerValue =
-    payload.mode === "fraud_drill"
+    safePayload.mode === "fraud_drill"
       ? "GPS jump detected"
       : eventType === "Rainfall"
-        ? `${Number(payload.rainfall || 0)} mm`
-        : `AQI ${Number(payload.aqi || 0)}`;
+        ? `${safePayload.rainfall} mm`
+        : `AQI ${safePayload.aqi}`;
   const claimId = `CLM-${claimSequence++}`;
   const detectedAt = nowIso();
   const headline =
-    payload.mode === "fraud_drill"
+    safePayload.mode === "fraud_drill"
       ? "Suspicious claim review"
       : eventType === "Rainfall"
         ? "Rainfall threshold crossed"
         : "Air quality threshold crossed";
-  const amount = buildClaimAmount(state, payload);
+  const amount = buildClaimAmount(state, safePayload);
 
   return {
     id: claimId,
@@ -363,23 +376,23 @@ function buildClaim(state, payload) {
     triggerValue,
     area: `${state.user.zone}, ${state.user.city}`,
     amount,
-    status: payload.mode === "fraud_drill" ? "manual_review" : "pending",
-    fraudStatus: payload.mode === "fraud_drill" ? "flagged" : "verified",
+    status: safePayload.mode === "fraud_drill" ? "manual_review" : "pending",
+    fraudStatus: safePayload.mode === "fraud_drill" ? "flagged" : "verified",
     flags:
-      payload.mode === "fraud_drill"
+      safePayload.mode === "fraud_drill"
         ? ["Location jump detected during claim window", "Manual review required"]
         : [],
     source: "Automated trigger monitor",
     detectedAt,
     updatedAt: detectedAt,
-    payoutWindow: payload.mode === "fraud_drill" ? "Held for manual review" : "Checking payout",
+    payoutWindow: safePayload.mode === "fraud_drill" ? "Held for manual review" : "Checking payout",
     history: [
       createHistory(
         "claim_created",
-        payload.mode === "fraud_drill"
+        safePayload.mode === "fraud_drill"
           ? "Fraud drill created a manual review claim."
           : `${headline} and generated a new claim automatically.`,
-        payload.mode === "fraud_drill" ? "danger" : "info"
+        safePayload.mode === "fraud_drill" ? "danger" : "info"
       ),
     ],
   };
@@ -607,9 +620,10 @@ const DemoStoreService = {
 
   triggerClaim(user, payload = {}) {
     const state = syncUserState(user);
-    const rainfall = Number(payload.rainfall || 0);
-    const aqi = Number(payload.aqi || 0);
-    const mode = payload.mode || "auto";
+    const safePayload = sanitizeClaimTriggerPayload(payload);
+    const rainfall = safePayload.rainfall;
+    const aqi = safePayload.aqi;
+    const mode = safePayload.mode || "auto";
 
     if (mode !== "fraud_drill" && rainfall <= 50 && aqi <= 400) {
       return {
@@ -620,7 +634,7 @@ const DemoStoreService = {
       };
     }
 
-    const claim = buildClaim(state, payload);
+    const claim = buildClaim(state, safePayload);
     state.claims.unshift(claim);
     scheduleClaimProgress(state.user.id, claim.id, mode);
 

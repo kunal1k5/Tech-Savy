@@ -1,4 +1,5 @@
 const aiService = require("../integrations/aiService");
+const { clampNumber, ensureObject } = require("../utils/inputSafety");
 
 const DETAILED_RISK_FIELDS = [
   "temperature",
@@ -29,44 +30,21 @@ const DEFAULT_LIVE_WEATHER = {
 };
 
 function validateDetailedRiskPayload(payload) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    const error = new Error("Request body must be a JSON object.");
-    error.statusCode = 400;
-    throw error;
-  }
+  const safePayload = ensureObject(payload);
 
-  const validatedPayload = {};
-  const missingFields = [];
-  const invalidFields = [];
-
-  for (const field of DETAILED_RISK_FIELDS) {
-    if (payload[field] === undefined) {
-      missingFields.push(field);
-      continue;
-    }
-
-    const numericValue = Number(payload[field]);
-    if (!Number.isFinite(numericValue)) {
-      invalidFields.push(field);
-      continue;
-    }
-
-    validatedPayload[field] = numericValue;
-  }
-
-  if (missingFields.length) {
-    const error = new Error(`Missing required fields: ${missingFields.join(", ")}`);
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (invalidFields.length) {
-    const error = new Error(`All input fields must be numeric. Invalid fields: ${invalidFields.join(", ")}`);
-    error.statusCode = 400;
-    throw error;
-  }
-
-  return validatedPayload;
+  return {
+    temperature: clampNumber(safePayload?.temperature, { min: -50, max: 60, defaultValue: 0 }),
+    humidity: clampNumber(safePayload?.humidity, { min: 0, max: 100, defaultValue: 0 }),
+    wind: clampNumber(safePayload?.wind, { min: 0, max: 100, defaultValue: 0 }),
+    pressure: clampNumber(safePayload?.pressure, { min: 800, max: 1200, defaultValue: 1000 }),
+    rain: clampNumber(safePayload?.rain, { min: 0, max: 100, defaultValue: 0 }),
+    cloud: clampNumber(safePayload?.cloud, { min: 0, max: 100, defaultValue: 0 }),
+    uv: clampNumber(safePayload?.uv, { min: 0, max: 20, defaultValue: 0 }),
+    pm25: clampNumber(safePayload?.pm25, { min: 0, max: 1000, defaultValue: 0 }),
+    pm10: clampNumber(safePayload?.pm10, { min: 0, max: 1000, defaultValue: 0 }),
+    visibility: clampNumber(safePayload?.visibility, { min: 0, max: 100, defaultValue: 0 }),
+    gust: clampNumber(safePayload?.gust, { min: 0, max: 150, defaultValue: 0 }),
+  };
 }
 
 function clampScore(score, min = 0, max = 100) {
@@ -169,12 +147,7 @@ async function proxyDetailedRiskPrediction(payload) {
 }
 
 async function proxyWeatherLookup(city) {
-  const trimmedCity = String(city || "").trim();
-  if (!trimmedCity) {
-    const error = new Error("Query parameter 'city' is required.");
-    error.statusCode = 400;
-    throw error;
-  }
+  const trimmedCity = String(city || "Bengaluru").trim() || "Bengaluru";
 
   try {
     return await aiService.fetchWeather(trimmedCity);
@@ -184,12 +157,8 @@ async function proxyWeatherLookup(city) {
 }
 
 async function proxyLiveRiskPrediction(payload) {
-  const city = String(payload?.city || payload?.location || "").trim();
-  if (!city) {
-    const error = new Error("Field 'city' is required.");
-    error.statusCode = 400;
-    throw error;
-  }
+  const safePayload = ensureObject(payload);
+  const city = String(safePayload?.city || safePayload?.location || "Bengaluru").trim() || "Bengaluru";
 
   try {
     return await aiService.predictLiveRisk({ city });

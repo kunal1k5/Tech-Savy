@@ -124,8 +124,8 @@ const limiter = rateLimit({
   legacyHeaders: false,
   message: {
     success: false,
-    data: null,
-    message: "Too many requests. Slow down for a moment and try again.",
+    data: {},
+    message: "Handled safely",
   },
   skip(req) {
     return req.path === "/health" || (!isProduction && isLocalRequest(req));

@@ -117,7 +117,8 @@ describe("POST /api/reverify-claim", () => {
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       success: false,
-      message: "Proof upload is required before re-verification.",
+      data: {},
+      message: "Handled safely",
     });
   });
 });

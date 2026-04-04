@@ -21,6 +21,8 @@ describe("GigShield AI workflow audit", () => {
       data: {
         risk: "HIGH",
         premium: 30,
+        riskReason: "AQI above 300 + rain above 20 mm + wind above 30 km/h",
+        reason: "AQI above 300 + rain above 20 mm + wind above 30 km/h",
       },
       message: "Risk and premium calculated successfully.",
     });
@@ -43,6 +45,11 @@ describe("GigShield AI workflow audit", () => {
         payout: 450,
         status: "PAID",
         incomeLoss: true,
+        riskReason: "Risk level is HIGH",
+        claimReason:
+          "active work confirmed + no orders completed + duration above 30 minutes",
+        reason:
+          "Risk level is HIGH + active work confirmed + no orders completed + duration above 30 minutes",
       },
     });
 
@@ -60,6 +67,11 @@ describe("GigShield AI workflow audit", () => {
       data: {
         status: "FRAUD",
         fraudScore: 110,
+        riskReason: "Risk level is HIGH",
+        fraudReason:
+          "high claim frequency + excessive login attempts + location mismatch + invalid context",
+        reason:
+          "Risk level is HIGH + high claim frequency + excessive login attempts + location mismatch + invalid context",
       },
     });
 
@@ -80,6 +92,11 @@ describe("GigShield AI workflow audit", () => {
         risk: "HIGH",
         decision: "FRAUD",
         nextAction: "REJECT_CLAIM",
+        riskReason: "AQI above 300 + rain above 20 mm + wind above 30 km/h",
+        fraudReason:
+          "high claim frequency + excessive login attempts + location mismatch + invalid context",
+        reason:
+          "AQI above 300 + rain above 20 mm + wind above 30 km/h + high claim frequency + excessive login attempts + location mismatch + invalid context",
       },
     });
 

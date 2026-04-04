@@ -1,13 +1,14 @@
 const DEFAULT_HOURLY_RATE = 150;
+const { buildRiskReason, joinReasonParts } = require("../utils/explanations");
+const { clampInteger, clampNumber, ensureObject, sanitizeBoolean } = require("../utils/inputSafety");
 const CLAIM_STATES = ["CREATED", "PROCESSING", "PAID"];
 const ELIGIBLE_RISK = "HIGH";
-const MIN_HOURS_LOST = 2;
+const CLAIM_DURATION_THRESHOLD_MINUTES = 30;
 const MIN_WORKING_MINUTES_FOR_INCOME_LOSS = 120;
 
 const INCOME_LOSS_REASONS = Object.freeze({
   NO_ORDERS_COMPLETED: "NO_ORDERS_COMPLETED",
   ZERO_EARNINGS_AFTER_THRESHOLD: "ZERO_EARNINGS_AFTER_THRESHOLD",
-  HOURS_LOST_FALLBACK: "HOURS_LOST_FALLBACK",
   EXPLICIT_SIGNAL: "EXPLICIT_SIGNAL",
   NONE: "NONE",
 });
@@ -16,109 +17,58 @@ function normalizeRisk(risk) {
   return String(risk || "").trim().toUpperCase();
 }
 
-function normalizeBoolean(value, fallbackValue = false) {
-  if (typeof value === "boolean") {
-    return value;
-  }
-
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === "true") {
-      return true;
-    }
-    if (normalized === "false") {
-      return false;
-    }
-  }
-
-  if (value === undefined) {
-    return fallbackValue;
-  }
-
-  return Boolean(value);
-}
-
 function normalizeOptionalNumber(value, fieldName, { integer = false } = {}) {
   if (value === undefined || value === null || value === "") {
     return null;
   }
 
-  const numericValue = Number(value);
-  if (Number.isNaN(numericValue) || numericValue < 0) {
-    const error = new Error(`${fieldName} must be a non-negative number when provided.`);
-    error.statusCode = 400;
-    throw error;
-  }
+  const numericValue = integer
+    ? clampInteger(value, { min: 0, max: 100000, defaultValue: 0 })
+    : clampNumber(value, { min: 0, max: 100000, defaultValue: 0 });
 
-  if (integer && !Number.isInteger(numericValue)) {
-    const error = new Error(`${fieldName} must be a non-negative integer when provided.`);
-    error.statusCode = 400;
-    throw error;
-  }
-
-  return numericValue;
+  return Number.isFinite(numericValue) ? numericValue : null;
 }
 
 function validateAutoClaimPayload(payload) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    const error = new Error("Request body must be a JSON object.");
-    error.statusCode = 400;
-    throw error;
-  }
+  const safePayload = ensureObject(payload);
+  const requestedRisk = normalizeRisk(safePayload?.risk);
+  const risk = ["LOW", "MEDIUM", "HIGH"].includes(requestedRisk) ? requestedRisk : "LOW";
+  const hoursLost = clampNumber(safePayload?.hoursLost, {
+    min: 0,
+    max: 24,
+    defaultValue: 0,
+  });
+  const hourlyRate = clampNumber(safePayload?.hourlyRate, {
+    min: 1,
+    max: 100000,
+    defaultValue: DEFAULT_HOURLY_RATE,
+  });
 
-  const risk = normalizeRisk(payload.risk);
-  if (!risk) {
-    const error = new Error("risk is required.");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  if (!["LOW", "MEDIUM", "HIGH"].includes(risk)) {
-    const error = new Error("risk must be one of LOW, MEDIUM, or HIGH.");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const hoursLost = Number(payload.hoursLost);
-  if (Number.isNaN(hoursLost) || hoursLost < 0) {
-    const error = new Error("hoursLost must be a non-negative number.");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const hourlyRate =
-    payload.hourlyRate === undefined ? DEFAULT_HOURLY_RATE : Number(payload.hourlyRate);
-  if (Number.isNaN(hourlyRate) || hourlyRate <= 0) {
-    const error = new Error("hourlyRate must be a positive number.");
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const ordersCompleted = normalizeOptionalNumber(payload.ordersCompleted, "ordersCompleted", {
+  const ordersCompleted = normalizeOptionalNumber(safePayload?.ordersCompleted, "ordersCompleted", {
     integer: true,
   });
-  const workingMinutes =
-    payload.workingMinutes === undefined
-      ? Math.round(hoursLost * 60)
-      : normalizeOptionalNumber(payload.workingMinutes, "workingMinutes", {
+  const duration =
+    safePayload?.duration === undefined
+      ? normalizeOptionalNumber(safePayload?.workingMinutes, "workingMinutes", {
+          integer: true,
+        })
+      : normalizeOptionalNumber(safePayload?.duration, "duration", {
           integer: true,
         });
-  const earnings = normalizeOptionalNumber(payload.earnings, "earnings");
-  const isWorking = normalizeBoolean(
-    payload.isWorking,
-    (workingMinutes ?? 0) > 0 || hoursLost > 0
-  );
+  const earnings = normalizeOptionalNumber(safePayload?.earnings, "earnings");
+  const isWorking = sanitizeBoolean(safePayload?.isWorking, false);
   const explicitIncomeLoss =
-    payload.incomeLoss === undefined
+    safePayload?.incomeLoss === undefined
       ? null
-      : normalizeBoolean(payload.incomeLoss, false);
+      : sanitizeBoolean(safePayload?.incomeLoss, false);
 
   return {
     risk,
     hoursLost,
     hourlyRate,
     ordersCompleted,
-    workingMinutes,
+    duration,
+    workingMinutes: duration,
     earnings,
     isWorking,
     explicitIncomeLoss,
@@ -132,9 +82,8 @@ function calculatePayout(hoursLost, hourlyRate) {
 function deriveIncomeLoss({
   isWorking,
   ordersCompleted,
-  workingMinutes,
+  duration,
   earnings,
-  hoursLost,
   explicitIncomeLoss,
 }) {
   if (explicitIncomeLoss !== null) {
@@ -153,25 +102,13 @@ function deriveIncomeLoss({
 
   if (
     isWorking &&
-    workingMinutes !== null &&
-    workingMinutes >= MIN_WORKING_MINUTES_FOR_INCOME_LOSS &&
+    duration !== null &&
+    duration >= MIN_WORKING_MINUTES_FOR_INCOME_LOSS &&
     earnings === 0
   ) {
     return {
       incomeLoss: true,
       reason: INCOME_LOSS_REASONS.ZERO_EARNINGS_AFTER_THRESHOLD,
-    };
-  }
-
-  if (
-    isWorking &&
-    ordersCompleted === null &&
-    earnings === null &&
-    hoursLost >= MIN_HOURS_LOST
-  ) {
-    return {
-      incomeLoss: true,
-      reason: INCOME_LOSS_REASONS.HOURS_LOST_FALLBACK,
     };
   }
 
@@ -181,13 +118,42 @@ function deriveIncomeLoss({
   };
 }
 
+function describeIncomeLoss(reason) {
+  if (reason === INCOME_LOSS_REASONS.NO_ORDERS_COMPLETED) {
+    return "no orders completed";
+  }
+
+  if (reason === INCOME_LOSS_REASONS.ZERO_EARNINGS_AFTER_THRESHOLD) {
+    return "zero earnings after a long active period";
+  }
+
+  if (reason === INCOME_LOSS_REASONS.EXPLICIT_SIGNAL) {
+    return "income loss explicitly confirmed";
+  }
+
+  return "income loss not detected";
+}
+
+function buildClaimReason({ isWorking, incomeLoss, incomeLossReason, duration }) {
+  return joinReasonParts(
+    [
+      isWorking ? "active work confirmed" : "active work not confirmed",
+      incomeLoss ? describeIncomeLoss(incomeLossReason) : "income loss not detected",
+      duration > CLAIM_DURATION_THRESHOLD_MINUTES
+        ? "duration above 30 minutes"
+        : "duration not above 30 minutes",
+    ],
+    "Claim conditions were not fully evaluated."
+  );
+}
+
 function getAutoClaimDecision(payload) {
   const {
     risk,
     hoursLost,
     hourlyRate,
     ordersCompleted,
-    workingMinutes,
+    duration,
     earnings,
     isWorking,
     explicitIncomeLoss,
@@ -195,13 +161,27 @@ function getAutoClaimDecision(payload) {
   const { incomeLoss, reason } = deriveIncomeLoss({
     isWorking,
     ordersCompleted,
-    workingMinutes,
+    duration,
     earnings,
-    hoursLost,
     explicitIncomeLoss,
   });
-  const claimTriggered = risk === ELIGIBLE_RISK && isWorking === true && incomeLoss === true;
+  const claimTriggered =
+    risk === ELIGIBLE_RISK &&
+    isWorking === true &&
+    incomeLoss === true &&
+    duration > CLAIM_DURATION_THRESHOLD_MINUTES;
   const payout = claimTriggered ? calculatePayout(hoursLost, hourlyRate) : 0;
+  const riskReason = buildRiskReason({ risk });
+  const claimReason = buildClaimReason({
+    isWorking,
+    incomeLoss,
+    incomeLossReason: reason,
+    duration,
+  });
+  const explanation = joinReasonParts(
+    [riskReason, claimReason],
+    "Claim decision explanation unavailable."
+  );
 
   return {
     claimTriggered,
@@ -213,29 +193,35 @@ function getAutoClaimDecision(payload) {
     isWorking,
     incomeLoss,
     incomeLossReason: reason,
+    riskReason,
+    claimReason,
+    reason: explanation,
     ordersCompleted,
-    workingMinutes,
+    duration,
+    workingMinutes: duration,
     earnings,
     eligibility: {
       riskEligible: risk === ELIGIBLE_RISK,
       activeWorkConfirmed: isWorking,
       incomeLossDetected: incomeLoss,
+      durationThresholdMet: duration > CLAIM_DURATION_THRESHOLD_MINUTES,
     },
     message: claimTriggered
-      ? "Claim auto-triggered after confirming active work and income loss."
-      : "No claim triggered. Active work and income loss could not both be confirmed.",
+      ? "Claim auto-triggered after confirming high risk, active work, income loss, and duration threshold."
+      : "No claim triggered. High risk, active work, income loss, and duration threshold must all be confirmed.",
   };
 }
 
 module.exports = {
   CLAIM_STATES,
+  CLAIM_DURATION_THRESHOLD_MINUTES,
   DEFAULT_HOURLY_RATE,
   INCOME_LOSS_REASONS,
   MIN_WORKING_MINUTES_FOR_INCOME_LOSS,
   calculatePayout,
   deriveIncomeLoss,
   getAutoClaimDecision,
-  normalizeBoolean,
   normalizeOptionalNumber,
+  normalizeBoolean: sanitizeBoolean,
   validateAutoClaimPayload,
 };

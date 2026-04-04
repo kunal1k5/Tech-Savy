@@ -274,13 +274,16 @@ function createMonitoringScenarioFromForm(form) {
 }
 
 function buildAutoClaimPayload({ risk, hoursLost, hourlyRate, activitySignals }) {
+  const duration = Number(activitySignals?.workingMinutes ?? hoursLost * 60);
+
   return {
     risk,
     hoursLost,
     hourlyRate,
+    duration,
     isWorking: Boolean(activitySignals?.isWorking),
     ordersCompleted: Number(activitySignals?.ordersCompleted ?? 0),
-    workingMinutes: Number(activitySignals?.workingMinutes ?? hoursLost * 60),
+    workingMinutes: duration,
     earnings: Number(activitySignals?.earnings ?? 0),
   };
 }
@@ -726,6 +729,9 @@ export default function Dashboard() {
         ),
         getFraudStatus({
           risk: nextRiskData?.risk || "LOW",
+          aqi: nextInputs.aqi,
+          rain: nextInputs.rain,
+          wind: nextInputs.wind,
           locationMatch: nextFraudSignals.locationMatch,
           claimsCount: nextFraudSignals.claimsCount,
           loginAttempts: nextFraudSignals.loginAttempts,
@@ -1025,6 +1031,9 @@ export default function Dashboard() {
                 fraudScore: aiDecisionData.fraudScore,
                 fraud_score: aiDecisionData.fraud_score,
                 status: aiDecisionData.status,
+                riskReason: aiDecisionData.riskReason,
+                fraudReason: aiDecisionData.fraudReason,
+                reason: aiDecisionData.reason,
               }
             : {}),
         }
@@ -1143,7 +1152,9 @@ export default function Dashboard() {
               <span className={riskStyle.accent}>{automatedRisk}</span>
             </div>
           }
-          supporting="Real-time monitoring keeps risk signals fresh."
+          supporting={
+            riskData?.reason || "Real-time monitoring keeps risk signals fresh."
+          }
           iconClassName="bg-blue-50 text-blue-600"
           valueClassName={riskStyle.accent}
           pulse={automatedRisk === "High"}
@@ -1172,8 +1183,9 @@ export default function Dashboard() {
           loading={claimLoading && !claimData}
           value={claimStatusLabel}
           supporting={
+            claimData?.reason ||
             claimData?.message ||
-            "Claims trigger only when high risk, active work, and income loss are confirmed."
+            "Claims trigger only when high risk, active work, income loss, and more than 30 minutes of duration are confirmed."
           }
           iconClassName="bg-emerald-50 text-emerald-600"
           valueClassName={claimTriggered ? "text-emerald-700" : "text-slate-900"}
@@ -1184,7 +1196,7 @@ export default function Dashboard() {
           label="Fraud Intelligence"
           loading={fraudLoading && !fraudSnapshot}
           value={fraudStatusLabel}
-          supporting={`Fraud score: ${fraudScore}`}
+          supporting={fraudSnapshot?.reason || `Fraud score: ${fraudScore}`}
           iconClassName="bg-slate-100 text-slate-700"
           valueClassName={
             fraudState.tone === "danger"
@@ -1443,15 +1455,19 @@ export default function Dashboard() {
                 label="Claim Status"
                 value={claimStatusLabel}
                 supporting={
+                  claimData?.reason ||
                   claimData?.message ||
-                  "Claim automation checks high risk, active work, and income loss."
+                  "Claim automation checks high risk, active work, income loss, and duration above 30 minutes."
                 }
                 toneClassName={claimTriggered ? "text-emerald-700" : "text-slate-900"}
               />
               <SimulationResultCard
                 label="Fraud Score"
                 value={fraudScore}
-                supporting={`Fraud Intelligence status: ${fraudStatusLabel}`}
+                supporting={
+                  fraudSnapshot?.reason ||
+                  `Fraud Intelligence status: ${fraudStatusLabel}`
+                }
                 toneClassName={
                   fraudState.tone === "danger"
                     ? "text-red-700"
@@ -1463,7 +1479,7 @@ export default function Dashboard() {
               <SimulationResultCard
                 label="Decision"
                 value={decisionLabel}
-                supporting={smartDecisionState.summary}
+                supporting={aiDecisionData?.reason || smartDecisionState.summary}
                 toneClassName={
                   smartDecisionState.label === "FRAUD"
                     ? "text-red-700"
@@ -1536,7 +1552,7 @@ export default function Dashboard() {
                   <p className="mt-2 text-sm leading-6 text-slate-500">
                     {showSuccessState
                       ? "Result highlighted for quick review."
-                      : "Claim automation runs only when high risk, active work, and income loss are confirmed."}
+                      : "Claim automation runs only when high risk, active work, income loss, and duration above 30 minutes are confirmed."}
                   </p>
                 </div>
 
@@ -1721,7 +1737,7 @@ export default function Dashboard() {
                   <p className="mt-2 text-sm leading-6 text-slate-500">
                     {aiDecisionLoading && !aiDecisionData
                       ? "Decision Engine Running"
-                      : smartDecisionState.summary}
+                      : aiDecisionData?.reason || smartDecisionState.summary}
                   </p>
                 </div>
 

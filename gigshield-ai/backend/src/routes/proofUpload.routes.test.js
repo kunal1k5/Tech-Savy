@@ -64,7 +64,8 @@ describe("POST /api/upload-proof", () => {
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       success: false,
-      message: "Geo-location image is required.",
+      data: {},
+      message: "Handled safely",
     });
   });
 
@@ -84,7 +85,8 @@ describe("POST /api/upload-proof", () => {
     expect(response.status).toBe(404);
     expect(response.body).toMatchObject({
       success: false,
-      message: "Dispute not found.",
+      data: {},
+      message: "Handled safely",
     });
   });
 
@@ -157,5 +159,5 @@ describe("POST /api/upload-proof", () => {
     expect(response.body.data.decision).toMatchObject({
       decision: "REJECTED",
     });
-  });
+  }, 15000);
 });

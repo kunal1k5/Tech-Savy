@@ -1,5 +1,5 @@
 const { createAiDecision } = require("../services/aiDecision.service");
-const { sendSuccess } = require("../utils/apiResponse");
+const { sendHandledError, sendSuccess } = require("../utils/apiResponse");
 
 const AiDecisionController = {
   async evaluate(req, res, next) {
@@ -7,7 +7,7 @@ const AiDecisionController = {
       const decision = createAiDecision(req.body);
       return sendSuccess(res, decision, "AI decision generated successfully.");
     } catch (error) {
-      return next(error);
+      return sendHandledError(res, error.statusCode || 500);
     }
   },
 };

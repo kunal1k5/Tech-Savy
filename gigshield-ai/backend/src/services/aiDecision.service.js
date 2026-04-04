@@ -1,5 +1,12 @@
 const Joi = require("joi");
+const { buildFraudReason, buildRiskReason, joinReasonParts } = require("../utils/explanations");
 const { calculateTrustScore } = require("../utils/trustScore");
+const {
+  clampInteger,
+  ensureObject,
+  sanitizeBoolean,
+  sanitizeWeatherMetrics,
+} = require("../utils/inputSafety");
 
 const RISK_LEVELS = Object.freeze({
   HIGH: "HIGH",
@@ -25,15 +32,24 @@ const NEXT_ACTIONS = Object.freeze({
   REJECT_CLAIM: "REJECT_CLAIM",
 });
 
+const LOW_RISK_TRIGGERED_CLAIM_SCORE = 50;
+const TOO_MANY_CLAIMS_SCORE = 25;
+const TOO_MANY_CLAIMS_THRESHOLD = 5;
+const SUSPICIOUS_PATTERN_SCORE = 30;
+
 const aiDecisionSchema = Joi.object({
-  aqi: Joi.number().required(),
-  rain: Joi.number().min(0).required(),
-  wind: Joi.number().min(0).required(),
-  claimsCount: Joi.number().integer().min(0).required(),
-  loginAttempts: Joi.number().integer().min(0).required(),
-  locationMatch: Joi.boolean().required(),
-  contextValid: Joi.boolean().required(),
-});
+  aqi: Joi.any().optional(),
+  rain: Joi.any().optional(),
+  wind: Joi.any().optional(),
+  claimsCount: Joi.any().optional(),
+  loginAttempts: Joi.any().optional(),
+  locationMatch: Joi.any().optional(),
+  contextValid: Joi.any().optional(),
+  claimTriggered: Joi.any().optional(),
+  claim_triggered: Joi.any().optional(),
+  suspiciousPattern: Joi.any().optional(),
+  suspicious_pattern: Joi.any().optional(),
+}).unknown(true);
 
 const RISK_RULES = Object.freeze([
   Object.freeze({
@@ -55,14 +71,30 @@ const RISK_RULES = Object.freeze([
 
 const FRAUD_RULES = Object.freeze([
   Object.freeze({
+    id: "low_risk_claim_triggered",
+    points: LOW_RISK_TRIGGERED_CLAIM_SCORE,
+    isTriggered: ({ risk, claimTriggered }) =>
+      risk === RISK_LEVELS.LOW && claimTriggered === true,
+  }),
+  Object.freeze({
     id: "high_claims_count",
     points: 20,
     isTriggered: ({ claimsCount }) => claimsCount > 3,
   }),
   Object.freeze({
+    id: "too_many_claims",
+    points: TOO_MANY_CLAIMS_SCORE,
+    isTriggered: ({ claimsCount }) => claimsCount > TOO_MANY_CLAIMS_THRESHOLD,
+  }),
+  Object.freeze({
     id: "excessive_login_attempts",
     points: 20,
     isTriggered: ({ loginAttempts }) => loginAttempts > 3,
+  }),
+  Object.freeze({
+    id: "suspicious_pattern",
+    points: SUSPICIOUS_PATTERN_SCORE,
+    isTriggered: ({ suspiciousPattern }) => suspiciousPattern === true,
   }),
   Object.freeze({
     id: "location_mismatch",
@@ -149,13 +181,87 @@ function getNextAction(decision) {
   return DECISION_ACTIONS[decision] || null;
 }
 
+function normalizeSuspiciousPattern(value, defaultValue = false) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+
+    if (!normalized || ["false", "none", "normal", "clean", "safe", "legit"].includes(normalized)) {
+      return false;
+    }
+
+    if (["true", "suspicious", "abnormal", "anomalous", "fake", "detected"].includes(normalized)) {
+      return true;
+    }
+  }
+
+  if (value === undefined || value === null || value === "") {
+    return defaultValue;
+  }
+
+  return Boolean(value);
+}
+
+function sanitizeAiDecisionInput(input = {}) {
+  const safeInput = ensureObject(input);
+  const weatherMetrics = sanitizeWeatherMetrics(safeInput);
+
+  return {
+    ...safeInput,
+    ...weatherMetrics,
+    claimsCount: clampInteger(safeInput?.claimsCount, {
+      min: 0,
+      max: 1000,
+      defaultValue: 0,
+    }),
+    loginAttempts: clampInteger(safeInput?.loginAttempts, {
+      min: 0,
+      max: 1000,
+      defaultValue: 0,
+    }),
+    locationMatch: sanitizeBoolean(safeInput?.locationMatch, false),
+    contextValid: sanitizeBoolean(safeInput?.contextValid, false),
+    claimTriggered: sanitizeBoolean(
+      safeInput?.claimTriggered ?? safeInput?.claim_triggered,
+      false
+    ),
+    suspiciousPattern: normalizeSuspiciousPattern(
+      safeInput?.suspiciousPattern ??
+        safeInput?.suspicious_pattern ??
+        safeInput?.claimPattern ??
+        safeInput?.claim_pattern,
+      false
+    ),
+  };
+}
+
 function createAiDecision(input) {
-  const risk = calculateRisk(input);
-  const fraudScore = calculateFraudScore(input);
+  const sanitizedInput = sanitizeAiDecisionInput(input);
+  const risk = calculateRisk(sanitizedInput);
+  const fraudBreakdown = calculateFraudBreakdown({
+    ...sanitizedInput,
+    risk,
+  });
+  const fraudScore = fraudBreakdown.reduce(
+    (score, rule) => score + (rule.triggered ? rule.points : 0),
+    0
+  );
   const trustScore = calculateTrustScore(fraudScore);
   const status = calculateStatus(fraudScore);
   const decision = getDecision(fraudScore);
   const nextAction = getNextAction(decision);
+  const riskReason = buildRiskReason({
+    risk,
+    ...sanitizedInput,
+  });
+  const fraudReason = buildFraudReason(fraudBreakdown);
+  const reason = joinReasonParts(
+    [riskReason, fraudReason],
+    "AI decision explanation unavailable."
+  );
 
   return {
     risk,
@@ -165,6 +271,9 @@ function createAiDecision(input) {
     status,
     decision,
     nextAction,
+    riskReason,
+    fraudReason,
+    reason,
   };
 }
 
@@ -244,10 +353,14 @@ module.exports = {
   DECISION_BANDS,
   DECISION_LEVELS,
   FRAUD_RULES,
+  LOW_RISK_TRIGGERED_CLAIM_SCORE,
   NEXT_ACTIONS,
   RISK_LEVELS,
   RISK_RULES,
+  SUSPICIOUS_PATTERN_SCORE,
   STATUS_LEVELS,
+  TOO_MANY_CLAIMS_SCORE,
+  TOO_MANY_CLAIMS_THRESHOLD,
   aiDecisionSchema,
   calculateFraudBreakdown,
   calculateFraudScore,
@@ -258,6 +371,8 @@ module.exports = {
   createAiDecision,
   createClaimDecision,
   getDecision,
+  sanitizeAiDecisionInput,
   getDecisionBand,
   getNextAction,
+  normalizeSuspiciousPattern,
 };

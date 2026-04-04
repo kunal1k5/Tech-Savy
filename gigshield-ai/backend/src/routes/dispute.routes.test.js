@@ -41,7 +41,8 @@ describe("POST /api/start-dispute", () => {
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       success: false,
-      message: "Validation failed",
+      data: {},
+      message: "Handled safely",
     });
   });
 });
