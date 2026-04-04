@@ -1,6 +1,6 @@
-# GigShield Premium White Design System
+# TrustGrid AI Premium White Design System
 
-This is the recommended UI direction for GigShield if the product should feel like a premium fintech SaaS app instead of a dark demo dashboard.
+This is the recommended UI direction for TrustGrid AI if the product should feel like a premium fintech SaaS app instead of a dark demo dashboard.
 
 ## Product Feel
 
@@ -377,4 +377,4 @@ The frontend now includes optional white-theme helper classes for the next imple
 
 ## Final Direction
 
-If you implement the shell and component recipes above, GigShield will read as a credible fintech product: white, structured, premium, and operational without drifting into generic AI-dashboard styling.
+If you implement the shell and component recipes above, TrustGrid AI will read as a credible fintech product: white, structured, premium, and operational without drifting into generic AI-dashboard styling.

@@ -1,4 +1,4 @@
-# GigShield AI API Reference
+# TrustGrid AI API Reference
 
 ## Base URL
 
@@ -46,6 +46,10 @@ Request:
 ```json
 {
   "risk": "HIGH",
+  "isWorking": true,
+  "ordersCompleted": 0,
+  "workingMinutes": 180,
+  "earnings": 0,
   "hoursLost": 3,
   "hourlyRate": 150
 }
@@ -61,9 +65,20 @@ Response:
     "payout": 450,
     "status": "PAID",
     "claimStates": ["CREATED", "PROCESSING", "PAID"],
+    "isWorking": true,
+    "incomeLoss": true,
+    "incomeLossReason": "NO_ORDERS_COMPLETED",
+    "ordersCompleted": 0,
+    "workingMinutes": 180,
+    "earnings": 0,
+    "eligibility": {
+      "riskEligible": true,
+      "activeWorkConfirmed": true,
+      "incomeLossDetected": true
+    },
     "hoursLost": 3,
     "hourlyRate": 150,
-    "message": "Claim automatically triggered due to high risk"
+    "message": "Claim auto-triggered after confirming active work and income loss."
   },
   "message": "Auto-claim decision generated successfully."
 }
@@ -92,6 +107,8 @@ Response:
     "risk": "HIGH",
     "fraudScore": 110,
     "fraud_score": 110,
+    "trustScore": 0,
+    "trust_score": 0,
     "status": "FRAUD",
     "locationMatch": false,
     "claimsCount": 4,
@@ -125,6 +142,8 @@ Response:
   "data": {
     "risk": "HIGH",
     "fraudScore": 110,
+    "trustScore": 0,
+    "trust_score": 0,
     "status": "FRAUD",
     "decision": "FRAUD",
     "nextAction": "REJECT_CLAIM"

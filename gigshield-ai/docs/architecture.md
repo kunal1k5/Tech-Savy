@@ -1,6 +1,6 @@
-# GigShield Architecture
+# TrustGrid AI Architecture
 
-GigShield is organized as a three-layer system:
+TrustGrid AI is organized as a three-layer system:
 
 `frontend -> backend -> ai-engine -> database`
 

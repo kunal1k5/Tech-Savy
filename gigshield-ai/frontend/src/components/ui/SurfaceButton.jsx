@@ -41,7 +41,7 @@ export default function SurfaceButton({
       transition={{ type: "spring", stiffness: 360, damping: 24 }}
       disabled={disabled || loading}
       className={cn(
-        "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-4 disabled:cursor-not-allowed disabled:opacity-60",
+        "inline-flex items-center justify-center gap-2 rounded-xl font-semibold shadow-sm transition-[transform,background-color,border-color,box-shadow] duration-200 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:shadow-sm",
         VARIANTS[variant] || VARIANTS.primary,
         SIZES[size] || SIZES.md,
         block && "w-full",

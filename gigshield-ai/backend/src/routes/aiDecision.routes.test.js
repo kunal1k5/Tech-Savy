@@ -20,6 +20,8 @@ describe("POST /api/ai-decision", () => {
       data: {
         risk: "LOW",
         fraudScore: 0,
+        trustScore: 100,
+        trust_score: 100,
         status: "SAFE",
         decision: "SAFE",
         nextAction: "AUTO_APPROVE_CLAIM",
@@ -45,6 +47,8 @@ describe("POST /api/ai-decision", () => {
       data: {
         risk: "MEDIUM",
         fraudScore: 40,
+        trustScore: 60,
+        trust_score: 60,
         status: "WARNING",
         decision: "VERIFY",
         nextAction: "UPLOAD_PROOF",
@@ -70,6 +74,8 @@ describe("POST /api/ai-decision", () => {
       data: {
         risk: "HIGH",
         fraudScore: 110,
+        trustScore: 0,
+        trust_score: 0,
         status: "FRAUD",
         decision: "FRAUD",
         nextAction: "REJECT_CLAIM",
@@ -95,6 +101,8 @@ describe("POST /api/ai-decision", () => {
       data: {
         risk: "LOW",
         fraudScore: 30,
+        trustScore: 70,
+        trust_score: 70,
         status: "SAFE",
         decision: "SAFE",
         nextAction: "AUTO_APPROVE_CLAIM",
@@ -120,6 +128,8 @@ describe("POST /api/ai-decision", () => {
       data: {
         risk: "LOW",
         fraudScore: 60,
+        trustScore: 40,
+        trust_score: 40,
         status: "WARNING",
         decision: "VERIFY",
         nextAction: "UPLOAD_PROOF",

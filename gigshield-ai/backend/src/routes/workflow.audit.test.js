@@ -27,6 +27,10 @@ describe("GigShield AI workflow audit", () => {
 
     const autoClaimResponse = await request(app).post("/api/auto-claim").send({
       risk: riskPremiumResponse.body.data.risk,
+      isWorking: true,
+      ordersCompleted: 0,
+      workingMinutes: 180,
+      earnings: 0,
       hoursLost: 3,
       hourlyRate: 150,
     });
@@ -38,6 +42,7 @@ describe("GigShield AI workflow audit", () => {
         claimTriggered: true,
         payout: 450,
         status: "PAID",
+        incomeLoss: true,
       },
     });
 

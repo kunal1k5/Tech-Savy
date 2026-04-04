@@ -9,7 +9,6 @@ import {
   ShieldAlert,
   ShieldCheck,
   Wallet,
-  Wind,
 } from "lucide-react";
 import SurfaceButton from "../components/ui/SurfaceButton";
 import { useGigShieldData } from "../context/GigShieldDataContext";
@@ -72,50 +71,84 @@ const riskStyles = {
   },
 };
 
-const DEFAULT_AUTOMATION_SCENARIO = {
-  riskInputs: DEFAULT_RISK_PREMIUM_INPUT,
-  hoursLost: 1,
-  fraudSignals: {
-    locationMatch: true,
+const SIMULATION_PRESETS = Object.freeze({
+  NORMAL: Object.freeze({
+    label: "Normal Scenario",
+    aqi: DEFAULT_RISK_PREMIUM_INPUT.aqi,
+    rain: DEFAULT_RISK_PREMIUM_INPUT.rain,
+    wind: DEFAULT_RISK_PREMIUM_INPUT.wind,
     claimsCount: 1,
     loginAttempts: 1,
-    contextValid: true,
-  },
-};
-
-const RAIN_SIMULATION_SCENARIO = {
-  riskInputs: {
-    aqi: 120,
-    rain: 24,
-    wind: 14,
-  },
-  hoursLost: 3,
-  fraudSignals: {
-    locationMatch: false,
-    claimsCount: 4,
-    loginAttempts: 5,
-    contextValid: false,
-  },
-};
-
-const POLLUTION_SIMULATION_SCENARIO = {
-  riskInputs: {
-    aqi: 340,
-    rain: 2,
-    wind: 14,
-  },
-  hoursLost: 3,
-  fraudSignals: {
     locationMatch: true,
-    claimsCount: 4,
-    loginAttempts: 5,
-    contextValid: true,
-  },
-};
+  }),
+  HEAVY_RAIN: Object.freeze({
+    label: "Heavy Rain Scenario",
+    aqi: 120,
+    rain: 28,
+    wind: 18,
+    claimsCount: 1,
+    loginAttempts: 2,
+    locationMatch: true,
+  }),
+  HIGH_FRAUD: Object.freeze({
+    label: "High Fraud Scenario",
+    aqi: 180,
+    rain: 8,
+    wind: 14,
+    claimsCount: 5,
+    loginAttempts: 6,
+    locationMatch: false,
+  }),
+});
+
+const DEFAULT_SIMULATION_FORM = Object.freeze({ ...SIMULATION_PRESETS.NORMAL });
+const DEFAULT_AUTOMATION_SCENARIO = createMonitoringScenarioFromForm(DEFAULT_SIMULATION_FORM);
+const HEAVY_RAIN_SIMULATION_SCENARIO = createMonitoringScenarioFromForm(
+  SIMULATION_PRESETS.HEAVY_RAIN
+);
+const HIGH_FRAUD_SIMULATION_SCENARIO = createMonitoringScenarioFromForm(
+  SIMULATION_PRESETS.HIGH_FRAUD
+);
 
 const AUTO_CLAIM_STEPS = ["CREATED", "PROCESSING", "PAID"];
 const DEFAULT_HOURLY_RATE = 150;
 const DEFAULT_DISPUTE_REASON = "System failed to detect actual issue";
+const AI_LIFECYCLE_STEPS = [
+  {
+    key: "detect",
+    label: "Detect",
+    note: "Signals are monitored across risk, behavior, and location.",
+  },
+  {
+    key: "decide",
+    label: "Decide",
+    note: "The decision engine classifies the claim and chooses the next action.",
+  },
+  {
+    key: "validate",
+    label: "Validate",
+    note: "Users can challenge the result with disputes and proof uploads.",
+  },
+  {
+    key: "correct",
+    label: "Correct",
+    note: "AI re-verification refines the final outcome and claim state.",
+  },
+];
+const LIVE_SYSTEM_SIGNALS = [
+  {
+    label: "Monitoring Active",
+    dotClassName: "bg-blue-500",
+  },
+  {
+    label: "Decision Engine Running",
+    dotClassName: "bg-emerald-500",
+  },
+  {
+    label: "Fraud Detection Active",
+    dotClassName: "bg-amber-500",
+  },
+];
 
 function formatClaimTime(date = new Date()) {
   const hours = String(date.getHours()).padStart(2, "0");
@@ -126,7 +159,7 @@ function formatClaimTime(date = new Date()) {
 function formatSignalLabel(value) {
   const normalized = String(value || "").trim().toUpperCase();
   if (!normalized) {
-    return "Checking";
+    return "Processing...";
   }
 
   return `${normalized.charAt(0)}${normalized.slice(1).toLowerCase()}`;
@@ -139,6 +172,117 @@ function getDefaultHourlyRate(weeklyIncome) {
   }
 
   return DEFAULT_HOURLY_RATE;
+}
+
+function clampNumber(value, min, max) {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return min;
+  }
+
+  return Math.min(max, Math.max(min, numericValue));
+}
+
+function normalizeSimulationForm(form = {}) {
+  return {
+    aqi: clampNumber(form.aqi ?? DEFAULT_SIMULATION_FORM.aqi, 0, 500),
+    rain: clampNumber(form.rain ?? DEFAULT_SIMULATION_FORM.rain, 0, 50),
+    wind: clampNumber(form.wind ?? DEFAULT_SIMULATION_FORM.wind, 0, 50),
+    claimsCount: clampNumber(
+      form.claimsCount ?? DEFAULT_SIMULATION_FORM.claimsCount,
+      0,
+      20
+    ),
+    loginAttempts: clampNumber(
+      form.loginAttempts ?? DEFAULT_SIMULATION_FORM.loginAttempts,
+      0,
+      20
+    ),
+    locationMatch:
+      form.locationMatch === undefined
+        ? DEFAULT_SIMULATION_FORM.locationMatch
+        : Boolean(form.locationMatch),
+  };
+}
+
+function deriveSimulationContextValidity({ claimsCount, loginAttempts, locationMatch }) {
+  if (!locationMatch) {
+    return false;
+  }
+
+  return !(Number(claimsCount) > 3 && Number(loginAttempts) > 3);
+}
+
+function deriveSimulationActivitySignals({ aqi, rain, wind }) {
+  if (aqi > 300 || rain > 20 || wind > 30) {
+    return {
+      hoursLost: 3,
+      activitySignals: {
+        isWorking: true,
+        ordersCompleted: 0,
+        workingMinutes: 180,
+        earnings: 0,
+      },
+    };
+  }
+
+  if (aqi > 150 || rain > 5) {
+    return {
+      hoursLost: 2,
+      activitySignals: {
+        isWorking: true,
+        ordersCompleted: 1,
+        workingMinutes: 140,
+        earnings: 80,
+      },
+    };
+  }
+
+  return {
+    hoursLost: 1,
+    activitySignals: {
+      isWorking: true,
+      ordersCompleted: 3,
+      workingMinutes: 90,
+      earnings: 240,
+    },
+  };
+}
+
+function createMonitoringScenarioFromForm(form) {
+  const simulationForm = normalizeSimulationForm(form);
+  const riskInputs = {
+    aqi: simulationForm.aqi,
+    rain: simulationForm.rain,
+    wind: simulationForm.wind,
+  };
+  const { hoursLost, activitySignals } = deriveSimulationActivitySignals(riskInputs);
+
+  return {
+    riskInputs,
+    hoursLost,
+    activitySignals,
+    fraudSignals: {
+      locationMatch: simulationForm.locationMatch,
+      claimsCount: simulationForm.claimsCount,
+      loginAttempts: simulationForm.loginAttempts,
+      contextValid: deriveSimulationContextValidity(simulationForm),
+    },
+    simulationForm,
+  };
+}
+
+function buildAutoClaimPayload({ risk, hoursLost, hourlyRate, activitySignals }) {
+  return {
+    risk,
+    hoursLost,
+    hourlyRate,
+    isWorking: Boolean(activitySignals?.isWorking),
+    ordersCompleted: Number(activitySignals?.ordersCompleted ?? 0),
+    workingMinutes: Number(activitySignals?.workingMinutes ?? hoursLost * 60),
+    earnings: Number(activitySignals?.earnings ?? 0),
+  };
 }
 
 function getFraudEngineState(snapshot) {
@@ -206,7 +350,7 @@ function getSmartDecisionState(snapshot) {
       nextAction: nextAction || "WAITING",
       className: "bg-slate-100 text-slate-700",
       dot: "bg-slate-400",
-      summary: "Smart decision is waiting for the backend response.",
+      summary: "Automated decision system is waiting for the backend response.",
     };
   }
 
@@ -216,7 +360,7 @@ function getSmartDecisionState(snapshot) {
       nextAction: nextAction || "REJECT_CLAIM",
       className: "bg-red-50 text-red-700",
       dot: "bg-red-500",
-      summary: "The system wants to reject this claim automatically.",
+      summary: "Automated decision system recommends rejecting this claim.",
     };
   }
 
@@ -226,7 +370,7 @@ function getSmartDecisionState(snapshot) {
       nextAction: nextAction || "UPLOAD_PROOF",
       className: "bg-amber-50 text-amber-700",
       dot: "bg-amber-500",
-      summary: "The system needs extra proof before it can continue.",
+      summary: "Automated decision system needs extra proof before it can continue.",
     };
   }
 
@@ -235,8 +379,22 @@ function getSmartDecisionState(snapshot) {
     nextAction: nextAction || "AUTO_APPROVE_CLAIM",
     className: "bg-emerald-50 text-emerald-700",
     dot: "bg-emerald-500",
-    summary: "The system can approve this claim automatically.",
+    summary: "Automated decision system can approve this claim automatically.",
   };
+}
+
+function getTrustScore(snapshot) {
+  if (!snapshot) {
+    return 100;
+  }
+
+  const explicitTrustScore = Number(snapshot?.trustScore ?? snapshot?.trust_score);
+  if (Number.isFinite(explicitTrustScore)) {
+    return Math.max(0, Math.min(100, explicitTrustScore));
+  }
+
+  const fraudScore = Number(snapshot?.fraudScore ?? snapshot?.fraud_score ?? 0);
+  return Math.max(0, Math.min(100, 100 - Math.max(0, fraudScore)));
 }
 
 function getClaimStepClasses(step, status) {
@@ -249,6 +407,58 @@ function getClaimStepClasses(step, status) {
   }
 
   return "border-slate-200 bg-slate-50 text-slate-500";
+}
+
+function getLifecycleStepsState({
+  fraudSnapshot,
+  aiDecisionData,
+  aiDecisionLoading,
+  showDisputeOption,
+  dispute,
+  disputeSubmitting,
+  proofUpload,
+  proofUploading,
+  reverificationLoading,
+  reverificationResult,
+}) {
+  return AI_LIFECYCLE_STEPS.map((step) => {
+    let status = "pending";
+
+    if (step.key === "detect") {
+      status = fraudSnapshot || aiDecisionData ? "complete" : aiDecisionLoading ? "active" : "pending";
+    }
+
+    if (step.key === "decide") {
+      status = aiDecisionData ? "complete" : aiDecisionLoading ? "active" : "pending";
+    }
+
+    if (step.key === "validate") {
+      if (reverificationResult) {
+        status = "complete";
+      } else if (
+        proofUpload ||
+        proofUploading ||
+        dispute ||
+        disputeSubmitting ||
+        showDisputeOption
+      ) {
+        status = "active";
+      }
+    }
+
+    if (step.key === "correct") {
+      if (reverificationResult) {
+        status = "complete";
+      } else if (reverificationLoading || proofUpload) {
+        status = "active";
+      }
+    }
+
+    return {
+      ...step,
+      status,
+    };
+  });
 }
 
 function SurfaceSkeleton({ className }) {
@@ -269,7 +479,7 @@ function DashboardCard({ children, className, hover = true }) {
       whileHover={hover ? { y: -2, scale: 1.01 } : undefined}
       transition={{ type: "spring", stiffness: 320, damping: 26 }}
       className={cn(
-        "rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)]",
+        "rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] transition-[border-color,box-shadow,transform] duration-200 hover:border-slate-300 hover:shadow-[0_24px_48px_rgba(15,23,42,0.08)]",
         className
       )}
     >
@@ -298,7 +508,6 @@ function MetricCard({
   value,
   supporting,
   loading = false,
-  toneClassName = "bg-blue-50 text-blue-700",
   iconClassName = "bg-blue-50 text-blue-600",
   valueClassName = "text-slate-900",
   pulse = false,
@@ -319,24 +528,54 @@ function MetricCard({
               <div className={cn("mt-4 text-3xl font-semibold tracking-tight md:text-4xl", valueClassName)}>
                 {value}
               </div>
-              <p className="mt-3 text-sm leading-6 text-slate-500">{supporting}</p>
+              <p className="mt-2 text-sm leading-6 text-slate-500">{supporting}</p>
             </>
           )}
         </div>
 
-        <div className={cn("flex h-12 w-12 items-center justify-center rounded-2xl", iconClassName)}>
+        <div className={cn("flex h-12 w-12 items-center justify-center rounded-2xl shadow-sm", iconClassName)}>
           <Icon size={20} />
         </div>
       </div>
-
-      {!loading ? (
-        <div className="mt-5">
-          <span className={cn("inline-flex rounded-full px-3 py-1.5 text-xs font-semibold", toneClassName)}>
-            {label}
-          </span>
-        </div>
-      ) : null}
     </DashboardCard>
+  );
+}
+
+function SimulationControlCard({ label, value, helper, children }) {
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+            {label}
+          </p>
+          <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+            {value}
+          </div>
+        </div>
+
+        {helper ? <span className="text-xs font-medium text-slate-400">{helper}</span> : null}
+      </div>
+
+      <div className="mt-4">{children}</div>
+    </div>
+  );
+}
+
+function SimulationResultCard({
+  label,
+  value,
+  supporting,
+  toneClassName = "text-slate-900",
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white px-4 py-4 shadow-sm transition-transform duration-200 hover:-translate-y-0.5">
+      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+        {label}
+      </div>
+      <div className={cn("mt-3 text-2xl font-semibold tracking-tight", toneClassName)}>{value}</div>
+      <div className="mt-2 text-sm leading-6 text-slate-500">{supporting}</div>
+    </div>
   );
 }
 
@@ -349,11 +588,61 @@ function DetailRow({ label, value, className }) {
   );
 }
 
+function LifecycleStepCard({ index, step }) {
+  const styles = {
+    complete: {
+      container: "border-emerald-200 bg-emerald-50",
+      badge: "bg-emerald-600 text-white",
+      label: "text-emerald-800",
+      status: "Complete",
+    },
+    active: {
+      container: "border-blue-200 bg-blue-50",
+      badge: "bg-blue-600 text-white",
+      label: "text-blue-800",
+      status: "Active",
+    },
+    pending: {
+      container: "border-slate-200 bg-slate-50",
+      badge: "bg-white text-slate-700 border border-slate-200",
+      label: "text-slate-800",
+      status: "Pending",
+    },
+  };
+
+  const currentStyle = styles[step.status] || styles.pending;
+
+  return (
+    <div className={cn("rounded-2xl border px-4 py-4", currentStyle.container)}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span
+            className={cn(
+              "inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold",
+              currentStyle.badge
+            )}
+          >
+            {index + 1}
+          </span>
+          <p className={cn("text-sm font-semibold", currentStyle.label)}>{step.label}</p>
+        </div>
+
+        <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+          {currentStyle.status}
+        </span>
+      </div>
+
+      <p className="mt-3 text-sm leading-6 text-slate-600">{step.note}</p>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { platformState } = useGigShieldData();
   const sessionUser = getUserFromToken();
   const [riskData, setRiskData] = useState(null);
   const [riskInputs, setRiskInputs] = useState(DEFAULT_AUTOMATION_SCENARIO.riskInputs);
+  const [simulationForm, setSimulationForm] = useState({ ...DEFAULT_SIMULATION_FORM });
   const [riskLoading, setRiskLoading] = useState(true);
   const [riskError, setRiskError] = useState("");
   const [riskAction, setRiskAction] = useState("load");
@@ -392,6 +681,8 @@ export default function Dashboard() {
     const requestId = requestIdRef.current + 1;
     const nextInputs = nextScenario?.riskInputs || DEFAULT_AUTOMATION_SCENARIO.riskInputs;
     const nextHoursLost = Number(nextScenario?.hoursLost ?? DEFAULT_AUTOMATION_SCENARIO.hoursLost);
+    const nextActivitySignals =
+      nextScenario?.activitySignals || DEFAULT_AUTOMATION_SCENARIO.activitySignals;
     const nextFraudSignals = nextScenario?.fraudSignals || DEFAULT_AUTOMATION_SCENARIO.fraudSignals;
     const hourlyRate = getDefaultHourlyRate(platformState.worker.weeklyIncome);
 
@@ -425,11 +716,14 @@ export default function Dashboard() {
       setRiskData(nextRiskData);
 
       const [claimResult, fraudResult, aiDecisionResult] = await Promise.allSettled([
-        getAutoClaim({
-          risk: nextRiskData?.risk || "LOW",
-          hoursLost: nextHoursLost,
-          hourlyRate,
-        }),
+        getAutoClaim(
+          buildAutoClaimPayload({
+            risk: nextRiskData?.risk || "LOW",
+            hoursLost: nextHoursLost,
+            hourlyRate,
+            activitySignals: nextActivitySignals,
+          })
+        ),
         getFraudStatus({
           risk: nextRiskData?.risk || "LOW",
           locationMatch: nextFraudSignals.locationMatch,
@@ -486,6 +780,42 @@ export default function Dashboard() {
       setFraudLoading(false);
       setAiDecisionLoading(false);
     }
+  }
+
+  function updateSimulationField(field, value, limits = {}) {
+    setSimulationForm((current) => ({
+      ...current,
+      [field]:
+        typeof value === "boolean"
+          ? value
+          : clampNumber(value, limits.min ?? 0, limits.max ?? 500),
+    }));
+  }
+
+  async function applySimulationPreset(presetKey) {
+    const preset = SIMULATION_PRESETS[presetKey];
+    if (!preset) {
+      return;
+    }
+
+    const nextForm = normalizeSimulationForm(preset);
+    setSimulationForm(nextForm);
+
+    const scenario =
+      presetKey === "HEAVY_RAIN"
+        ? HEAVY_RAIN_SIMULATION_SCENARIO
+        : presetKey === "HIGH_FRAUD"
+          ? HIGH_FRAUD_SIMULATION_SCENARIO
+          : DEFAULT_AUTOMATION_SCENARIO;
+
+    await loadMonitoringScenario(scenario, `preset-${presetKey.toLowerCase()}`);
+  }
+
+  async function handleRunSimulation() {
+    await loadMonitoringScenario(
+      createMonitoringScenarioFromForm(simulationForm),
+      "manual"
+    );
   }
 
   async function handleStartDispute() {
@@ -685,7 +1015,21 @@ export default function Dashboard() {
     };
   }, []);
 
-  const fraudSnapshot = fraudData || liveSnapshot;
+  const baseFraudSnapshot = fraudData || liveSnapshot || null;
+  const fraudSnapshot =
+    baseFraudSnapshot || aiDecisionData
+      ? {
+          ...(baseFraudSnapshot || {}),
+          ...(aiDecisionData
+            ? {
+                fraudScore: aiDecisionData.fraudScore,
+                fraud_score: aiDecisionData.fraud_score,
+                status: aiDecisionData.status,
+              }
+            : {}),
+        }
+      : null;
+  const simulationContextValid = deriveSimulationContextValidity(simulationForm);
   const automatedRisk = formatSignalLabel(riskData?.risk || liveSnapshot?.risk || "Low");
   const automatedPremiumAmount = Number(
     riskData?.premium ?? liveSnapshot?.premium ?? 0
@@ -697,18 +1041,47 @@ export default function Dashboard() {
     claimData?.hourlyRate ?? getDefaultHourlyRate(platformState.worker.weeklyIncome)
   );
   const fraudState = getFraudEngineState(fraudSnapshot);
-  const fraudScore = Number(fraudSnapshot?.fraudScore ?? fraudSnapshot?.fraud_score ?? 0);
+  const fraudScore = Number(
+    aiDecisionData?.fraudScore ??
+      aiDecisionData?.fraud_score ??
+      fraudSnapshot?.fraudScore ??
+      fraudSnapshot?.fraud_score ??
+      0
+  );
   const fraudDetails = fraudSnapshot?.details || {
-    behavior: "Checking",
-    location: "Checking",
-    context: "Checking",
+    behavior: "Processing...",
+    location: "Processing...",
+    context: "Processing...",
   };
   const smartDecisionState = getSmartDecisionState(aiDecisionData);
+  const trustScore = getTrustScore(aiDecisionData || fraudSnapshot);
   const showDisputeOption = ["VERIFY", "FRAUD"].includes(smartDecisionState.label);
+  const lifecycleSteps = getLifecycleStepsState({
+    fraudSnapshot,
+    aiDecisionData,
+    aiDecisionLoading,
+    showDisputeOption,
+    dispute,
+    disputeSubmitting,
+    proofUpload,
+    proofUploading,
+    reverificationLoading,
+    reverificationResult,
+  });
   const riskStyle = riskStyles[automatedRisk] || riskStyles.Low;
   const fraudPanelError = fraudError || aiDecisionError || (!fraudSnapshot ? liveBackendError : "");
   const systemBusy = riskLoading || claimLoading || fraudLoading || aiDecisionLoading;
   const showSuccessState = claimTriggered && claimStatus === "PAID";
+  const statusBannerLabel = systemBusy || liveBackendRefreshing ? "Processing..." : "Decision updated";
+  const statusBannerCopy =
+    systemBusy || liveBackendRefreshing
+      ? "Live signals are syncing across the system."
+      : "Monitoring remains active across decisions and fraud checks.";
+  const claimStatusLabel = formatSignalLabel(claimStatus || (claimTriggered ? "PAID" : "NOT TRIGGERED"));
+  const fraudStatusLabel = formatSignalLabel(fraudState.label);
+  const trustScoreSnapshot = aiDecisionData || fraudSnapshot;
+  const simulationPanelError = riskError || claimError || fraudPanelError;
+  const decisionLabel = formatSignalLabel(smartDecisionState.label);
 
   return (
     <motion.div
@@ -727,10 +1100,10 @@ export default function Dashboard() {
               Real-Time Monitoring
             </p>
             <h2 className="text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
-              GigShield Command Center
+              TrustGrid AI Command Center
             </h2>
             <p className="text-sm leading-6 text-slate-500 md:text-base">
-              System is monitoring your environment.
+              We are not an insurance platform - we are an AI Decision Intelligence System and real-time protection system for gig workers.
             </p>
           </div>
 
@@ -739,19 +1112,30 @@ export default function Dashboard() {
               Live Status
             </div>
             <div className="mt-2 text-sm font-semibold text-slate-900">
-              {systemBusy ? "Refreshing signals" : liveBackendRefreshing ? "Monitoring live changes" : "Monitoring active"}
+              {statusBannerLabel}
             </div>
-            <div className="mt-1 text-xs text-slate-500">
-              Risk, premium, claim, and fraud stay in sync.
+            <div className="mt-3 flex flex-wrap gap-2">
+              {LIVE_SYSTEM_SIGNALS.map((signal) => (
+                <span
+                  key={signal.label}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm"
+                >
+                  <span className={cn("h-2 w-2 rounded-full animate-pulse", signal.dotClassName)} />
+                  {signal.label}
+                </span>
+              ))}
+            </div>
+            <div className="mt-3 text-xs text-slate-500">
+              {statusBannerCopy}
             </div>
           </div>
         </div>
       </motion.header>
 
-      <section className="grid gap-5 xl:grid-cols-4">
+      <section className="grid gap-5 xl:grid-cols-5">
         <MetricCard
           icon={Activity}
-          label="Risk"
+          label="Risk Engine"
           loading={riskLoading && !riskData}
           value={
             <div className="flex items-center gap-3">
@@ -759,8 +1143,7 @@ export default function Dashboard() {
               <span className={riskStyle.accent}>{automatedRisk}</span>
             </div>
           }
-          supporting="Real-time signals are updating continuously."
-          toneClassName={riskStyle.badge}
+          supporting="Real-time monitoring keeps risk signals fresh."
           iconClassName="bg-blue-50 text-blue-600"
           valueClassName={riskStyle.accent}
           pulse={automatedRisk === "High"}
@@ -778,116 +1161,340 @@ export default function Dashboard() {
               preserveValue
             />
           }
-          supporting="Premium updates as soon as risk changes."
-          toneClassName="bg-blue-50 text-blue-700"
+          supporting="Premium updates from live risk signals."
           iconClassName="bg-blue-50 text-blue-600"
           valueClassName="text-slate-900"
         />
 
         <MetricCard
           icon={CheckCircle2}
-          label="Claim"
+          label="Claim Status"
           loading={claimLoading && !claimData}
-          value={showSuccessState ? formatINR(claimPayout) : claimTriggered ? claimStatus : "Not triggered"}
+          value={claimStatusLabel}
           supporting={
-            showSuccessState
-              ? "Claim processed successfully"
-              : "Eligible only when high risk causes 2+ hours lost."
+            claimData?.message ||
+            "Claims trigger only when high risk, active work, and income loss are confirmed."
           }
-          toneClassName={showSuccessState ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-700"}
-          iconClassName={showSuccessState ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 text-slate-600"}
-          valueClassName={showSuccessState ? "text-emerald-700" : "text-slate-900"}
+          iconClassName="bg-emerald-50 text-emerald-600"
+          valueClassName={claimTriggered ? "text-emerald-700" : "text-slate-900"}
         />
 
         <MetricCard
           icon={ShieldAlert}
-          label="Fraud"
+          label="Fraud Intelligence"
           loading={fraudLoading && !fraudSnapshot}
-          value={
-            <div className="flex items-center gap-3">
-              <span>{fraudScore}</span>
-              <span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", fraudState.className)}>
-                {fraudState.label}
-              </span>
-            </div>
-          }
-          supporting="Behavior, location, and context are checked together."
-          toneClassName={fraudState.className}
+          value={fraudStatusLabel}
+          supporting={`Fraud score: ${fraudScore}`}
           iconClassName="bg-slate-100 text-slate-700"
-          valueClassName="text-slate-900"
+          valueClassName={
+            fraudState.tone === "danger"
+              ? "text-red-700"
+              : fraudState.tone === "warning"
+                ? "text-amber-700"
+                : "text-emerald-700"
+          }
+        />
+
+        <MetricCard
+          icon={ShieldCheck}
+          label="Trust Score"
+          loading={fraudLoading && !trustScoreSnapshot}
+          value={`${trustScore}%`}
+          supporting={`User Trust Score: ${trustScore}%`}
+          iconClassName="bg-emerald-50 text-emerald-600"
+          valueClassName={trustScore >= 80 ? "text-emerald-700" : trustScore >= 50 ? "text-amber-700" : "text-red-700"}
         />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <DashboardCard className="overflow-hidden">
           <div className="flex flex-col gap-6">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <p className="text-sm font-medium text-slate-500">Real-time monitoring</p>
+                <p className="text-sm font-medium text-slate-500">Interactive simulation panel</p>
                 <h3 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
-                  Simulate live conditions
+                  Test live decision scenarios
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Use one action and watch risk, premium, claim, and fraud react together.
+                  Adjust risk and fraud signals, then run the system to update Risk Engine, premium, claim status, Fraud Intelligence, decision, and trust score in one pass.
                 </p>
               </div>
 
               <StatusPill
-                label={systemBusy ? "Syncing live signals" : "Monitoring active"}
+                label={systemBusy || liveBackendRefreshing ? "Processing..." : "Decision updated"}
                 className="bg-blue-50 text-blue-700"
                 dotClassName="bg-blue-500"
               />
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              {[
-                { label: "AQI", value: riskInputs.aqi },
-                { label: "Rain", value: `${riskInputs.rain} mm` },
-                { label: "Wind", value: `${riskInputs.wind} km/h` },
-              ].map((item) => (
-                <div key={item.label} className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4">
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    {item.label}
-                  </div>
-                  <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-900">
-                    {item.value}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="grid gap-3 lg:grid-cols-3">
               <SurfaceButton
-                onClick={() => loadMonitoringScenario(RAIN_SIMULATION_SCENARIO, "rain")}
-                loading={riskLoading && riskAction === "rain"}
+                onClick={() => applySimulationPreset("NORMAL")}
+                loading={riskLoading && riskAction === "preset-normal"}
+                disabled={riskLoading}
+                leftIcon={Activity}
+                variant="secondary"
+                className="w-full border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+              >
+                Normal Scenario
+              </SurfaceButton>
+
+              <SurfaceButton
+                onClick={() => applySimulationPreset("HEAVY_RAIN")}
+                loading={riskLoading && riskAction === "preset-heavy_rain"}
                 disabled={riskLoading}
                 leftIcon={CloudRain}
-                className="w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto"
+                className="w-full bg-blue-600 text-white hover:bg-blue-700"
               >
-                Simulate Rain
+                Heavy Rain Scenario
               </SurfaceButton>
 
               <SurfaceButton
-                onClick={() => loadMonitoringScenario(POLLUTION_SIMULATION_SCENARIO, "pollution")}
-                loading={riskLoading && riskAction === "pollution"}
+                onClick={() => applySimulationPreset("HIGH_FRAUD")}
+                loading={riskLoading && riskAction === "preset-high_fraud"}
                 disabled={riskLoading}
-                leftIcon={Wind}
+                leftIcon={ShieldAlert}
                 variant="secondary"
-                className="w-full border-blue-100 bg-blue-50 text-blue-700 hover:bg-blue-100 sm:w-auto"
+                className="w-full border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
               >
-                Simulate Pollution
+                High Fraud Scenario
               </SurfaceButton>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[1.25fr_0.95fr]">
+              <div className="grid gap-4">
+                <SimulationControlCard
+                  label="AQI"
+                  value={simulationForm.aqi}
+                  helper="0 - 500"
+                >
+                  <input
+                    type="range"
+                    min="0"
+                    max="500"
+                    step="1"
+                    value={simulationForm.aqi}
+                    onChange={(event) =>
+                      updateSimulationField("aqi", event.target.value, {
+                        min: 0,
+                        max: 500,
+                      })
+                    }
+                    className="h-2 w-full cursor-pointer accent-blue-600"
+                  />
+                </SimulationControlCard>
+
+                <SimulationControlCard
+                  label="Rain"
+                  value={`${simulationForm.rain} mm`}
+                  helper="0 - 50"
+                >
+                  <input
+                    type="range"
+                    min="0"
+                    max="50"
+                    step="1"
+                    value={simulationForm.rain}
+                    onChange={(event) =>
+                      updateSimulationField("rain", event.target.value, {
+                        min: 0,
+                        max: 50,
+                      })
+                    }
+                    className="h-2 w-full cursor-pointer accent-blue-600"
+                  />
+                </SimulationControlCard>
+
+                <SimulationControlCard
+                  label="Wind"
+                  value={`${simulationForm.wind} km/h`}
+                  helper="0 - 50"
+                >
+                  <input
+                    type="range"
+                    min="0"
+                    max="50"
+                    step="1"
+                    value={simulationForm.wind}
+                    onChange={(event) =>
+                      updateSimulationField("wind", event.target.value, {
+                        min: 0,
+                        max: 50,
+                      })
+                    }
+                    className="h-2 w-full cursor-pointer accent-blue-600"
+                  />
+                </SimulationControlCard>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+                <SimulationControlCard
+                  label="Claims Count"
+                  value={simulationForm.claimsCount}
+                  helper="0 - 20"
+                >
+                  <input
+                    type="number"
+                    min="0"
+                    max="20"
+                    value={simulationForm.claimsCount}
+                    onChange={(event) =>
+                      updateSimulationField("claimsCount", event.target.value, {
+                        min: 0,
+                        max: 20,
+                      })
+                    }
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+                  />
+                </SimulationControlCard>
+
+                <SimulationControlCard
+                  label="Login Attempts"
+                  value={simulationForm.loginAttempts}
+                  helper="0 - 20"
+                >
+                  <input
+                    type="number"
+                    min="0"
+                    max="20"
+                    value={simulationForm.loginAttempts}
+                    onChange={(event) =>
+                      updateSimulationField("loginAttempts", event.target.value, {
+                        min: 0,
+                        max: 20,
+                      })
+                    }
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+                  />
+                </SimulationControlCard>
+
+                <SimulationControlCard
+                  label="Location Match"
+                  value={simulationForm.locationMatch ? "TRUE" : "FALSE"}
+                  helper={simulationContextValid ? "Context valid" : "Context flagged"}
+                >
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => updateSimulationField("locationMatch", true)}
+                      className={cn(
+                        "flex-1 rounded-2xl border px-4 py-3 text-sm font-semibold transition",
+                        simulationForm.locationMatch
+                          ? "border-blue-200 bg-blue-600 text-white shadow-sm"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      )}
+                    >
+                      Match
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateSimulationField("locationMatch", false)}
+                      className={cn(
+                        "flex-1 rounded-2xl border px-4 py-3 text-sm font-semibold transition",
+                        !simulationForm.locationMatch
+                          ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      )}
+                    >
+                      Mismatch
+                    </button>
+                  </div>
+                  <p className="mt-3 text-xs leading-5 text-slate-500">
+                    Context validity is inferred automatically from mismatch and repeated anomalies to keep the simulation realistic.
+                  </p>
+                </SimulationControlCard>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-4 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-slate-900">
+                  Manual changes stay local until you run the simulation.
+                </div>
+                <div className="mt-1 text-sm leading-6 text-slate-500">
+                  Work and income-loss signals are inferred automatically from live conditions so judges can test the whole flow with minimal input.
+                </div>
+              </div>
+
+              <SurfaceButton
+                onClick={handleRunSimulation}
+                loading={riskLoading && riskAction === "manual"}
+                disabled={riskLoading}
+                leftIcon={BadgeCheck}
+                className="w-full bg-slate-900 text-white hover:bg-slate-800 lg:w-auto"
+              >
+                Run Simulation
+              </SurfaceButton>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <SimulationResultCard
+                label="Risk"
+                value={automatedRisk}
+                supporting={`AQI ${riskInputs.aqi} • Rain ${riskInputs.rain} mm • Wind ${riskInputs.wind} km/h`}
+                toneClassName={riskStyle.accent}
+              />
+              <SimulationResultCard
+                label="Premium"
+                value={`${formatINR(Math.round(automatedPremiumAmount))}/week`}
+                supporting="Premium recalculates instantly from current live risk inputs."
+              />
+              <SimulationResultCard
+                label="Claim Status"
+                value={claimStatusLabel}
+                supporting={
+                  claimData?.message ||
+                  "Claim automation checks high risk, active work, and income loss."
+                }
+                toneClassName={claimTriggered ? "text-emerald-700" : "text-slate-900"}
+              />
+              <SimulationResultCard
+                label="Fraud Score"
+                value={fraudScore}
+                supporting={`Fraud Intelligence status: ${fraudStatusLabel}`}
+                toneClassName={
+                  fraudState.tone === "danger"
+                    ? "text-red-700"
+                    : fraudState.tone === "warning"
+                      ? "text-amber-700"
+                      : "text-emerald-700"
+                }
+              />
+              <SimulationResultCard
+                label="Decision"
+                value={decisionLabel}
+                supporting={smartDecisionState.summary}
+                toneClassName={
+                  smartDecisionState.label === "FRAUD"
+                    ? "text-red-700"
+                    : smartDecisionState.label === "VERIFY"
+                      ? "text-amber-700"
+                      : "text-emerald-700"
+                }
+              />
+              <SimulationResultCard
+                label="Trust Score"
+                value={`${trustScore}%`}
+                supporting={`User Trust Score: ${trustScore}%`}
+                toneClassName={
+                  trustScore >= 80
+                    ? "text-emerald-700"
+                    : trustScore >= 50
+                      ? "text-amber-700"
+                      : "text-red-700"
+                }
+              />
             </div>
 
             <AnimatePresence initial={false}>
-              {riskError ? (
+              {simulationPanelError ? (
                 <motion.div
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
                   className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
                 >
-                  {riskError}
+                  {simulationPanelError}
                 </motion.div>
               ) : (
                 <motion.div
@@ -896,8 +1503,8 @@ export default function Dashboard() {
                   className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 text-sm text-slate-600"
                 >
                   {systemBusy
-                    ? "Refreshing live signals across risk, premium, claim, and fraud."
-                    : "Every simulation reruns the full monitoring flow instantly."}
+                    ? "Processing..."
+                    : "Decision updated. The dashboard reflects the latest simulation run."}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -921,20 +1528,20 @@ export default function Dashboard() {
                   <p className="text-sm font-medium text-slate-500">Claim</p>
                   <h3 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
                     {claimLoading
-                      ? "Checking claim eligibility"
+                      ? "Processing..."
                       : showSuccessState
-                        ? "Claim processed successfully"
-                        : "Automatic claim status"}
+                        ? "Decision updated"
+                        : "Claim status"}
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-slate-500">
                     {showSuccessState
-                      ? "Payout has been highlighted and the flow is complete."
-                      : "Claims are created only when high risk leads to sufficient downtime."}
+                      ? "Result highlighted for quick review."
+                      : "Claim automation runs only when high risk, active work, and income loss are confirmed."}
                   </p>
                 </div>
 
                 {claimLoading ? (
-                  <StatusPill label="Checking" className="bg-blue-50 text-blue-700" dotClassName="bg-blue-500" />
+                  <StatusPill label="Processing..." className="bg-blue-50 text-blue-700" dotClassName="bg-blue-500" />
                 ) : claimStatus ? (
                   <StatusPill label={claimStatus} className="bg-emerald-50 text-emerald-700" dotClassName="bg-emerald-500" />
                 ) : (
@@ -969,6 +1576,32 @@ export default function Dashboard() {
                 )}
               </div>
 
+              {claimLoading ? (
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <SurfaceSkeleton className="h-14 w-full" />
+                  <SurfaceSkeleton className="h-14 w-full" />
+                  <SurfaceSkeleton className="h-14 w-full" />
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <DetailRow
+                    label="Active Work"
+                    value={claimData?.eligibility?.activeWorkConfirmed ? "Confirmed" : "Not confirmed"}
+                    className={claimData?.eligibility?.activeWorkConfirmed ? "text-emerald-700" : "text-slate-900"}
+                  />
+                  <DetailRow
+                    label="Income Loss"
+                    value={claimData?.eligibility?.incomeLossDetected ? "Detected" : "Clear"}
+                    className={claimData?.eligibility?.incomeLossDetected ? "text-emerald-700" : "text-slate-900"}
+                  />
+                  <DetailRow
+                    label="Decision"
+                    value={claimTriggered ? "Triggered" : "On hold"}
+                    className={claimTriggered ? "text-emerald-700" : "text-slate-900"}
+                  />
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-3">
                 {AUTO_CLAIM_STEPS.map((step) => (
                   <span
@@ -998,7 +1631,7 @@ export default function Dashboard() {
           <div>
             <p className="text-sm font-medium text-slate-500">Fraud</p>
             <h3 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
-              Fraud Engine
+              Fraud Intelligence Engine
             </h3>
             <p className="mt-2 text-sm leading-6 text-slate-500">
               Behavior, location, and context are checked in real time.
@@ -1006,7 +1639,7 @@ export default function Dashboard() {
           </div>
 
           {fraudLoading && !fraudSnapshot ? (
-            <StatusPill label="Checking" className="bg-blue-50 text-blue-700" dotClassName="bg-blue-500" />
+            <StatusPill label="Processing..." className="bg-blue-50 text-blue-700" dotClassName="bg-blue-500" />
           ) : (
             <StatusPill label={fraudState.label} className={fraudState.className} dotClassName={fraudState.dot} />
           )}
@@ -1016,7 +1649,7 @@ export default function Dashboard() {
           <div className="space-y-4">
             <div className="rounded-[24px] border border-slate-100 bg-slate-50 px-5 py-5">
               <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                Final Score
+                Fraud Score
               </div>
               <div className="mt-3 text-4xl font-semibold tracking-tight text-slate-900">
                 {fraudLoading && !fraudSnapshot ? (
@@ -1068,7 +1701,7 @@ export default function Dashboard() {
                   <DetailRow label="Behavior" value={fraudDetails.behavior} />
                   <DetailRow label="Location" value={fraudDetails.location} />
                   <DetailRow label="Context" value={fraudDetails.context} />
-                  <DetailRow label="Final Score" value={fraudScore} />
+                  <DetailRow label="Fraud Score" value={fraudScore} />
                   <DetailRow label="Status" value={fraudState.label} className={fraudState.tone === "danger" ? "text-red-700" : fraudState.tone === "warning" ? "text-amber-700" : "text-emerald-700"} />
                 </>
               )}
@@ -1078,16 +1711,16 @@ export default function Dashboard() {
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    Smart Decision Layer
+                    Decision Engine
                   </div>
                   <h4 className="mt-2 text-lg font-semibold tracking-tight text-slate-900">
                     {aiDecisionLoading && !aiDecisionData
-                      ? "Loading smart decision"
+                      ? "Processing..."
                       : smartDecisionState.label}
                   </h4>
                   <p className="mt-2 text-sm leading-6 text-slate-500">
                     {aiDecisionLoading && !aiDecisionData
-                      ? "Evaluating the next system action."
+                      ? "Decision Engine Running"
                       : smartDecisionState.summary}
                   </p>
                 </div>
@@ -1120,13 +1753,41 @@ export default function Dashboard() {
                 )}
               </div>
 
+              <div className="mt-5 rounded-[24px] border border-slate-100 bg-slate-50 px-5 py-5">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div className="max-w-2xl">
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                      Self-Correcting AI System
+                    </div>
+                    <h5 className="mt-2 text-lg font-semibold tracking-tight text-slate-900">
+                      AI Decision Lifecycle
+                    </h5>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Our system not only detects problems, it validates and corrects decisions.
+                    </p>
+                  </div>
+
+                  <StatusPill
+                    label="Adaptive"
+                    className="bg-blue-50 text-blue-700"
+                    dotClassName="bg-blue-500"
+                  />
+                </div>
+
+                <div className="mt-5 grid gap-3 xl:grid-cols-4 sm:grid-cols-2">
+                  {lifecycleSteps.map((step, index) => (
+                    <LifecycleStepCard key={step.key} index={index} step={step} />
+                  ))}
+                </div>
+              </div>
+
               {showDisputeOption ? (
                 <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4">
                   <p className="text-sm font-semibold text-slate-900">
                     Not satisfied with this decision?
                   </p>
                   <p className="mt-1 text-sm leading-6 text-slate-600">
-                    You can challenge the result and start a dispute flow.
+                    Start the Self-Correcting AI System flow by raising a dispute and uploading proof.
                   </p>
 
                   <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -1142,7 +1803,7 @@ export default function Dashboard() {
 
                     {dispute ? (
                       <span className="text-sm font-medium text-emerald-700">
-                        Dispute started. Please upload proof to continue.
+                        Decision updated. Please upload proof to continue.
                       </span>
                     ) : null}
                   </div>
@@ -1207,7 +1868,7 @@ export default function Dashboard() {
 
                         {proofUpload?.status === "RECEIVED" && reverificationLoading ? (
                           <span className="text-sm font-medium text-emerald-700">
-                            Proof uploaded successfully. Verifying...
+                            Verification in progress
                           </span>
                         ) : null}
                       </div>
@@ -1233,9 +1894,12 @@ export default function Dashboard() {
                               : "border-red-200 bg-red-50"
                           )}
                         >
+                          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Decision updated
+                          </div>
                           <p
                             className={cn(
-                              "text-sm font-semibold",
+                              "mt-2 text-sm font-semibold",
                               reverificationResult.finalStatus === "APPROVED"
                                 ? "text-emerald-700"
                                 : "text-red-700"
@@ -1290,7 +1954,7 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold tracking-tight text-slate-900">
-                      Claim processed successfully
+                      Decision updated
                     </h3>
                     <p className="mt-1 text-sm text-slate-500">
                       Payout has been confirmed and highlighted below for quick review.

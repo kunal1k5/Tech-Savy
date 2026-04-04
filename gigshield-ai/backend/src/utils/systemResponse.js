@@ -1,3 +1,5 @@
+const { calculateTrustScore } = require("./trustScore");
+
 function normalizeUppercase(value) {
   const normalized = String(value || "").trim().toUpperCase();
   return normalized || null;
@@ -69,11 +71,18 @@ function buildSystemResponse(data = {}) {
   const match = typeof data.match === "boolean" ? data.match : null;
   const explicitSuspicious =
     typeof data?.suspicious === "boolean" ? data.suspicious : null;
+  const fraudScore = normalizeNumber(data.fraud_score ?? data.fraudScore);
+  const trustScore =
+    data.trustScore !== undefined || data.trust_score !== undefined
+      ? normalizeNumber(data.trustScore ?? data.trust_score)
+      : calculateTrustScore(fraudScore);
 
   return {
     risk,
     premium: normalizeNumber(data.premium),
-    fraud_score: normalizeNumber(data.fraud_score),
+    fraud_score: fraudScore,
+    trustScore,
+    trust_score: trustScore,
     status,
     location_check: data.location_check || deriveLocationCheck(match, locationSignal),
     behavior_status: behaviorStatus,

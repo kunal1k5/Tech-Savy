@@ -110,10 +110,10 @@ export default function Claims() {
       <motion.header variants={itemVariants} className="space-y-2">
         <p className="text-sm font-medium text-slate-500">Claims</p>
         <h2 className="text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
-          Claims
+          Claim Flow
         </h2>
         <p className="text-sm leading-6 text-slate-600 md:text-base">
-          Review claim activity with real-time monitoring, an automated system, and a simple
+          Review claim activity with real-time monitoring, automated decisions, and a clear
           payout flow.
         </p>
       </motion.header>
@@ -130,10 +130,10 @@ export default function Claims() {
             }
             description={
               liveBackendLoading && !liveBackendData
-                ? "Fetching real risk, premium, and fraud signals from the backend."
+                ? "Fetching real risk, engine cost, and fraud signals from the backend."
                 : uiState.claimTriggering
                 ? "Checking the latest risk signal and starting the automated payout flow."
-                : "Updating premium, status, and payout information."
+                : "Updating engine cost, status, and payout information."
             }
           />
         ) : null}
@@ -153,19 +153,19 @@ export default function Claims() {
           variants={itemVariants}
           className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md"
         >
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium text-slate-500">Automatic Claim Trigger</p>
-                <InfoTooltip
-                  label="Automatic claims information"
-                  text="Risk-based protection checks weather, AQI, and traffic signals before creating a claim."
-                />
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-slate-500">Decision Trigger</p>
+                  <InfoTooltip
+                    label="Automatic claims information"
+                    text="Decision intelligence checks weather, AQI, and traffic signals before creating a claim."
+                  />
+                </div>
+                <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
+                  Claim auto-triggered by the decision engine
+                </h3>
               </div>
-              <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
-                Claim automatically triggered due to high risk conditions
-              </h3>
-            </div>
 
             <StatusBadge
               status={`risk_${currentRisk.toLowerCase()}`}
@@ -181,15 +181,15 @@ export default function Claims() {
               Automated system
             </span>
             <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
-              Risk-based protection
+              Self-correcting AI
             </span>
           </div>
 
           <div className="mt-6 rounded-2xl bg-slate-50 p-4">
             <p className="text-sm leading-6 text-slate-600">
               {latestClaim
-                ? `Latest auto claim was triggered due to ${getClaimReason(latestClaim)} conditions and is moving through the payout flow automatically.`
-                : "Claims are created automatically when rain, AQI, or traffic conditions cross the risk threshold."}
+                ? `Latest auto claim was triggered when the decision engine detected ${getClaimReason(latestClaim)} conditions and is moving through the payout flow automatically.`
+                : "Claims are created automatically when rain, AQI, or traffic conditions cross the live decision threshold."}
             </p>
           </div>
 
@@ -202,7 +202,7 @@ export default function Claims() {
             </div>
 
             <div className="rounded-2xl bg-slate-50 p-4">
-              <p className="text-sm font-medium text-slate-500">Smart premium</p>
+              <p className="text-sm font-medium text-slate-500">Engine Cost</p>
               <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
                 <CurrencyCount value={smartPremium} suffix="/week" />
               </div>

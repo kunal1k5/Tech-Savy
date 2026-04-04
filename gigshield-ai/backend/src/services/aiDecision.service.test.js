@@ -1,4 +1,5 @@
 const {
+  calculateTrustScore,
   DECISION_LEVELS,
   NEXT_ACTIONS,
   getDecision,
@@ -28,5 +29,12 @@ describe("aiDecision.service smart decision layer", () => {
     expect(getNextAction(DECISION_LEVELS.FRAUD)).toBe(
       NEXT_ACTIONS.REJECT_CLAIM
     );
+  });
+
+  it("derives trust score directly from fraud score", () => {
+    expect(calculateTrustScore(0)).toBe(100);
+    expect(calculateTrustScore(18)).toBe(82);
+    expect(calculateTrustScore(40)).toBe(60);
+    expect(calculateTrustScore(110)).toBe(0);
   });
 });

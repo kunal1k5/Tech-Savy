@@ -1,6 +1,6 @@
-# GigShield UI Redesign Notes
+# TrustGrid AI UI Redesign Notes
 
-GigShield has been refactored to feel like a modern fintech product instead of a static demo.
+TrustGrid AI has been refactored to feel like a modern fintech product instead of a static demo.
 
 ## Design Direction
 
@@ -67,7 +67,7 @@ These components help keep the UI consistent and easier to maintain.
 
 ## Why This Helps the Demo
 
-The redesign makes GigShield easier to explain in a hackathon setting because judges can quickly see:
+The redesign makes TrustGrid AI easier to explain in a hackathon setting because judges can quickly see:
 
 - what problem the product solves
 - how the automated workflow behaves

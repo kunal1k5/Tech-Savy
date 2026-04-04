@@ -1,4 +1,5 @@
 const Joi = require("joi");
+const { calculateTrustScore } = require("../utils/trustScore");
 
 const RISK_LEVELS = Object.freeze({
   HIGH: "HIGH",
@@ -145,6 +146,7 @@ function getNextAction(decision) {
 function createAiDecision(input) {
   const risk = calculateRisk(input);
   const fraudScore = calculateFraudScore(input);
+  const trustScore = calculateTrustScore(fraudScore);
   const status = calculateStatus(fraudScore);
   const decision = getDecision(fraudScore);
   const nextAction = getNextAction(decision);
@@ -152,6 +154,8 @@ function createAiDecision(input) {
   return {
     risk,
     fraudScore,
+    trustScore,
+    trust_score: trustScore,
     status,
     decision,
     nextAction,
@@ -172,6 +176,7 @@ module.exports = {
   calculateFraudScore,
   calculateRisk,
   calculateStatus,
+  calculateTrustScore,
   createAiDecision,
   getDecision,
   getDecisionBand,

@@ -169,9 +169,9 @@ export default function Login() {
   return (
     <AuthShell
       eyebrow="Login"
-      title="Sign in to GigShield"
-      description="Enter your mobile number and a 4-digit OTP to continue into your protected dashboard."
-      note="Fast sign-in, clean feedback, and silent verification checks run in the background while you move forward."
+      title="Sign in to TrustGrid AI"
+      description="Enter your mobile number and a 4-digit OTP to continue into your real-time decision workspace."
+      note="Fast sign-in, clean feedback, and silent trust checks run in the background while you move forward."
       footer={
         <>
           Need an account?{" "}

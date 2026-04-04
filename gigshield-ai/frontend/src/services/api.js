@@ -47,6 +47,10 @@ export const DEFAULT_RISK_PREMIUM_INPUT = {
 
 export const DEFAULT_AUTO_CLAIM_INPUT = {
   risk: "LOW",
+  isWorking: true,
+  ordersCompleted: 1,
+  workingMinutes: 60,
+  earnings: 150,
   hoursLost: 1,
   hourlyRate: 150,
 };

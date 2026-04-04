@@ -45,7 +45,7 @@ export default function PlanCard({
       </div>
 
       <div className="mt-6 rounded-2xl bg-slate-50 p-4">
-        <p className="text-sm font-medium text-slate-500">Premium</p>
+        <p className="text-sm font-medium text-slate-500">Engine Cost</p>
         <div className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
           {premiumLabel}
         </div>
@@ -74,7 +74,7 @@ export default function PlanCard({
         )}
         variant={isActive ? "success" : "primary"}
       >
-        {isActive ? "Active Plan" : "Select Plan"}
+        {isActive ? "Active Profile" : "Use Profile"}
       </SurfaceButton>
     </motion.article>
   );

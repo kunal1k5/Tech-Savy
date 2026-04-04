@@ -1,4 +1,4 @@
-# GigShield AI — Workflow Documentation
+# TrustGrid AI Workflow Documentation
 
 ## Complete System Workflow
 

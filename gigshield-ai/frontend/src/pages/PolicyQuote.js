@@ -73,12 +73,12 @@ export default function PolicyQuote() {
       platformState.plans.map((plan) => ({
         sourceId: plan.id,
         title: plan.name,
-        coverageLabel: `Coverage: ${formatINR(plan.coverageAmount || plan.payoutCap || 0)}`,
+        coverageLabel: `Signal Capacity: ${formatINR(plan.coverageAmount || plan.payoutCap || 0)}`,
         premiumLabel: `${formatINR(plan.premiumWeekly || 0)}/week`,
         premiumAmount: plan.premiumWeekly || 0,
-        features: plan.features?.length ? plan.features : ["Live protection active"],
+        features: plan.features?.length ? plan.features : ["Real-time monitoring active"],
         summary:
-          plan.description || plan.note || "Risk-based cover backed by live backend data.",
+          plan.description || plan.note || "Decision intelligence profile backed by live backend data.",
         isRecommended: plan.id === platformState.recommendedPlanId,
         isActive: plan.id === platformState.activePlanId,
       })),
@@ -100,12 +100,12 @@ export default function PolicyQuote() {
       animate="show"
     >
       <motion.header variants={itemVariants} className="space-y-2">
-        <p className="text-sm font-medium text-slate-500">Policy</p>
+        <p className="text-sm font-medium text-slate-500">Decision Studio</p>
         <h2 className="text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
-          Choose Your Plan
+          Choose Your Monitoring Profile
         </h2>
         <p className="text-sm leading-6 text-slate-600 md:text-base">
-          Select a plan, see premium respond to real-time monitoring, and keep protection risk-based.
+          Select a profile, watch engine cost respond to real-time monitoring, and keep self-correcting AI active.
         </p>
       </motion.header>
 
@@ -116,15 +116,15 @@ export default function PolicyQuote() {
               liveBackendLoading && !liveBackendData
                 ? "Loading live backend data"
                 : uiState.planUpdating
-                  ? "Activating policy"
-                  : "Updating premium"
+                  ? "Activating decision profile"
+                  : "Updating engine cost"
             }
             description={
               liveBackendLoading && !liveBackendData
-                ? "Fetching risk, premium, and fraud status from the backend."
+                ? "Fetching risk, engine cost, and fraud status from the backend."
                 : uiState.planUpdating
-                ? "Applying your selected plan and refreshing coverage."
-                : "Refreshing premium from live risk conditions."
+                ? "Applying your selected profile and refreshing live signals."
+                : "Refreshing engine cost from live risk conditions."
             }
           />
         ) : null}
@@ -146,14 +146,14 @@ export default function PolicyQuote() {
         >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Plan Selection</p>
+              <p className="text-sm font-medium text-slate-500">Decision Profiles</p>
               <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
-                Simple insurance coverage
+                Decision engine profiles
               </h3>
             </div>
 
             {platformState.recommendedPlanId ? (
-              <StatusBadge status="recommended" label="Recommended Plan" />
+              <StatusBadge status="recommended" label="Recommended Profile" />
             ) : null}
           </div>
 
@@ -175,7 +175,7 @@ export default function PolicyQuote() {
             </div>
           ) : (
             <div className="mt-6 rounded-2xl bg-slate-50 px-4 py-5 text-sm text-slate-600">
-              No plans available right now. Please wait for the backend sync to finish.
+              No profiles available right now. Please wait for the backend sync to finish.
             </div>
           )}
         </motion.section>
@@ -188,14 +188,14 @@ export default function PolicyQuote() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-slate-500">Risk to premium</p>
+                  <p className="text-sm font-medium text-slate-500">Risk Engine to Engine Cost</p>
                   <InfoTooltip
-                    label="Dynamic premium information"
-                    text="Real-time monitoring updates the Smart Plan premium as risk conditions change."
+                    label="Dynamic engine cost information"
+                    text="Real-time monitoring updates the active profile cost as risk conditions change."
                   />
                 </div>
                 <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
-                  Dynamic premium
+                  Dynamic engine cost
                 </h3>
               </div>
 
@@ -203,7 +203,7 @@ export default function PolicyQuote() {
             </div>
 
             <div className="mt-6 rounded-2xl bg-slate-50 p-4">
-              <div className="text-sm font-medium text-slate-500">Smart Plan premium</div>
+              <div className="text-sm font-medium text-slate-500">Active profile cost</div>
               <div className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
                 <CountUp
                   end={smartPremium}
@@ -213,21 +213,21 @@ export default function PolicyQuote() {
                 />
               </div>
               <div className="mt-2 text-sm text-slate-600">
-                Risk: {currentRisk} -> Premium: {formatINR(smartPremium)}
+                Risk Engine: {currentRisk} -> Engine Cost: {formatINR(smartPremium)}
               </div>
               <div className="mt-4 flex items-center justify-between gap-3">
                 <span className="text-sm font-medium text-slate-500">Fraud status</span>
                 <StatusBadge status={liveFraudStatus} label={liveFraudStatus.toUpperCase()} />
               </div>
               <div className="mt-2 text-xs text-slate-500">
-                {liveBackendRefreshing ? "Refreshing backend data..." : "Live backend data connected."}
+                {liveBackendRefreshing ? "Refreshing decision signals..." : "Live backend data connected."}
               </div>
             </div>
 
             <div className="mt-6">
               <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-500">
                 <AlertTriangle size={16} />
-                Update risk
+                Update risk engine
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 {RISK_OPTIONS.map((option) => (
@@ -252,10 +252,10 @@ export default function PolicyQuote() {
 
           <motion.div variants={itemVariants}>
             <ActivePolicyCard
-              planName={activePlan?.title || "No active plan"}
+              planName={activePlan?.title || "No active profile"}
               premiumAmount={activePlan?.premiumAmount ?? smartPremium}
               coverageSummary={
-                activePlan?.summary || "Your live policy details will appear here after sync."
+                activePlan?.summary || "Your live decision profile details will appear here after sync."
               }
               riskLevel={currentRisk}
             />
@@ -269,7 +269,7 @@ export default function PolicyQuote() {
               <div>
                 <p className="text-sm font-medium text-slate-500">Backend snapshot</p>
                 <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
-                  Real policy intelligence
+                  Decision intelligence snapshot
                 </h3>
               </div>
               <StatusBadge status={liveFraudStatus} label={liveFraudStatus.toUpperCase()} />
@@ -277,11 +277,11 @@ export default function PolicyQuote() {
 
             <div className="mt-6 grid gap-4 sm:grid-cols-3">
               <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-sm font-medium text-slate-500">Current Risk</p>
+                <p className="text-sm font-medium text-slate-500">Risk Engine</p>
                 <p className="mt-2 text-2xl font-semibold text-slate-900">{currentRisk}</p>
               </div>
               <div className="rounded-2xl bg-slate-50 p-4">
-                <p className="text-sm font-medium text-slate-500">Premium</p>
+                <p className="text-sm font-medium text-slate-500">Engine Cost</p>
                 <p className="mt-2 text-2xl font-semibold text-slate-900">{formatINR(smartPremium)}</p>
               </div>
               <div className="rounded-2xl bg-slate-50 p-4">
@@ -299,14 +299,14 @@ export default function PolicyQuote() {
           >
             <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
               <ShieldCheck size={16} />
-              Automatic claim support
+              Claim automation support
             </div>
             <h3 className="mt-2 text-xl font-semibold tracking-tight text-slate-900">
-              Claim automatically triggered due to high risk conditions
+              Auto claim trigger under high-risk downtime
             </h3>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Real-time monitoring watches weather and air quality, then the automated system
-              moves a claim from pending to paid when the policy conditions match.
+              Real-time monitoring watches weather and air quality, then the decision engine
+              moves a claim from pending to paid when live conditions match.
             </p>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">

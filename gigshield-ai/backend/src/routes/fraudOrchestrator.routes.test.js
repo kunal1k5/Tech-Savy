@@ -19,6 +19,8 @@ describe("POST /api/fraud-check", () => {
       data: {
         fraudScore: 0,
         fraud_score: 0,
+        trustScore: 100,
+        trust_score: 100,
         status: "SAFE",
         details: {
           behavior: "Normal",
@@ -45,6 +47,8 @@ describe("POST /api/fraud-check", () => {
       data: {
         fraudScore: 40,
         fraud_score: 40,
+        trustScore: 60,
+        trust_score: 60,
         status: "WARNING",
         details: {
           behavior: "Abnormal",
@@ -71,6 +75,8 @@ describe("POST /api/fraud-check", () => {
       data: {
         fraudScore: 110,
         fraud_score: 110,
+        trustScore: 0,
+        trust_score: 0,
         status: "FRAUD",
         details: {
           behavior: "Abnormal",

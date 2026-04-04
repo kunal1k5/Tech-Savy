@@ -1,6 +1,6 @@
-# GigShield AI
+# TrustGrid AI
 
-GigShield AI is a full-stack fintech prototype for gig worker income protection. It combines risk monitoring, premium calculation, automated claims, fraud scoring, dispute handling, proof upload, and AI-style re-verification into one end-to-end product workflow.
+TrustGrid AI is a full-stack AI Decision Intelligence System for gig workers. It combines risk monitoring, real-time protection logic, engine cost calculation, automated claims, fraud scoring, dispute handling, proof upload, and AI-style re-verification into one end-to-end product workflow.
 
 ## Problem
 
@@ -8,10 +8,10 @@ Gig workers lose income because of rain, pollution, route disruption, and suspic
 
 ## Solution
 
-GigShield turns the claim journey into a connected decision system:
+TrustGrid AI turns the claim journey into a connected decision intelligence loop:
 
 1. Detect environmental and behavioral risk.
-2. Calculate premium and claim eligibility.
+2. Calculate engine cost and claim eligibility.
 3. Score fraud automatically.
 4. Trigger smart actions such as approve, verify, or reject.
 5. Let the user raise a dispute when needed.
@@ -20,14 +20,14 @@ GigShield turns the claim journey into a connected decision system:
 ## Core Features
 
 - AI risk engine for weather and AQI-based claim risk
-- Dynamic premium calculation from live risk inputs
+- Dynamic engine cost calculation from live risk inputs
 - Auto-claim engine for eligible high-risk downtime
 - Fraud detection using behavior, location, and context signals
 - Smart decision layer with `SAFE`, `VERIFY`, and `FRAUD`
 - Dispute workflow for challenged decisions
 - Proof upload for geo-image and work screenshot evidence
 - AI re-verification flow with final claim status update
-- Authenticated dashboard, policy, profile, and claims experience
+- Authenticated dashboard, decision studio, profile, and claims experience
 
 ## Tech Stack
 
@@ -153,7 +153,7 @@ docker compose up --build
 1. Register a gig worker account.
 2. Sign in with mobile OTP demo flow.
 3. Open the dashboard and run a monitored scenario.
-4. Watch risk, premium, claim, fraud, and AI decision update together.
+4. Watch risk, engine cost, claim, fraud, and AI decision update together.
 5. Raise a dispute when the decision is `VERIFY` or `FRAUD`.
 6. Upload geo proof and work screenshot.
 7. Run AI re-verification and view final claim status.
@@ -196,6 +196,6 @@ The dispute/proof/re-verification workflow is still backed by in-memory storage 
 
 ```powershell
 git add .
-git commit -m "Final submission - GigShield AI system"
+git commit -m "Final submission - TrustGrid AI system"
 git push origin main
 ```

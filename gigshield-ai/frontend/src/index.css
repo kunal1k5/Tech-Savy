@@ -55,10 +55,7 @@
     @apply min-h-screen bg-slate-50 text-slate-900 antialiased;
     font-family: "Inter", sans-serif;
     background-color: var(--app-bg);
-    background-image:
-      radial-gradient(circle at 12% 10%, rgba(37, 99, 235, 0.08), transparent 20%),
-      radial-gradient(circle at 82% 16%, rgba(14, 165, 233, 0.06), transparent 22%),
-      linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    background-image: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
     background-attachment: fixed;
   }
 
@@ -132,9 +129,7 @@
 
   .gigshield-white-shell {
     @apply min-h-screen bg-app-canvas text-app-strong;
-    background-image:
-      radial-gradient(circle at top left, rgba(37, 99, 235, 0.06), transparent 20%),
-      linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    background-image: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   }
 
   .gigshield-sidebar {

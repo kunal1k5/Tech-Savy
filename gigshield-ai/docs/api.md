@@ -1,4 +1,4 @@
-# GigShield API
+# TrustGrid AI API
 
 ## Base URL
 
@@ -71,6 +71,8 @@ Error responses:
 ## Integration Notes
 
 - The dashboard uses the backend as the single source of truth for the AI decision workflow.
+- `POST /auto-claim` now confirms both active work and income loss before triggering a payout.
+- Trust score is standardized as `100 - fraudScore` and returned with fraud and AI decision responses.
 - The dispute flow depends on a previously created dispute record and uploaded proof files.
 - `POST /reverify-claim` reads the uploaded dispute proof, simulates location/time/activity checks, and returns the final claim outcome.
 - Demo auth and policy endpoints are still available for the onboarding and dashboard experience.

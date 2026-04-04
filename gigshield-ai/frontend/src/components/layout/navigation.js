@@ -14,7 +14,7 @@ export const NAV_ITEMS = [
     matches: (pathname) => pathname === "/dashboard",
   },
   {
-    label: "Policy",
+    label: "Decision Studio",
     path: "/policy",
     icon: Shield,
     matches: (pathname) => pathname === "/policy" || pathname === "/insurance",
@@ -41,8 +41,8 @@ export const NAV_ITEMS = [
 
 const PAGE_TITLES = {
   "/dashboard": "Dashboard",
-  "/policy": "Policy",
-  "/insurance": "Policy",
+  "/policy": "Decision Studio",
+  "/insurance": "Decision Studio",
   "/claims": "Claims",
   "/risk-map": "Risk Map",
   "/profile": "Profile",
@@ -55,5 +55,5 @@ export function getPageTitle(pathname) {
   }
 
   const matchingItem = NAV_ITEMS.find((item) => item.matches(pathname));
-  return matchingItem?.label || "GigShield";
+  return matchingItem?.label || "TrustGrid AI";
 }

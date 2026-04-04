@@ -10,14 +10,14 @@ const LIVE_INDICATORS = [
     dotClassName: "bg-blue-500",
   },
   {
-    label: "Auto Claim Enabled",
+    label: "Decision Engine Running",
     className: "bg-emerald-50 text-emerald-700",
     dotClassName: "bg-emerald-500",
   },
   {
     label: "Fraud Detection Active",
-    className: "bg-slate-100 text-slate-700",
-    dotClassName: "bg-slate-500",
+    className: "bg-amber-50 text-amber-700",
+    dotClassName: "bg-amber-500",
   },
 ];
 
@@ -54,7 +54,7 @@ export default function Navbar({ title, onMenuClick }) {
           <div className="min-w-0">
             <h1 className="truncate text-xl font-semibold text-slate-900 md:text-2xl">{title}</h1>
             <p className="mt-1 hidden text-sm text-slate-500 md:block">
-              System is monitoring your environment
+              Decision intelligence is live and monitoring your environment
             </p>
           </div>
         </div>
@@ -65,7 +65,7 @@ export default function Navbar({ title, onMenuClick }) {
               key={indicator.label}
               className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${indicator.className}`}
             >
-              <span className={`h-2 w-2 rounded-full ${indicator.dotClassName}`} />
+              <span className={`h-2 w-2 rounded-full animate-pulse ${indicator.dotClassName}`} />
               {indicator.label}
             </div>
           ))}
@@ -73,7 +73,7 @@ export default function Navbar({ title, onMenuClick }) {
 
         <div className="flex items-center gap-2 sm:gap-3">
           <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 md:hidden">
-            <span className="h-2 w-2 rounded-full bg-blue-500" />
+            <span className="h-2 w-2 rounded-full animate-pulse bg-blue-500" />
             Monitoring Active
           </div>
 

@@ -1,6 +1,6 @@
 # Fraud System
 
-GigShield now treats fraud review as a composed decision, not a single check.
+TrustGrid AI now treats fraud review as a composed decision, not a single check.
 
 ## Core Idea
 

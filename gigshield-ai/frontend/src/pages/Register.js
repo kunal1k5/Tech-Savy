@@ -168,9 +168,9 @@ export default function Register() {
   return (
     <AuthShell
       eyebrow="Signup"
-      title="Create your GigShield account"
-      description="Set up your profile and verify your work details to activate protection."
-      note="We begin fraud detection at the moment a user enters the system - not after a claim is made."
+      title="Create your TrustGrid AI account"
+      description="Set up your profile and verify your work details to join the decision intelligence network."
+      note="We are not an insurance platform - we are an AI Decision Intelligence System and real-time protection system for gig workers."
       footer={
         <>
           Already have an account?{" "}
@@ -237,7 +237,7 @@ export default function Register() {
           <div>
             <p className="text-sm font-medium text-slate-500">Work Verification</p>
             <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
-              Verify your work profile to activate protection
+              Verify your work profile to activate monitoring
             </h2>
           </div>
 

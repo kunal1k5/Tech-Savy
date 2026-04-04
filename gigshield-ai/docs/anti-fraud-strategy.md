@@ -1,12 +1,12 @@
-# GigShield Anti-Fraud Strategy
+# TrustGrid AI Anti-Fraud Strategy
 
-GigShield is designed to protect real income loss, so the fraud system has to be strong without blocking genuine workers who are already under stress.
+TrustGrid AI is designed to protect real income loss, so the fraud system has to be strong without blocking genuine workers who are already under stress.
 
 This strategy focuses on practical signals that can be explained clearly during a demo and scaled later in production.
 
 ## 1. Fraud Detection Logic
 
-GigShield checks a claim in layers instead of trusting one signal alone.
+TrustGrid AI checks a claim in layers instead of trusting one signal alone.
 
 ### Step 1: Verify zone presence
 
@@ -46,7 +46,7 @@ GigShield checks a claim in layers instead of trusting one signal alone.
 
 ## 2. What Data is Used
 
-GigShield uses simple but useful signals:
+TrustGrid AI uses simple but useful signals:
 
 - worker GPS location
 - timestamps
@@ -104,7 +104,7 @@ Action:
 
 This is critical.
 
-GigShield should not punish honest workers because of one noisy signal.
+TrustGrid AI should not punish honest workers because of one noisy signal.
 
 ### False-positive controls
 
@@ -204,7 +204,7 @@ The fraud system should be visible in the product so judges can understand it qu
 - Show timestamps for every fraud state transition
 - Keep manual review claims clearly separate from normal paid claims
 
-## Why This Strategy Works for GigShield
+## Why This Strategy Works for TrustGrid AI
 
 It is simple enough to demo clearly, strong enough to feel realistic, and structured enough to grow into a production fraud system.
 

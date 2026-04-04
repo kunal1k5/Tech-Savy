@@ -38,8 +38,8 @@ function SidebarContent({ onNavigate = () => {}, showClose = false }) {
             <Shield size={18} />
           </div>
           <div>
-            <p className="text-base font-semibold text-slate-900">GigShield</p>
-            <p className="text-xs text-slate-500">Income protection</p>
+            <p className="text-base font-semibold text-slate-900">TrustGrid AI</p>
+            <p className="text-xs text-slate-500">Decision intelligence</p>
           </div>
         </NavLink>
 
