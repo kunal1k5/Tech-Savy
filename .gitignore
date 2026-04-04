@@ -1,6 +1,7 @@
 .venv/
 tmp_pycache/
 package-lock.json
+!gigshield-ai/frontend/package-lock.json
 
 # Dependencies
 node_modules/
