@@ -183,3 +183,211 @@ CREATE TABLE zone_weather_cache (
 
 CREATE INDEX idx_weather_cache_zone ON zone_weather_cache(city, zone);
 CREATE INDEX idx_weather_cache_time ON zone_weather_cache(fetched_at);
+
+-- ============================================================
+-- 10. ACTIVITY_LOGS — Real-time worker activity tracking
+-- ============================================================
+CREATE TABLE activity_logs (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    worker_id       UUID            NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    timestamp       TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    latitude        NUMERIC(10,8),
+    longitude       NUMERIC(11,8),
+    speed_kmh       NUMERIC(10,2),
+    motion_state    VARCHAR(20)     NOT NULL DEFAULT 'IDLE'
+                    CHECK (motion_state IN ('IDLE', 'WALKING', 'DRIVING')),
+    accuracy_meters NUMERIC(10,2),
+    battery_pct     INTEGER,
+    signal_strength INTEGER,
+    metadata        JSONB,
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_activity_worker ON activity_logs(worker_id);
+CREATE INDEX idx_activity_timestamp ON activity_logs(timestamp);
+CREATE INDEX idx_activity_location ON activity_logs(worker_id, timestamp);
+
+-- ============================================================
+-- 11. WORK_SESSIONS — Tracked work periods
+-- ============================================================
+CREATE TABLE work_sessions (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    worker_id       UUID            NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    start_time      TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    end_time        TIMESTAMPTZ,
+    start_latitude  NUMERIC(10,8),
+    start_longitude NUMERIC(11,8),
+    end_latitude    NUMERIC(10,8),
+    end_longitude   NUMERIC(11,8),
+    duration_minutes INTEGER,
+    status          VARCHAR(20)     DEFAULT 'active'
+                    CHECK (status IN ('active', 'completed', 'paused', 'abandoned')),
+    distance_km     NUMERIC(10,2),
+    earnings_inr    NUMERIC(10,2),
+    orders_count    INTEGER DEFAULT 0,
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_session_worker ON work_sessions(worker_id);
+CREATE INDEX idx_session_time ON work_sessions(start_time, end_time);
+CREATE INDEX idx_session_status ON work_sessions(status);
+
+-- ============================================================
+-- 12. USER_TRUST_SCORE — Dynamic reputation system
+-- ============================================================
+CREATE TABLE user_trust_score (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    worker_id       UUID            NOT NULL UNIQUE REFERENCES workers(id) ON DELETE CASCADE,
+    score           NUMERIC(5,2)    NOT NULL DEFAULT 50
+                    CHECK (score BETWEEN 0 AND 100),
+    total_claims    INTEGER         DEFAULT 0,
+    successful_claims INTEGER       DEFAULT 0,
+    fraud_flags     INTEGER         DEFAULT 0,
+    last_updated    TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    history         JSONB,          -- audit trail of score changes
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_trust_worker ON user_trust_score(worker_id);
+CREATE INDEX idx_trust_score ON user_trust_score(score DESC);
+
+-- ============================================================
+-- 13. ANOMALY_LOGS — Anomaly detection audit
+-- ============================================================
+CREATE TABLE anomaly_logs (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    worker_id       UUID            NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    claim_id        UUID            REFERENCES claims(id) ON DELETE CASCADE,
+    anomaly_score   NUMERIC(5,2)    NOT NULL DEFAULT 0
+                    CHECK (anomaly_score BETWEEN 0 AND 100),
+    anomaly_type    VARCHAR(50),    -- 'high_frequency', 'location_cluster', 'behavior_change'
+    conditions      JSONB,          -- which conditions triggered
+    severity        VARCHAR(10)     CHECK (severity IN ('low', 'medium', 'high')),
+    detected_at     TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_anomaly_worker ON anomaly_logs(worker_id);
+CREATE INDEX idx_anomaly_claim ON anomaly_logs(claim_id);
+CREATE INDEX idx_anomaly_severity ON anomaly_logs(severity);
+
+-- ============================================================
+-- 14. FRAUD_FLAGS — Detailed fraud detection log
+-- ============================================================
+CREATE TABLE fraud_flags (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    worker_id       UUID            NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    claim_id        UUID            REFERENCES claims(id) ON DELETE CASCADE,
+    flag_type       VARCHAR(50)     NOT NULL,  -- 'gps_mismatch', 'inactive_during_claim', 'high_frequency', etc.
+    flag_value      NUMERIC(5,2)    NOT NULL,  -- score contribution (0-100)
+    flag_reason     TEXT,
+    confidence      NUMERIC(5,2),
+    details         JSONB,
+    flagged_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_flag_worker ON fraud_flags(worker_id);
+CREATE INDEX idx_flag_claim ON fraud_flags(claim_id);
+CREATE INDEX idx_flag_type ON fraud_flags(flag_type);
+
+-- ============================================================
+-- 15. PROOF_UPLOADS — File metadata and validation
+-- ============================================================
+CREATE TABLE proof_uploads (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    claim_id        UUID            NOT NULL REFERENCES claims(id) ON DELETE CASCADE,
+    worker_id       UUID            NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    file_type       VARCHAR(30)     NOT NULL CHECK (file_type IN ('screenshot', 'photo', 'video')),
+    file_path       TEXT            NOT NULL,
+    file_size       INTEGER,
+    file_hash       VARCHAR(255),
+    upload_timestamp TIMESTAMPTZ,
+    location_latitude NUMERIC(10,8),
+    location_longitude NUMERIC(11,8),
+    metadata        JSONB,
+    validation_status VARCHAR(20) DEFAULT 'pending'
+                    CHECK (validation_status IN ('pending', 'valid', 'invalid', 'flagged')),
+    validation_details JSONB,
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_proof_claim ON proof_uploads(claim_id);
+CREATE INDEX idx_proof_worker ON proof_uploads(worker_id);
+CREATE INDEX idx_proof_validation ON proof_uploads(validation_status);
+
+-- ============================================================
+-- 16. PROOFS — Structured fraud-proof uploads
+-- ============================================================
+CREATE TABLE proofs (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id         UUID            NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    claim_id        UUID            NOT NULL REFERENCES claims(id) ON DELETE CASCADE,
+    type            VARCHAR(30)     NOT NULL
+                    CHECK (type IN ('PARCEL', 'SELFIE', 'WORK_SCREEN')),
+    file_path       TEXT            NOT NULL,
+    timestamp       TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+    lat             NUMERIC(10,8),
+    lng             NUMERIC(11,8),
+    metadata_json   JSONB,
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_proofs_user ON proofs(user_id);
+CREATE INDEX idx_proofs_claim ON proofs(claim_id);
+CREATE INDEX idx_proofs_type ON proofs(type);
+
+-- ============================================================
+-- 17. PROOF_ANALYSIS — Fraud scoring per proof artifact
+-- ============================================================
+CREATE TABLE proof_analysis (
+    id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    proof_id                UUID            NOT NULL REFERENCES proofs(id) ON DELETE CASCADE,
+    user_id                 UUID            NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    claim_id                UUID            NOT NULL REFERENCES claims(id) ON DELETE CASCADE,
+    ai_generated_probability NUMERIC(5,2)   DEFAULT 0,
+    tampering_detected      BOOLEAN         NOT NULL DEFAULT FALSE,
+    duplicate_found         BOOLEAN         NOT NULL DEFAULT FALSE,
+    weather_mismatch        BOOLEAN         NOT NULL DEFAULT FALSE,
+    activity_valid          BOOLEAN         NOT NULL DEFAULT TRUE,
+    work_screen_valid       BOOLEAN         NOT NULL DEFAULT TRUE,
+    is_live_capture         BOOLEAN         NOT NULL DEFAULT TRUE,
+    fraud_score_delta       NUMERIC(6,2)    DEFAULT 0,
+    warning_reasons         JSONB,
+    analysis_json           JSONB,
+    created_at              TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_proof_analysis_proof ON proof_analysis(proof_id);
+CREATE INDEX idx_proof_analysis_claim ON proof_analysis(claim_id);
+CREATE INDEX idx_proof_analysis_risk ON proof_analysis(ai_generated_probability DESC, fraud_score_delta DESC);
+
+-- ============================================================
+-- 18. IMAGE_HASHES — Duplicate proof detection
+-- ============================================================
+CREATE TABLE image_hashes (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    proof_id        UUID            NOT NULL REFERENCES proofs(id) ON DELETE CASCADE,
+    user_id         UUID            NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    claim_id        UUID            NOT NULL REFERENCES claims(id) ON DELETE CASCADE,
+    image_hash      VARCHAR(128)    NOT NULL,
+    perceptual_hash VARCHAR(128),
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_image_hashes_hash ON image_hashes(image_hash);
+CREATE INDEX idx_image_hashes_user ON image_hashes(user_id, created_at DESC);
+
+-- ============================================================
+-- 19. AI_DETECTION_LOGS — Detector outputs for auditability
+-- ============================================================
+CREATE TABLE ai_detection_logs (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    proof_id        UUID            NOT NULL REFERENCES proofs(id) ON DELETE CASCADE,
+    claim_id        UUID            NOT NULL REFERENCES claims(id) ON DELETE CASCADE,
+    detector_name   VARCHAR(50)     NOT NULL,
+    result_json     JSONB,
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_detection_logs_proof ON ai_detection_logs(proof_id);
+CREATE INDEX idx_ai_detection_logs_claim ON ai_detection_logs(claim_id);
+CREATE INDEX idx_ai_detection_logs_detector ON ai_detection_logs(detector_name, created_at DESC);

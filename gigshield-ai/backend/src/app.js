@@ -33,6 +33,8 @@ const aiDecisionRoutes = require("./routes/aiDecision.routes");
 const disputeRoutes = require("./routes/dispute.routes");
 const proofUploadRoutes = require("./routes/proofUpload.routes");
 const reverificationRoutes = require("./routes/reverification.routes");
+const activityRoutes = require("./routes/activity.routes");
+const fraudAnalysisRoutes = require("./routes/fraudAnalysis.routes");
 const { sendError, sendSuccess } = require("./utils/apiResponse");
 
 // Middleware
@@ -83,18 +85,24 @@ function getAllowedOrigins() {
 
   return new Set([
     "http://localhost:3000",
+    "http://localhost:3001",
     "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
     ...configuredOrigins,
   ]);
 }
 
 const allowedOrigins = getAllowedOrigins();
 
+function isLocalDevOrigin(origin) {
+  return /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(String(origin || "").trim());
+}
+
 // ── Security & Parsing ──────────────────────────────────────
 app.use(helmet());
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.has(origin)) {
+    if (!origin || allowedOrigins.has(origin) || isLocalDevOrigin(origin)) {
       callback(null, true);
       return;
     }
@@ -159,6 +167,8 @@ app.use("/api", aiDecisionRoutes);
 app.use("/api", disputeRoutes);
 app.use("/api", proofUploadRoutes);
 app.use("/api", reverificationRoutes);
+app.use("/api/activity", activityRoutes);
+app.use("/api/fraud", fraudAnalysisRoutes);
 
 // ── 404 Catch-All ───────────────────────────────────────────
 app.use((_req, res) => {

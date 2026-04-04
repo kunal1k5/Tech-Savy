@@ -87,4 +87,75 @@ describe("POST /api/upload-proof", () => {
       message: "Dispute not found.",
     });
   });
+
+  it("runs automated claim-proof analysis for single proof uploads", async () => {
+    const response = await request(app)
+      .post("/api/upload-proof")
+      .field("user_id", "demo-user-1")
+      .field("claim_id", "claim-demo-1")
+      .field("proof_type", "SELFIE")
+      .field("latitude", "12.9716")
+      .field("longitude", "77.5946")
+      .attach("file", Buffer.from("demo-selfie-proof"), {
+        filename: "live-selfie-outdoor.png",
+        contentType: "image/png",
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data).toMatchObject({
+      status: "RECEIVED",
+      proof_type: "SELFIE",
+      warning: false,
+      decision: expect.objectContaining({
+        decision: expect.any(String),
+        confidence: expect.any(Number),
+        fraud_score: expect.any(Number),
+      }),
+      analysis: expect.objectContaining({
+        image_validation: expect.any(Object),
+        weather_validation: expect.any(Object),
+        activity_validation: expect.any(Object),
+      }),
+    });
+  });
+
+  it("flags duplicate and suspicious uploads through fallback heuristics", async () => {
+    const suspiciousBuffer = Buffer.from("duplicate-proof-buffer");
+
+    await request(app)
+      .post("/api/upload-proof")
+      .field("user_id", "demo-user-2")
+      .field("claim_id", "claim-demo-2")
+      .field("proof_type", "PARCEL")
+      .attach("file", suspiciousBuffer, {
+        filename: "parcel-base.png",
+        contentType: "image/png",
+      });
+
+    const response = await request(app)
+      .post("/api/upload-proof")
+      .field("user_id", "demo-user-2")
+      .field("claim_id", "claim-demo-2")
+      .field("proof_type", "SELFIE")
+      .attach("file", suspiciousBuffer, {
+        filename: "old-ai-fake-selfie.png",
+        contentType: "image/png",
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data).toMatchObject({
+      duplicate_found: true,
+      warning: true,
+      reasons: expect.arrayContaining([
+        "AI-generated image suspected",
+        "Repeated proof image detected",
+        "Proof was not captured live",
+      ]),
+    });
+    expect(response.body.data.decision).toMatchObject({
+      decision: "REJECTED",
+    });
+  });
 });

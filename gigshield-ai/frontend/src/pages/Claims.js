@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useRef, useState } from "react";
 import CountUp from "react-countup";
 import { AnimatePresence, motion } from "framer-motion";
-import { CloudRain, FileText, ShieldCheck, Wind } from "lucide-react";
+import { Camera, CloudRain, FileText, Package2, ShieldCheck, Smartphone, Wind } from "lucide-react";
 import ClaimCard from "../components/claims/ClaimCard";
 import InfoTooltip from "../components/ui/InfoTooltip";
 import StatusBadge from "../components/ui/StatusBadge";
@@ -9,6 +9,8 @@ import SurfaceButton from "../components/ui/SurfaceButton";
 import SurfaceLoadingPanel from "../components/ui/SurfaceLoadingPanel";
 import { useGigShieldData } from "../context/GigShieldDataContext";
 import useLiveBackendData from "../hooks/useLiveBackendData";
+import { extractApiErrorMessage, uploadClaimProof } from "../services/api";
+import { getUserFromToken } from "../utils/auth";
 import { formatINR } from "../utils/helpers";
 
 const pageVariants = {
@@ -37,6 +39,13 @@ const SMART_PREMIUM_BY_RISK = {
   Low: 10,
   Medium: 20,
   High: 30,
+};
+
+const CITY_COORDINATES = {
+  bengaluru: { latitude: 12.9716, longitude: 77.5946 },
+  bangalore: { latitude: 12.9716, longitude: 77.5946 },
+  delhi: { latitude: 28.6139, longitude: 77.209 },
+  mumbai: { latitude: 19.076, longitude: 72.8777 },
 };
 
 function getClaimReason(claim) {
@@ -79,12 +88,19 @@ function normalizeRiskLabel(value) {
 
 export default function Claims() {
   const { platformState, derivedData, actions, uiState } = useGigShieldData();
+  const parcelInputRef = useRef(null);
+  const selfieInputRef = useRef(null);
+  const workInputRef = useRef(null);
+  const [proofUploadError, setProofUploadError] = useState("");
+  const [proofUploadResult, setProofUploadResult] = useState(null);
+  const [uploadingProofType, setUploadingProofType] = useState("");
   const {
     data: liveBackendData,
     error: liveBackendError,
     isLoading: liveBackendLoading,
     isRefreshing: liveBackendRefreshing,
   } = useLiveBackendData();
+  const sessionUser = getUserFromToken();
   const latestClaim = platformState.claims[0] || null;
   const currentRisk = normalizeRiskLabel(liveBackendData?.risk || derivedData.currentRisk?.level || "Low");
   const smartPremium = Number(liveBackendData?.premium ?? SMART_PREMIUM_BY_RISK[currentRisk] ?? 20);
@@ -94,6 +110,85 @@ export default function Claims() {
     uiState.riskUpdating ||
     uiState.syncing ||
     (liveBackendLoading && !liveBackendData);
+  const activeClaimId = latestClaim?.id || liveBackendData?.claim_id || "";
+  const activeClaimTime = latestClaim?.detectedAt || new Date().toISOString();
+
+  function getFallbackCoordinates() {
+    const normalizedCity = String(sessionUser?.city || platformState.worker.city || "bengaluru")
+      .trim()
+      .toLowerCase();
+    return CITY_COORDINATES[normalizedCity] || CITY_COORDINATES.bengaluru;
+  }
+
+  async function resolveCoordinates() {
+    const fallback = getFallbackCoordinates();
+    if (!navigator.geolocation) {
+      return fallback;
+    }
+
+    try {
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 4000,
+          maximumAge: 0,
+        });
+      });
+
+      return {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      };
+    } catch (_error) {
+      return fallback;
+    }
+  }
+
+  async function handleProofSelection(proofType, event) {
+    const file = event.target.files?.[0] || null;
+    event.target.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    if (!activeClaimId) {
+      setProofUploadError("A claim must exist before automated proof validation can run.");
+      setProofUploadResult(null);
+      return;
+    }
+
+    setUploadingProofType(proofType);
+    setProofUploadError("");
+
+    try {
+      const coordinates = await resolveCoordinates();
+      const result = await uploadClaimProof({
+        userId: sessionUser?.id || sessionUser?.worker_id || "demo-user",
+        claimId: activeClaimId,
+        proofType,
+        file,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+        claimTime: activeClaimTime,
+        city: sessionUser?.city || platformState.worker.city || "Bengaluru",
+        zone: sessionUser?.zone || platformState.worker.area || "Central",
+        metadata: {
+          source_page: "claims",
+          original_file_name: file.name,
+        },
+      });
+
+      setProofUploadResult(result);
+    } catch (error) {
+      setProofUploadResult(null);
+      setProofUploadError(
+        extractApiErrorMessage(error, "Automated proof validation failed. Please retry.")
+      );
+    } finally {
+      setUploadingProofType("");
+    }
+  }
 
   async function handleAutoClaimDemo(scenarioId, riskKey) {
     await actions.simulateRisk(riskKey, { silent: true });
@@ -280,6 +375,122 @@ export default function Claims() {
           </div>
         </motion.section>
       </div>
+
+      <motion.section
+        variants={itemVariants}
+        className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md"
+      >
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-500">Automated proof validation</p>
+            <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
+              Upload required proof for AI fraud checks
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Upload one proof at a time. Live capture, image forensics, activity logs, and weather
+              checks run automatically.
+            </p>
+          </div>
+
+          <StatusBadge
+            status={activeClaimId ? "approved" : "pending"}
+            label={activeClaimId ? "Claim Ready" : "Claim Needed"}
+          />
+        </div>
+
+        <input
+          ref={parcelInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(event) => handleProofSelection("PARCEL", event)}
+        />
+        <input
+          ref={selfieInputRef}
+          type="file"
+          accept="image/*"
+          capture="user"
+          className="hidden"
+          onChange={(event) => handleProofSelection("SELFIE", event)}
+        />
+        <input
+          ref={workInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(event) => handleProofSelection("WORK_SCREEN", event)}
+        />
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <SurfaceButton
+            onClick={() => parcelInputRef.current?.click()}
+            leftIcon={Package2}
+            disabled={!activeClaimId}
+            loading={uploadingProofType === "PARCEL"}
+            className="w-full sm:w-auto"
+          >
+            Upload Parcel Screenshot
+          </SurfaceButton>
+
+          <SurfaceButton
+            onClick={() => selfieInputRef.current?.click()}
+            leftIcon={Camera}
+            variant="secondary"
+            disabled={!activeClaimId}
+            loading={uploadingProofType === "SELFIE"}
+            className="w-full sm:w-auto"
+          >
+            Take Live Selfie
+          </SurfaceButton>
+
+          <SurfaceButton
+            onClick={() => workInputRef.current?.click()}
+            leftIcon={Smartphone}
+            variant="secondary"
+            disabled={!activeClaimId}
+            loading={uploadingProofType === "WORK_SCREEN"}
+            className="w-full sm:w-auto"
+          >
+            Upload Work Screen
+          </SurfaceButton>
+        </div>
+
+        {proofUploadError ? (
+          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {proofUploadError}
+          </div>
+        ) : null}
+
+        {proofUploadResult ? (
+          <div
+            className={`mt-4 rounded-2xl border px-4 py-4 text-sm ${
+              proofUploadResult.warning
+                ? "border-amber-200 bg-amber-50 text-amber-900"
+                : "border-emerald-200 bg-emerald-50 text-emerald-900"
+            }`}
+          >
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="font-semibold">
+                {proofUploadResult.message}
+              </div>
+              <div className="text-xs font-semibold uppercase tracking-[0.14em]">
+                Decision: {proofUploadResult.decision?.decision || "--"}
+              </div>
+            </div>
+
+            <div className="mt-2 text-xs text-slate-700">
+              Fraud score: {proofUploadResult.decision?.fraud_score ?? "--"} | Confidence:{" "}
+              {proofUploadResult.decision?.confidence ?? "--"}%
+            </div>
+
+            {proofUploadResult.reasons?.length ? (
+              <div className="mt-2 text-xs text-slate-700">
+                {proofUploadResult.reasons.join(" | ")}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </motion.section>
 
       {platformState.claims.length ? (
         <motion.section variants={itemVariants} className="space-y-4">

@@ -8,7 +8,7 @@ const { uploadProofSchema } = require("../services/proofUpload.service");
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    files: 2,
+    files: 6,
     fileSize: 5 * 1024 * 1024,
   },
 });
@@ -18,6 +18,10 @@ const router = Router();
 router.post(
   "/upload-proof",
   upload.fields([
+    { name: "file", maxCount: 1 },
+    { name: "parcelScreenshot", maxCount: 1 },
+    { name: "liveSelfie", maxCount: 1 },
+    { name: "workScreen", maxCount: 1 },
     { name: "geoImage", maxCount: 1 },
     { name: "workScreenshot", maxCount: 1 },
   ]),

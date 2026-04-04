@@ -75,4 +75,12 @@ module.exports = {
   predictLocation(payload) {
     return request("post", "/predict-location", payload);
   },
+
+  analyzeImageForensics(payload) {
+    return request("post", "/api/forensics/image", payload);
+  },
+
+  analyzeProof(payload) {
+    return request("post", "/api/proof/analyze", payload);
+  },
 };

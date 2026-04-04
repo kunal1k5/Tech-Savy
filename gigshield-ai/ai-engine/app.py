@@ -7,6 +7,8 @@ import os
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
+from image_forensics import analyze_image_forensics
+from proof_analyzer import analyze_proof_payload
 from services import get_fraud_service_health
 from services.location_service import get_location_model_health, predict_location
 from services.risk_service import (
@@ -83,6 +85,28 @@ def create_app() -> Flask:
     def predict_next_location_api():
         payload = request.get_json(silent=True)
         return jsonify(predict_location(payload))
+
+    @app.post("/api/proof/analyze")
+    def analyze_proof():
+        payload = request.get_json(silent=True) or {}
+        return jsonify(
+            analyze_proof_payload(
+                proof_type=str(payload.get("proof_type") or ""),
+                file_name=str(payload.get("file_name") or ""),
+                file_base64=str(payload.get("file_base64") or ""),
+                context=payload.get("context") or {},
+            )
+        )
+
+    @app.post("/api/forensics/image")
+    def analyze_image():
+        payload = request.get_json(silent=True) or {}
+        return jsonify(
+            analyze_image_forensics(
+                file_base64=str(payload.get("file_base64") or ""),
+                context=payload.get("context") or {},
+            )
+        )
 
     return app
 

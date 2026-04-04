@@ -100,6 +100,12 @@ const DECISION_ACTIONS = Object.freeze({
   [DECISION_LEVELS.FRAUD]: NEXT_ACTIONS.REJECT_CLAIM,
 });
 
+const CLAIM_DECISIONS = Object.freeze({
+  APPROVED: "APPROVED",
+  VERIFY: "VERIFY",
+  REJECTED: "REJECTED",
+});
+
 function isAnyConditionMet(input, conditions) {
   return conditions.some(({ field, threshold }) => Number(input[field]) > threshold);
 }
@@ -162,7 +168,78 @@ function createAiDecision(input) {
   };
 }
 
+function clampScore(value, min = 0, max = 100) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return min;
+  }
+
+  return Math.min(max, Math.max(min, numericValue));
+}
+
+function createClaimDecision(input = {}) {
+  const baseFraudScore = clampScore(input.fraud_score ?? input.fraudScore ?? 0);
+  const aiImageScore = clampScore(input.ai_image_score ?? input.aiImageScore ?? 0);
+  const anomalyScore = clampScore(input.anomaly_score ?? input.anomalyScore ?? 0);
+  const trustScore = clampScore(input.trust_score ?? input.trustScore ?? 50);
+  const warnings = Array.isArray(input.warnings) ? input.warnings.filter(Boolean) : [];
+  const explanation = Array.isArray(input.explanation) ? input.explanation.filter(Boolean) : [];
+  const activityValid = input.activity_validation?.was_active !== false;
+  const withinWorkHours = input.activity_validation?.within_working_hours !== false;
+  const weatherMismatch = input.weather_validation?.mismatch === true;
+  const workScreenValid =
+    input.work_validation?.checked === true ? input.work_validation?.valid !== false : true;
+  const tamperingDetected = input.image_validation?.tampering_detected === true;
+  const duplicateFound = input.image_validation?.duplicate_found === true;
+  const trustPenalty = Math.max(0, 60 - trustScore) * 0.35;
+  const anomalyWeight = anomalyScore * 0.35;
+  const aiWeight = aiImageScore * 0.2;
+
+  let compositeScore = baseFraudScore + trustPenalty + anomalyWeight + aiWeight;
+
+  if (!activityValid || !withinWorkHours) {
+    compositeScore += 10;
+  }
+
+  if (weatherMismatch) {
+    compositeScore += 8;
+  }
+
+  if (!workScreenValid) {
+    compositeScore += 8;
+  }
+
+  if (tamperingDetected) {
+    compositeScore += 12;
+  }
+
+  if (duplicateFound) {
+    compositeScore += 8;
+  }
+
+  compositeScore = clampScore(compositeScore);
+
+  let decision = CLAIM_DECISIONS.APPROVED;
+  if (compositeScore >= 70 || tamperingDetected) {
+    decision = CLAIM_DECISIONS.REJECTED;
+  } else if (compositeScore >= 35 || warnings.length > 0) {
+    decision = CLAIM_DECISIONS.VERIFY;
+  }
+
+  const confidenceBase = 55 + warnings.length * 8 + Math.abs(compositeScore - 50) * 0.45;
+  const confidence = clampScore(confidenceBase);
+
+  return {
+    decision,
+    confidence: Math.round(confidence),
+    fraud_score: Number(compositeScore.toFixed(2)),
+    warnings,
+    explanation,
+  };
+}
+
 module.exports = {
+  CLAIM_DECISIONS,
   DECISION_ACTIONS,
   DECISION_BANDS,
   DECISION_LEVELS,
@@ -177,7 +254,9 @@ module.exports = {
   calculateRisk,
   calculateStatus,
   calculateTrustScore,
+  clampScore,
   createAiDecision,
+  createClaimDecision,
   getDecision,
   getDecisionBand,
   getNextAction,

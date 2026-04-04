@@ -17,6 +17,7 @@ frontend/build-temp/
 frontend/build-verification/
 frontend/dist/
 backend/dist/
+backend/uploads/
 
 # IDE
 .vscode/

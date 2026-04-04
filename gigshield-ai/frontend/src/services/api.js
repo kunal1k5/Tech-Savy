@@ -234,6 +234,34 @@ export async function uploadProof({ disputeId, geoImage, workScreenshot }) {
   return unwrapAxiosResponse(response);
 }
 
+export async function uploadClaimProof({
+  userId,
+  claimId,
+  proofType,
+  file,
+  latitude,
+  longitude,
+  claimTime,
+  city,
+  zone,
+  metadata = {},
+}) {
+  const response = await api.postForm(buildApiUrl("/upload-proof"), {
+    user_id: userId,
+    claim_id: claimId,
+    proof_type: proofType,
+    file,
+    latitude,
+    longitude,
+    claim_time: claimTime,
+    city,
+    zone,
+    metadata_json: JSON.stringify(metadata),
+  });
+
+  return unwrapAxiosResponse(response);
+}
+
 export async function reverifyClaim(payload) {
   const response = await apiPost("/reverify-claim", payload);
   return unwrapAxiosResponse(response);

@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes.fraud_routes import router as fraud_router
 from routes.location_routes import router as location_router
 from routes.premium_routes import router as premium_router
+from routes.proof_routes import router as proof_router
 from routes.risk_routes import router as risk_router
 from services import get_fraud_service_health
 from services.location_service import get_location_model_health, predict_location
@@ -101,3 +102,5 @@ app.include_router(risk_router, prefix="/api/risk", tags=["Risk Assessment"])
 app.include_router(fraud_router, prefix="/api/fraud", tags=["Fraud Detection"])
 app.include_router(premium_router, prefix="/api/premium", tags=["Premium Calculation"])
 app.include_router(location_router, prefix="/api/location", tags=["Location Prediction"])
+app.include_router(proof_router, prefix="/api/proof", tags=["Proof Analysis"])
+app.include_router(proof_router, prefix="/api/forensics", tags=["Image Forensics"])
