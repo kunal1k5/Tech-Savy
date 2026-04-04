@@ -11,7 +11,7 @@ const app = require("./app");
 const { pool, testConnection } = require("./database/connection");
 const logger = require("./utils/logger");
 
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT || 5000;
 
 async function startServer() {
   // Try to connect to database, but start server even if DB is unavailable (demo mode)

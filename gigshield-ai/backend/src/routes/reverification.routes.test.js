@@ -1,0 +1,123 @@
+const request = require("supertest");
+
+const app = require("../app");
+const { getDisputeById, resetDisputeStore, startDispute } = require("../services/dispute.service");
+
+describe("POST /api/reverify-claim", () => {
+  beforeEach(() => {
+    resetDisputeStore();
+  });
+
+  it("approves a claim when all proof checks match", async () => {
+    const dispute = startDispute({
+      userId: "123",
+      reason: "System failed to detect actual issue",
+    });
+
+    await request(app)
+      .post("/api/upload-proof")
+      .field("disputeId", dispute.disputeId)
+      .attach("geoImage", Buffer.from("geo-image"), {
+        filename: "geo-proof.png",
+        contentType: "image/png",
+      })
+      .attach("workScreenshot", Buffer.from("work-image"), {
+        filename: "active-order.png",
+        contentType: "image/png",
+      });
+
+    const response = await request(app).post("/api/reverify-claim").send({
+      disputeId: dispute.disputeId,
+      claimTime: "14:00",
+      userLocation: "Zone-A",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      data: {
+        finalStatus: "APPROVED",
+        confidence: 85,
+        claimUpdate: {
+          claimStatus: "PAID",
+          payoutStatus: "PAYOUT_RELEASED",
+          fraudStatus: "verified",
+        },
+      },
+      message: "Claim re-verification completed.",
+    });
+
+    expect(getDisputeById(dispute.disputeId)).toMatchObject({
+      status: "APPROVED",
+      verification: {
+        finalStatus: "APPROVED",
+        confidence: 85,
+        score: 80,
+        checks: {
+          locationMatch: true,
+          timeMatch: true,
+          activityValid: true,
+        },
+      },
+    });
+  });
+
+  it("rejects a claim when proof signals do not match", async () => {
+    const dispute = startDispute({
+      userId: "123",
+      reason: "System failed to detect actual issue",
+    });
+
+    await request(app)
+      .post("/api/upload-proof")
+      .field("disputeId", dispute.disputeId)
+      .attach("geoImage", Buffer.from("geo-image"), {
+        filename: "outside-old-proof.png",
+        contentType: "image/png",
+      })
+      .attach("workScreenshot", Buffer.from("work-image"), {
+        filename: "offline-screen.png",
+        contentType: "image/png",
+      });
+
+    const response = await request(app).post("/api/reverify-claim").send({
+      disputeId: dispute.disputeId,
+      claimTime: "14:00",
+      userLocation: "Zone-A",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      success: true,
+      data: {
+        finalStatus: "REJECTED",
+        confidence: 5,
+        claimUpdate: {
+          claimStatus: "REJECTED",
+          payoutStatus: "BLOCKED",
+          fraudStatus: "flagged",
+        },
+      },
+      message: "Claim re-verification completed.",
+    });
+  });
+
+  it("requires uploaded proof before re-verification", async () => {
+    const dispute = startDispute({
+      userId: "123",
+      reason: "System failed to detect actual issue",
+    });
+
+    const response = await request(app).post("/api/reverify-claim").send({
+      disputeId: dispute.disputeId,
+      claimTime: "14:00",
+      userLocation: "Zone-A",
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      success: false,
+      message: "Proof upload is required before re-verification.",
+    });
+  });
+});

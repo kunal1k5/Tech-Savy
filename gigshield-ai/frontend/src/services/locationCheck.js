@@ -1,12 +1,6 @@
-import api from "./api";
+import { apiPost, unwrapApiPayload } from "./api";
 
-export const SAMPLE_LOCATION_PAYLOAD = {
-  current_location: "Zone-A",
-  time: "14:00",
-  actual_location: "Zone-Z",
-};
-
-export async function fetchLocationCheck(payload = SAMPLE_LOCATION_PAYLOAD) {
-  const response = await api.post("/location-check", payload);
-  return response.data;
+export async function fetchLocationCheck(payload) {
+  const response = await apiPost("/predict-location", payload);
+  return unwrapApiPayload(response.data);
 }

@@ -6,10 +6,10 @@
 
 @layer base {
   :root {
-    color-scheme: dark;
-    --app-bg: #050816;
-    --panel-bg: rgba(10, 15, 29, 0.82);
-    --panel-line: rgba(148, 163, 184, 0.14);
+    color-scheme: light;
+    --app-bg: #f8fafc;
+    --panel-bg: rgba(255, 255, 255, 0.92);
+    --panel-line: rgba(148, 163, 184, 0.2);
     --white-canvas: #ffffff;
     --white-surface: #f8fafc;
     --white-line: #e2e8f0;
@@ -30,7 +30,7 @@
     @apply scroll-smooth;
     scrollbar-gutter: stable;
     scrollbar-width: thin;
-    scrollbar-color: rgba(226, 232, 240, 0.72) rgba(5, 8, 22, 0.96);
+    scrollbar-color: rgba(148, 163, 184, 0.65) rgba(248, 250, 252, 1);
   }
 
   html::-webkit-scrollbar {
@@ -38,27 +38,27 @@
   }
 
   html::-webkit-scrollbar-track {
-    background: rgba(5, 8, 22, 0.96);
+    background: rgba(248, 250, 252, 1);
   }
 
   html::-webkit-scrollbar-thumb {
     border-radius: 9999px;
-    border: 2px solid rgba(5, 8, 22, 0.96);
-    background: rgba(226, 232, 240, 0.72);
+    border: 2px solid rgba(248, 250, 252, 1);
+    background: rgba(148, 163, 184, 0.58);
   }
 
   html::-webkit-scrollbar-thumb:hover {
-    background: rgba(226, 232, 240, 0.82);
+    background: rgba(100, 116, 139, 0.72);
   }
 
   body {
-    @apply min-h-screen bg-slate-950 text-slate-50 antialiased;
+    @apply min-h-screen bg-slate-50 text-slate-900 antialiased;
     font-family: "Inter", sans-serif;
     background-color: var(--app-bg);
     background-image:
-      radial-gradient(circle at 12% 10%, rgba(34, 211, 238, 0.08), transparent 22%),
-      radial-gradient(circle at 82% 16%, rgba(99, 102, 241, 0.1), transparent 24%),
-      linear-gradient(180deg, #050816 0%, #070b15 52%, #060912 100%);
+      radial-gradient(circle at 12% 10%, rgba(37, 99, 235, 0.08), transparent 20%),
+      radial-gradient(circle at 82% 16%, rgba(14, 165, 233, 0.06), transparent 22%),
+      linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
     background-attachment: fixed;
   }
 
@@ -82,8 +82,8 @@
   }
 
   ::selection {
-    background: rgba(56, 189, 248, 0.32);
-    color: #f8fafc;
+    background: rgba(37, 99, 235, 0.18);
+    color: #0f172a;
   }
 }
 

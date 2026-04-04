@@ -1,69 +1,139 @@
 # GigShield AI
 
-GigShield is an income-protection platform for gig workers affected by rain, air-quality spikes, and route disruption.
+GigShield AI is a full-stack fintech prototype for gig worker income protection. It combines risk monitoring, premium calculation, automated claims, fraud scoring, dispute handling, proof upload, and AI-style re-verification into one end-to-end product workflow.
 
-The project is structured as a connected full-stack system:
+## Problem
 
-- `frontend/` React app for dashboard, policy, claims, profile, and route/risk views
-- `backend/` Express API for auth, workflow, persistence, and orchestration
-- `ai-engine/` Python services for risk scoring, fraud checks, location prediction, premium pricing, and fraud orchestration
-- `database/` SQL schema
-- `docs/` architecture, API, and fraud-system notes
+Gig workers lose income because of rain, pollution, route disruption, and suspicious claim handling delays. Traditional claim systems are slow, manual, and hard to trust.
 
-## Production-Style Upgrades
+## Solution
 
-- AI model artifacts are separated from inference logic under `ai-engine/models/` and `ai-engine/services/`
-- `ai-engine/fraud_orchestrator.py` combines multiple signals into one final fraud score
-- frontend uses `frontend/src/modules/` for feature-based boundaries
-- backend centralizes Python service calls in `backend/src/integrations/aiService.js`
-- compose and env setup are aligned for frontend, backend, and AI-engine connectivity
+GigShield turns the claim journey into a connected decision system:
 
-## Final Structure
+1. Detect environmental and behavioral risk.
+2. Calculate premium and claim eligibility.
+3. Score fraud automatically.
+4. Trigger smart actions such as approve, verify, or reject.
+5. Let the user raise a dispute when needed.
+6. Accept proof uploads and run re-verification before the final payout decision.
+
+## Core Features
+
+- AI risk engine for weather and AQI-based claim risk
+- Dynamic premium calculation from live risk inputs
+- Auto-claim engine for eligible high-risk downtime
+- Fraud detection using behavior, location, and context signals
+- Smart decision layer with `SAFE`, `VERIFY`, and `FRAUD`
+- Dispute workflow for challenged decisions
+- Proof upload for geo-image and work screenshot evidence
+- AI re-verification flow with final claim status update
+- Authenticated dashboard, policy, profile, and claims experience
+
+## Tech Stack
+
+- Frontend: React, React Router, Framer Motion, Axios, Tailwind utility styling
+- Backend: Node.js, Express, Joi, Multer, Winston, Jest, Supertest
+- AI Engine: Python service layer for risk and fraud-related inference utilities
+- Database: PostgreSQL schema in [`database/schema.sql`](/f:/guide/gigshield-ai/database/schema.sql)
+- DevOps: Docker Compose, environment-based configuration
+
+## Project Structure
 
 ```text
 gigshield-ai/
-  frontend/
-  backend/
-  ai-engine/
-    models/
-    services/
-    routes/
-    utils/
-    fraud_orchestrator.py
-  database/
-  docs/
+  ai-engine/      Python AI services
+  backend/        Express API and orchestration layer
+  database/       SQL schema
+  docs/           API and architecture notes
+  frontend/       React application
   docker-compose.yml
   README.md
 ```
 
-## Core Flows
+## Standard API Format
 
-1. Worker signs in and views protection status in the frontend.
-2. Backend manages policy, claim, and payment workflow.
-3. AI engine scores environmental risk and route consistency.
-4. Fraud orchestrator combines fraud, risk, and location context.
-5. Claims move toward pass, flag, or block decisions.
+All production-ready routes now return a consistent envelope:
+
+```json
+{
+  "success": true,
+  "data": {},
+  "message": "Request completed successfully."
+}
+```
+
+Error responses use:
+
+```json
+{
+  "success": false,
+  "data": null,
+  "message": "Validation failed"
+}
+```
+
+## Key API Endpoints
+
+- `POST /api/ai-decision`
+- `POST /api/risk-premium`
+- `POST /api/auto-claim`
+- `POST /api/fraud-check`
+- `POST /api/start-dispute`
+- `POST /api/upload-proof`
+- `POST /api/reverify-claim`
+
+Detailed examples live in [`docs/api-reference.md`](/f:/guide/gigshield-ai/docs/api-reference.md).
 
 ## Local Setup
 
+### 1. Environment
+
+Copy the sample env file and fill the required values:
+
 ```powershell
 cd F:\guide\gigshield-ai
-docker compose up --build
+copy .env.example .env
+copy backend\.env.example backend\.env
 ```
 
-Manual startup also works:
+Important variables:
+
+- `REACT_APP_API_URL`
+- `PORT`
+- `JWT_SECRET`
+- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+- `AI_ENGINE_URL`
+- `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`
+
+### 2. Install dependencies
 
 ```powershell
 cd F:\guide\gigshield-ai\backend
 npm install
-npm run dev
 ```
 
 ```powershell
 cd F:\guide\gigshield-ai\frontend
 npm install
+```
+
+### 3. Run services
+
+Backend:
+
+```powershell
+cd F:\guide\gigshield-ai\backend
+npm run dev
+```
+
+Frontend:
+
+```powershell
+cd F:\guide\gigshield-ai\frontend
 npm start
 ```
+
+AI engine:
 
 ```powershell
 cd F:\guide\gigshield-ai\ai-engine
@@ -71,10 +141,61 @@ python -m pip install -r requirements.txt
 uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-## Docs
+### Optional Docker startup
 
-- [Architecture](./docs/architecture.md)
-- [API](./docs/api.md)
-- [Fraud System](./docs/fraud-system.md)
+```powershell
+cd F:\guide\gigshield-ai
+docker compose up --build
+```
 
-Legacy deep-dive notes are still available in `docs/api-reference.md` and `docs/anti-fraud-strategy.md`.
+## Demo Flow
+
+1. Register a gig worker account.
+2. Sign in with mobile OTP demo flow.
+3. Open the dashboard and run a monitored scenario.
+4. Watch risk, premium, claim, fraud, and AI decision update together.
+5. Raise a dispute when the decision is `VERIFY` or `FRAUD`.
+6. Upload geo proof and work screenshot.
+7. Run AI re-verification and view final claim status.
+
+## Testing
+
+Backend:
+
+```powershell
+cd F:\guide\gigshield-ai\backend
+npx jest --runInBand
+```
+
+Frontend:
+
+```powershell
+cd F:\guide\gigshield-ai\frontend
+$env:CI='true'; npm test -- --watch=false
+npm run build
+```
+
+## Production Prep Notes
+
+- API responses are standardized across success and error paths.
+- Duplicate route mounting at `/` has been removed; public API lives under `/api`.
+- Dispute and proof flows are connected end to end.
+- Obvious dead mock data artifacts were removed from the frontend.
+- Secrets are expected from `.env` files and sample values remain in `.env.example`.
+
+## Current Limitation
+
+The dispute/proof/re-verification workflow is still backed by in-memory storage in the backend service layer, so those records reset on server restart. For a full production deployment, move those records and uploaded files to persistent storage.
+
+## Useful Docs
+
+- [API Summary](/f:/guide/gigshield-ai/docs/api.md)
+- [API Reference](/f:/guide/gigshield-ai/docs/api-reference.md)
+
+## GitHub Submission
+
+```powershell
+git add .
+git commit -m "Final submission - GigShield AI system"
+git push origin main
+```

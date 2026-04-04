@@ -3,6 +3,7 @@ const Joi = require("joi");
 const DemoStoreService = require("../services/demoStore.service");
 const { authenticate } = require("../middleware/auth");
 const { validate } = require("../middleware/validate");
+const { sendSuccess } = require("../utils/apiResponse");
 
 const router = Router();
 
@@ -16,11 +17,34 @@ const verifySchema = Joi.object({
   otp: Joi.string().required(),
   profile: Joi.object({
     fullName: Joi.string().allow("", null),
+    full_name: Joi.string().allow("", null),
     city: Joi.string().allow("", null),
     zone: Joi.string().allow("", null),
     platform: Joi.string().allow("", null),
     weeklyIncome: Joi.alternatives().try(Joi.number(), Joi.string()).allow(null),
-  }).optional(),
+    weekly_income: Joi.alternatives().try(Joi.number(), Joi.string()).allow(null),
+    workType: Joi.string().allow("", null),
+    work_type: Joi.string().allow("", null),
+    workerId: Joi.string().allow("", null),
+    worker_id: Joi.string().allow("", null),
+    workProofName: Joi.string().allow("", null),
+    work_proof_name: Joi.string().allow("", null),
+    workVerificationStatus: Joi.string().allow("", null),
+    work_verification_status: Joi.string().allow("", null),
+    workVerificationFlag: Joi.alternatives().try(Joi.string(), Joi.valid(null)).allow(null),
+    work_verification_flag: Joi.alternatives().try(Joi.string(), Joi.valid(null)).allow(null),
+    deviceId: Joi.string().allow("", null),
+    device_id: Joi.string().allow("", null),
+    authRiskScore: Joi.alternatives().try(Joi.number(), Joi.string()).allow(null),
+    auth_risk_score: Joi.alternatives().try(Joi.number(), Joi.string()).allow(null),
+    authRiskLevel: Joi.string().allow("", null),
+    auth_risk_level: Joi.string().allow("", null),
+    authRiskStatus: Joi.string().allow("", null),
+    auth_risk_status: Joi.string().allow("", null),
+    signupTime: Joi.string().isoDate().allow("", null),
+    signup_time: Joi.string().isoDate().allow("", null),
+    location: Joi.object().unknown(true).allow(null),
+  }).unknown(true).optional(),
 });
 
 const registerSchema = Joi.object({
@@ -30,7 +54,7 @@ const registerSchema = Joi.object({
   zone: Joi.string().required(),
   platform: Joi.string().required(),
   weeklyIncome: Joi.alternatives().try(Joi.number(), Joi.string()).required(),
-});
+}).unknown(true);
 
 const buyPolicySchema = Joi.object({
   planId: Joi.string().valid("basic", "premium").required(),
@@ -45,9 +69,9 @@ const triggerClaimSchema = Joi.object({
 router.post("/auth/login", validate(loginSchema), (req, res, next) => {
   try {
     const result = DemoStoreService.requestOtp(req.body.phone);
-    res.json(result);
+    return sendSuccess(res, result, "OTP sent successfully.");
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
@@ -59,60 +83,74 @@ router.post("/auth/verify-otp", validate(verifySchema), (req, res, next) => {
       otp: req.body.otp,
       profile: req.body.profile,
     });
-    res.json(result);
+    return sendSuccess(res, result, "OTP verified successfully.");
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
 router.post("/auth/register", validate(registerSchema), (req, res, next) => {
   try {
     const result = DemoStoreService.register(req.body);
-    res.status(201).json(result);
+    return sendSuccess(res, result, "Worker registered successfully.", 201);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
 router.get("/policy", authenticate, (req, res, next) => {
   try {
-    res.json(DemoStoreService.getPolicy(req.user));
+    return sendSuccess(
+      res,
+      DemoStoreService.getPolicy(req.user),
+      "Policy state loaded successfully."
+    );
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
 router.post("/policy/buy", authenticate, validate(buyPolicySchema), (req, res, next) => {
   try {
-    res.status(201).json(DemoStoreService.buyPolicy(req.user, req.body.planId));
+    return sendSuccess(
+      res,
+      DemoStoreService.buyPolicy(req.user, req.body.planId),
+      "Policy purchased successfully.",
+      201
+    );
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
 router.get("/premium", authenticate, async (req, res, next) => {
   try {
     const result = await DemoStoreService.getPremium(req.user, req.query.risk);
-    res.json(result);
+    return sendSuccess(res, result, "Premium state loaded successfully.");
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
 router.get("/claims", authenticate, (req, res, next) => {
   try {
-    res.json(DemoStoreService.getClaims(req.user));
+    return sendSuccess(res, DemoStoreService.getClaims(req.user), "Claims loaded successfully.");
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 
 router.post("/claim/trigger", authenticate, validate(triggerClaimSchema), (req, res, next) => {
   try {
     const result = DemoStoreService.triggerClaim(req.user, req.body);
-    res.status(result.triggered ? 201 : 200).json(result);
+    return sendSuccess(
+      res,
+      result,
+      result.message || "Claim trigger evaluated successfully.",
+      result.triggered ? 201 : 200
+    );
   } catch (error) {
-    next(error);
+    return next(error);
   }
 });
 

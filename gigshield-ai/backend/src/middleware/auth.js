@@ -6,13 +6,14 @@
  */
 
 const jwt = require("jsonwebtoken");
+const { sendError } = require("../utils/apiResponse");
 
 const JWT_SECRET = process.env.JWT_SECRET || "default-dev-secret";
 
 function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Authentication required" });
+    return sendError(res, 401, "Authentication required");
   }
 
   const token = authHeader.split(" ")[1];
@@ -21,7 +22,7 @@ function authenticate(req, res, next) {
     req.user = decoded;
     next();
   } catch {
-    return res.status(401).json({ error: "Invalid or expired token" });
+    return sendError(res, 401, "Invalid or expired token");
   }
 }
 
@@ -32,7 +33,7 @@ function authenticate(req, res, next) {
 function authorize(...roles) {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.role)) {
-      return res.status(403).json({ error: "Insufficient permissions" });
+      return sendError(res, 403, "Insufficient permissions");
     }
     next();
   };

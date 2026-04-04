@@ -4,12 +4,13 @@
 
 const PolicyService = require("../services/policy.service");
 const PolicyModel = require("../models/policy.model");
+const { sendSuccess } = require("../utils/apiResponse");
 
 const PolicyController = {
   async getQuote(req, res, next) {
     try {
       const quote = await PolicyService.getQuote(req.user.id);
-      res.json({ data: quote });
+      return sendSuccess(res, quote, "Policy quote loaded successfully.");
     } catch (err) {
       next(err);
     }
@@ -19,7 +20,7 @@ const PolicyController = {
     try {
       const { assessment_id, payment_id } = req.body;
       const policy = await PolicyService.purchasePolicy(req.user.id, assessment_id, payment_id);
-      res.status(201).json({ message: "Policy purchased", data: policy });
+      return sendSuccess(res, policy, "Policy purchased successfully.", 201);
     } catch (err) {
       next(err);
     }
@@ -28,7 +29,7 @@ const PolicyController = {
   async getActivePolicies(req, res, next) {
     try {
       const policies = await PolicyModel.findActiveByWorker(req.user.id);
-      res.json({ data: policies });
+      return sendSuccess(res, policies, "Active policies loaded successfully.");
     } catch (err) {
       next(err);
     }

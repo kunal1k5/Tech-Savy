@@ -46,24 +46,6 @@ const SMART_PREMIUM_BY_RISK = {
   High: 30,
 };
 
-function getPlanSources(plans = []) {
-  if (!plans.length) {
-    return { basicSource: null, smartSource: null };
-  }
-
-  const sortedPlans = [...plans].sort((firstPlan, secondPlan) => {
-    const firstValue = firstPlan.coverageAmount || firstPlan.payoutCap || firstPlan.premiumWeekly || 0;
-    const secondValue =
-      secondPlan.coverageAmount || secondPlan.payoutCap || secondPlan.premiumWeekly || 0;
-    return firstValue - secondValue;
-  });
-
-  return {
-    basicSource: sortedPlans[0],
-    smartSource: sortedPlans[sortedPlans.length - 1],
-  };
-}
-
 function normalizeRiskLabel(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (normalized === "high") {
@@ -86,34 +68,24 @@ export default function PolicyQuote() {
   const currentRisk = normalizeRiskLabel(liveBackendData?.risk || derivedData.currentRisk?.level || "Low");
   const smartPremium = Number(liveBackendData?.premium ?? SMART_PREMIUM_BY_RISK[currentRisk] ?? 20);
   const liveFraudStatus = String(liveBackendData?.status || "SAFE").toLowerCase();
-  const { basicSource, smartSource } = useMemo(
-    () => getPlanSources(platformState.plans),
-    [platformState.plans]
+  const displayedPlans = useMemo(
+    () =>
+      platformState.plans.map((plan) => ({
+        sourceId: plan.id,
+        title: plan.name,
+        coverageLabel: `Coverage: ${formatINR(plan.coverageAmount || plan.payoutCap || 0)}`,
+        premiumLabel: `${formatINR(plan.premiumWeekly || 0)}/week`,
+        premiumAmount: plan.premiumWeekly || 0,
+        features: plan.features?.length ? plan.features : ["Live protection active"],
+        summary:
+          plan.description || plan.note || "Risk-based cover backed by live backend data.",
+        isRecommended: plan.id === platformState.recommendedPlanId,
+        isActive: plan.id === platformState.activePlanId,
+      })),
+    [platformState.activePlanId, platformState.plans, platformState.recommendedPlanId]
   );
 
-  const displayedPlans = [
-    {
-      sourceId: basicSource?.id,
-      title: "Basic Plan",
-      coverageLabel: "Coverage: Limited",
-      premiumLabel: `${formatINR(10)}/week`,
-      features: ["Basic risk coverage"],
-      summary: "Entry cover for essential disruptions during active work hours.",
-      isRecommended: false,
-    },
-    {
-      sourceId: smartSource?.id,
-      title: "Smart Plan",
-      coverageLabel: "Coverage: Full",
-      premiumLabel: `${formatINR(smartPremium)}/week`,
-      features: ["Full risk coverage", "Automatic claim support"],
-      summary: "Dynamic premium linked to live risk conditions and auto-claim support.",
-      isRecommended: true,
-    },
-  ];
-
-  const activePlan =
-    displayedPlans.find((plan) => plan.sourceId === platformState.activePlanId) || displayedPlans[1];
+  const activePlan = displayedPlans.find((plan) => plan.isActive) || displayedPlans[0] || null;
 
   async function handleAutoClaimDemo(scenarioId, riskKey) {
     await actions.simulateRisk(riskKey, { silent: true });
@@ -180,24 +152,32 @@ export default function PolicyQuote() {
               </h3>
             </div>
 
-            <StatusBadge status="recommended" label="Smart Plan Recommended" />
+            {platformState.recommendedPlanId ? (
+              <StatusBadge status="recommended" label="Recommended Plan" />
+            ) : null}
           </div>
 
-          <div className="mt-6 grid gap-4 lg:grid-cols-2">
-            {displayedPlans.map((plan) => (
-              <PlanCard
-                key={plan.title}
-                title={plan.title}
-                coverageLabel={plan.coverageLabel}
-                premiumLabel={plan.premiumLabel}
-                features={plan.features}
-                isRecommended={plan.isRecommended}
-                isActive={plan.sourceId === platformState.activePlanId}
-                isLoading={uiState.planUpdating && uiState.planTarget === plan.sourceId}
-                onSelect={() => plan.sourceId && actions.selectPlan(plan.sourceId)}
-              />
-            ))}
-          </div>
+          {displayedPlans.length ? (
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              {displayedPlans.map((plan) => (
+                <PlanCard
+                  key={plan.sourceId}
+                  title={plan.title}
+                  coverageLabel={plan.coverageLabel}
+                  premiumLabel={plan.premiumLabel}
+                  features={plan.features}
+                  isRecommended={plan.isRecommended}
+                  isActive={plan.isActive}
+                  isLoading={uiState.planUpdating && uiState.planTarget === plan.sourceId}
+                  onSelect={() => plan.sourceId && actions.selectPlan(plan.sourceId)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="mt-6 rounded-2xl bg-slate-50 px-4 py-5 text-sm text-slate-600">
+              No plans available right now. Please wait for the backend sync to finish.
+            </div>
+          )}
         </motion.section>
 
         <div className="space-y-6">
@@ -272,9 +252,11 @@ export default function PolicyQuote() {
 
           <motion.div variants={itemVariants}>
             <ActivePolicyCard
-              planName={activePlan.title}
-              premiumAmount={activePlan.title === "Smart Plan" ? smartPremium : 10}
-              coverageSummary={activePlan.summary}
+              planName={activePlan?.title || "No active plan"}
+              premiumAmount={activePlan?.premiumAmount ?? smartPremium}
+              coverageSummary={
+                activePlan?.summary || "Your live policy details will appear here after sync."
+              }
               riskLevel={currentRisk}
             />
           </motion.div>

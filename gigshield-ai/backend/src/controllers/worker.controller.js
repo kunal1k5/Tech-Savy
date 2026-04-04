@@ -3,12 +3,13 @@
  */
 
 const WorkerService = require("../services/worker.service");
+const { sendSuccess } = require("../utils/apiResponse");
 
 const WorkerController = {
   async register(req, res, next) {
     try {
       const result = await WorkerService.register(req.body);
-      res.status(201).json({ message: "Worker registered successfully", data: result });
+      return sendSuccess(res, result, "Worker registered successfully.", 201);
     } catch (err) {
       next(err);
     }
@@ -18,7 +19,7 @@ const WorkerController = {
     try {
       const { email, password } = req.body;
       const result = await WorkerService.login(email, password);
-      res.json({ message: "Login successful", data: result });
+      return sendSuccess(res, result, "Login successful.");
     } catch (err) {
       next(err);
     }
@@ -27,7 +28,7 @@ const WorkerController = {
   async getProfile(req, res, next) {
     try {
       const worker = await WorkerService.getProfile(req.user.id);
-      res.json({ data: worker });
+      return sendSuccess(res, worker, "Worker profile loaded successfully.");
     } catch (err) {
       next(err);
     }

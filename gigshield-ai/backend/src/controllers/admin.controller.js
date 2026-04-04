@@ -3,6 +3,7 @@
  */
 
 const { pool } = require("../database/connection");
+const { sendSuccess } = require("../utils/apiResponse");
 
 const AdminController = {
   async getDashboardStats(req, res, next) {
@@ -19,21 +20,23 @@ const AdminController = {
         pool.query("SELECT COUNT(*) as count FROM parametric_triggers WHERE triggered_at > NOW() - INTERVAL '7 days'"),
       ]);
 
-      res.json({
-        data: {
-          total_workers: parseInt(workers.rows[0].count),
-          total_policies: parseInt(policies.rows[0].total),
-          active_policies: parseInt(policies.rows[0].active),
+      return sendSuccess(
+        res,
+        {
+          total_workers: parseInt(workers.rows[0].count, 10),
+          total_policies: parseInt(policies.rows[0].total, 10),
+          active_policies: parseInt(policies.rows[0].active, 10),
           claims: {
-            total: parseInt(claims.rows[0].total),
-            pending: parseInt(claims.rows[0].pending),
-            approved: parseInt(claims.rows[0].approved),
-            flagged: parseInt(claims.rows[0].flagged),
+            total: parseInt(claims.rows[0].total, 10),
+            pending: parseInt(claims.rows[0].pending, 10),
+            approved: parseInt(claims.rows[0].approved, 10),
+            flagged: parseInt(claims.rows[0].flagged, 10),
             total_payout: parseFloat(claims.rows[0].total_payout),
           },
-          triggers_this_week: parseInt(triggers.rows[0].count),
+          triggers_this_week: parseInt(triggers.rows[0].count, 10),
         },
-      });
+        "Admin dashboard stats loaded successfully."
+      );
     } catch (err) {
       next(err);
     }
@@ -44,7 +47,7 @@ const AdminController = {
       const result = await pool.query(
         "SELECT * FROM parametric_triggers ORDER BY triggered_at DESC LIMIT 20"
       );
-      res.json({ data: result.rows });
+      return sendSuccess(res, result.rows, "Recent triggers loaded successfully.");
     } catch (err) {
       next(err);
     }
@@ -58,7 +61,7 @@ const AdminController = {
          WHERE c.status = 'flagged'
          ORDER BY c.created_at DESC`
       );
-      res.json({ data: result.rows });
+      return sendSuccess(res, result.rows, "Flagged claims loaded successfully.");
     } catch (err) {
       next(err);
     }

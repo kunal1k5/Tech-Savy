@@ -1,4 +1,4 @@
-import api from "./api";
+import { apiGet, apiPost, unwrapApiPayload } from "./api";
 
 const OFFLINE_OTP_CODE = "1234";
 const OFFLINE_OTP_TTL_MS = 5 * 60 * 1000;
@@ -53,24 +53,24 @@ function buildOfflineUser(profile = {}) {
 
   return {
     id: profile.id || `demo-user-${phone || Math.random().toString(36).slice(2, 8)}`,
-    full_name: profile.full_name || profile.fullName || "Rahul Singh",
+    full_name: profile.full_name ?? profile.fullName ?? "",
     phone,
-    city: profile.city || "Bengaluru",
-    zone: profile.zone || "Koramangala",
-    platform: profile.platform || "Swiggy",
-    weekly_income: Number(profile.weekly_income ?? profile.weeklyIncome) || 18350,
-    work_type: profile.work_type || profile.workType || null,
-    worker_id: profile.worker_id || profile.workerId || null,
-    work_proof_name: profile.work_proof_name || profile.workProofName || null,
+    city: profile.city ?? "",
+    zone: profile.zone ?? profile.city ?? "",
+    platform: profile.platform ?? "",
+    weekly_income: Number(profile.weekly_income ?? profile.weeklyIncome ?? 0),
+    work_type: profile.work_type ?? profile.workType ?? "",
+    worker_id: profile.worker_id ?? profile.workerId ?? "",
+    work_proof_name: profile.work_proof_name ?? profile.workProofName ?? "",
     work_verification_status:
-      profile.work_verification_status || profile.workVerificationStatus || "pending",
+      profile.work_verification_status ?? profile.workVerificationStatus ?? "pending",
     work_verification_flag:
-      profile.work_verification_flag || profile.workVerificationFlag || null,
-    device_id: profile.device_id || profile.deviceId || null,
-    auth_risk_score: Number(profile.auth_risk_score ?? profile.authRiskScore) || 0,
-    auth_risk_level: profile.auth_risk_level || profile.authRiskLevel || "low",
-    auth_risk_status: profile.auth_risk_status || profile.authRiskStatus || "Safe",
-    signup_time: profile.signup_time || profile.signupTime || null,
+      profile.work_verification_flag ?? profile.workVerificationFlag ?? null,
+    device_id: profile.device_id ?? profile.deviceId ?? null,
+    auth_risk_score: Number(profile.auth_risk_score ?? profile.authRiskScore ?? 0),
+    auth_risk_level: profile.auth_risk_level ?? profile.authRiskLevel ?? "low",
+    auth_risk_status: profile.auth_risk_status ?? profile.authRiskStatus ?? "Safe",
+    signup_time: profile.signup_time ?? profile.signupTime ?? null,
     location: profile.location || null,
   };
 }
@@ -165,13 +165,8 @@ function verifyOfflineOtp({ sessionId, phone, otp, profile }) {
         phone: sanitizedPhone,
       })
     : saveOfflineUser({
-        fullName: "Rahul Singh",
-        city: "Bengaluru",
-        zone: "Koramangala",
-        platform: "Swiggy",
-        weeklyIncome: 18350,
-        ...profile,
         phone: sanitizedPhone,
+        ...profile,
       });
 
   return {
@@ -188,15 +183,17 @@ function registerOfflineWorker(profile = {}) {
 }
 
 export async function requestOtp(phone, options = {}) {
-  if (options.preferOfflineDemo) {
+  const { preferOfflineDemo = false, allowOfflineFallback = false } = options;
+
+  if (preferOfflineDemo) {
     return requestOfflineOtp(phone);
   }
 
   try {
-    const response = await api.post("/auth/login", { phone });
-    return response.data;
+    const response = await apiPost("/auth/login", { phone });
+    return unwrapApiPayload(response.data);
   } catch (error) {
-    if (!shouldUseOfflineFallback(error)) {
+    if (!(allowOfflineFallback && shouldUseOfflineFallback(error))) {
       throw error;
     }
 
@@ -204,21 +201,29 @@ export async function requestOtp(phone, options = {}) {
   }
 }
 
-export async function verifyOtp({ sessionId, phone, otp, profile, preferOfflineDemo = false }) {
+export async function verifyOtp({
+  sessionId,
+  phone,
+  otp,
+  profile,
+  preferOfflineDemo = false,
+  allowOfflineFallback = false,
+}) {
+
   if (preferOfflineDemo) {
     return verifyOfflineOtp({ sessionId, phone, otp, profile });
   }
 
   try {
-    const response = await api.post("/auth/verify-otp", {
+    const response = await apiPost("/auth/verify-otp", {
       sessionId,
       phone,
       otp,
       profile,
     });
-    return response.data;
+    return unwrapApiPayload(response.data);
   } catch (error) {
-    if (!shouldUseOfflineFallback(error)) {
+    if (!(allowOfflineFallback && shouldUseOfflineFallback(error))) {
       throw error;
     }
 
@@ -227,15 +232,17 @@ export async function verifyOtp({ sessionId, phone, otp, profile, preferOfflineD
 }
 
 export async function registerWorker(profile, options = {}) {
-  if (options.preferOfflineDemo) {
+  const { preferOfflineDemo = false, allowOfflineFallback = false } = options;
+
+  if (preferOfflineDemo) {
     return registerOfflineWorker(profile);
   }
 
   try {
-    const response = await api.post("/auth/register", profile);
-    return response.data;
+    const response = await apiPost("/auth/register", profile);
+    return unwrapApiPayload(response.data);
   } catch (error) {
-    if (!shouldUseOfflineFallback(error)) {
+    if (!(allowOfflineFallback && shouldUseOfflineFallback(error))) {
       throw error;
     }
 
@@ -244,28 +251,28 @@ export async function registerWorker(profile, options = {}) {
 }
 
 export async function getPolicyState() {
-  const response = await api.get("/policy");
-  return response.data;
+  const response = await apiGet("/policy");
+  return unwrapApiPayload(response.data);
 }
 
 export async function buyPolicy(planId) {
-  const response = await api.post("/policy/buy", { planId });
-  return response.data;
+  const response = await apiPost("/policy/buy", { planId });
+  return unwrapApiPayload(response.data);
 }
 
 export async function getPremium(risk) {
-  const response = await api.get("/premium", {
+  const response = await apiGet("/premium", {
     params: risk ? { risk } : undefined,
   });
-  return response.data;
+  return unwrapApiPayload(response.data);
 }
 
 export async function getClaims() {
-  const response = await api.get("/claims");
-  return response.data;
+  const response = await apiGet("/claims");
+  return unwrapApiPayload(response.data);
 }
 
 export async function triggerClaim(payload) {
-  const response = await api.post("/claim/trigger", payload);
-  return response.data;
+  const response = await apiPost("/claim/trigger", payload);
+  return unwrapApiPayload(response.data);
 }

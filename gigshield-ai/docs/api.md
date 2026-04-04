@@ -1,75 +1,76 @@
 # GigShield API
 
-## Public App Base
+## Base URL
 
 `http://localhost:5000/api`
 
-## Backend Endpoints
+## Response Format
 
-### Health
+Successful responses:
 
-- `GET /health`
+```json
+{
+  "success": true,
+  "data": {},
+  "message": "Request completed successfully."
+}
+```
 
-### Worker / Auth
+Error responses:
 
-- `POST /workers/register`
-- `POST /workers/login`
+```json
+{
+  "success": false,
+  "data": null,
+  "message": "Validation failed"
+}
+```
+
+## Primary Workflow Endpoints
+
+### Decision and Fraud
+
+- `POST /ai-decision`
+- `POST /risk-premium`
+- `POST /auto-claim`
+- `POST /fraud-check`
+
+### Dispute and Proof
+
+- `POST /start-dispute`
+- `POST /upload-proof`
+- `POST /reverify-claim`
+
+## Supporting App Endpoints
+
+### Auth and Worker
+
+- `POST /auth/login`
+- `POST /auth/verify-otp`
+- `POST /auth/register`
 - `GET /workers/profile`
 
-### Risk
+### Policy and Claim Demo Flow
 
-- `POST /risk/assess`
-- `GET /risk/latest`
+- `GET /policy`
+- `POST /policy/buy`
+- `GET /premium`
+- `GET /claims`
+- `POST /claim/trigger`
 
-### Policy
-
-- `GET /policies/quote`
-- `POST /policies/purchase`
-- `GET /policies/active`
-
-### Claims
-
-- `GET /claims/my`
-- `POST /claims/:id/process`
-
-### Triggers
-
-- `POST /triggers/evaluate`
-- `POST /triggers/manual`
-
-### Payments
-
-- `POST /payments/create-order`
-- `POST /payments/verify`
-
-## AI Engine Base
-
-`http://localhost:8000`
-
-## AI Engine Endpoints
-
-### Health and Live Data
+### Platform APIs
 
 - `GET /health`
-- `GET /weather/live?city=Bengaluru`
-
-### Risk Prediction
-
+- `POST /analyze-behavior`
+- `POST /predict-location`
+- `POST /calculate-premium`
 - `POST /predict`
 - `POST /predict/live`
-- `POST /api/risk/assess`
-
-### Location Prediction
-
-- `POST /predict-location`
-
-### Fraud and Premium
-
-- `POST /api/fraud/check`
-- `POST /api/premium/calculate`
+- `GET /weather/live`
 
 ## Integration Notes
 
-- backend talks to Python through `backend/src/integrations/aiService.js`
-- frontend risk and location screens talk to the AI engine directly for demo-friendly live feedback
-- fraud review can now return orchestrated context, not just a single raw score
+- The dashboard uses the backend as the single source of truth for the AI decision workflow.
+- The dispute flow depends on a previously created dispute record and uploaded proof files.
+- `POST /reverify-claim` reads the uploaded dispute proof, simulates location/time/activity checks, and returns the final claim outcome.
+- Demo auth and policy endpoints are still available for the onboarding and dashboard experience.

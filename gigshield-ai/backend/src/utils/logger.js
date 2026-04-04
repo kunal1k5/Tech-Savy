@@ -6,6 +6,7 @@
  */
 
 const { createLogger, format, transports } = require("winston");
+const isTestEnvironment = process.env.NODE_ENV === "test";
 
 const logger = createLogger({
   level: process.env.LOG_LEVEL || "info",
@@ -18,7 +19,7 @@ const logger = createLogger({
         : `${timestamp} [${level.toUpperCase()}] ${message}`;
     })
   ),
-  transports: [new transports.Console()],
+  transports: [new transports.Console({ silent: isTestEnvironment })],
 });
 
 module.exports = logger;

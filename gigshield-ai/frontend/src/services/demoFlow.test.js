@@ -1,12 +1,11 @@
 jest.mock("./api", () => ({
   __esModule: true,
-  default: {
-    post: jest.fn(),
-    get: jest.fn(),
-  },
+  apiPost: jest.fn(),
+  apiGet: jest.fn(),
+  unwrapApiPayload: (payload) => payload?.data ?? payload,
 }));
 
-import api from "./api";
+import { apiPost } from "./api";
 import { registerWorker, requestOtp, verifyOtp } from "./demoFlow";
 
 describe("demoFlow auth fallback", () => {
@@ -16,7 +15,7 @@ describe("demoFlow auth fallback", () => {
   });
 
   it("uses the backend response when the API is available", async () => {
-    api.post.mockResolvedValueOnce({
+    apiPost.mockResolvedValueOnce({
       data: {
         sessionId: "backend-session",
         phone: "1234567890",
@@ -30,9 +29,9 @@ describe("demoFlow auth fallback", () => {
   });
 
   it("falls back to offline OTP mode when login is unreachable", async () => {
-    api.post.mockRejectedValueOnce(new Error("Network Error"));
+    apiPost.mockRejectedValueOnce(new Error("Network Error"));
 
-    const response = await requestOtp("1234567890");
+    const response = await requestOtp("1234567890", { allowOfflineFallback: true });
 
     expect(response.fallbackMode).toBe("offline_demo");
     expect(response.sessionId).toMatch(/^offline-/);
@@ -40,14 +39,15 @@ describe("demoFlow auth fallback", () => {
   });
 
   it("verifies an offline OTP and returns a demo user", async () => {
-    api.post.mockRejectedValueOnce(new Error("Network Error"));
-    const otpSession = await requestOtp("1234567890");
+    apiPost.mockRejectedValueOnce(new Error("Network Error"));
+    const otpSession = await requestOtp("1234567890", { allowOfflineFallback: true });
 
-    api.post.mockRejectedValueOnce(new Error("Network Error"));
+    apiPost.mockRejectedValueOnce(new Error("Network Error"));
     const response = await verifyOtp({
       sessionId: otpSession.sessionId,
       phone: "1234567890",
       otp: "1234",
+      allowOfflineFallback: true,
       profile: {
         fullName: "Test Rider",
         city: "Bengaluru",
@@ -63,16 +63,17 @@ describe("demoFlow auth fallback", () => {
   });
 
   it("shows the correct OTP error in offline mode", async () => {
-    api.post.mockRejectedValueOnce(new Error("Network Error"));
-    const otpSession = await requestOtp("1234567890");
+    apiPost.mockRejectedValueOnce(new Error("Network Error"));
+    const otpSession = await requestOtp("1234567890", { allowOfflineFallback: true });
 
-    api.post.mockRejectedValueOnce(new Error("Network Error"));
+    apiPost.mockRejectedValueOnce(new Error("Network Error"));
 
     await expect(
       verifyOtp({
         sessionId: otpSession.sessionId,
         phone: "1234567890",
         otp: "0000",
+        allowOfflineFallback: true,
       })
     ).rejects.toMatchObject({
       response: {
@@ -85,7 +86,7 @@ describe("demoFlow auth fallback", () => {
   });
 
   it("registers a demo user locally when the API is unreachable", async () => {
-    api.post.mockRejectedValueOnce(new Error("Network Error"));
+    apiPost.mockRejectedValueOnce(new Error("Network Error"));
 
     const response = await registerWorker({
       fullName: "Offline Worker",
@@ -94,7 +95,7 @@ describe("demoFlow auth fallback", () => {
       zone: "Koramangala",
       platform: "Swiggy",
       weeklyIncome: 18000,
-    });
+    }, { allowOfflineFallback: true });
 
     expect(response.fallbackMode).toBe("offline_demo");
     expect(response.user).toMatchObject({

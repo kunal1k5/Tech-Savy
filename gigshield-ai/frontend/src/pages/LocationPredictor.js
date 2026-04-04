@@ -14,10 +14,7 @@ import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import { LoadingPanel } from "../components/ui/Loader";
 import SectionHeader from "../components/ui/SectionHeader";
-import {
-  SAMPLE_LOCATION_PAYLOAD,
-  predictNextLocation,
-} from "../services/locationPrediction";
+import { predictNextLocation } from "../services/locationPrediction";
 
 const FIELD_CONFIG = [
   { name: "origin_id", label: "Origin ID", unit: "encoded" },
@@ -37,6 +34,10 @@ const STATUS_STYLES = {
 
 function toFormState(payload) {
   return Object.fromEntries(FIELD_CONFIG.map(({ name }) => [name, String(payload[name] ?? "")]));
+}
+
+function createEmptyFormState() {
+  return Object.fromEntries(FIELD_CONFIG.map(({ name }) => [name, ""]));
 }
 
 function toPayload(formData) {
@@ -63,7 +64,7 @@ function toPayload(formData) {
 }
 
 export default function LocationPredictor() {
-  const [formData, setFormData] = useState(() => toFormState(SAMPLE_LOCATION_PAYLOAD));
+  const [formData, setFormData] = useState(createEmptyFormState);
   const [response, setResponse] = useState(null);
   const [apiError, setApiError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -75,8 +76,9 @@ export default function LocationPredictor() {
     setFormData((current) => ({ ...current, [name]: value }));
   }
 
-  function loadSample() {
-    setFormData(toFormState(SAMPLE_LOCATION_PAYLOAD));
+  function resetForm() {
+    setFormData(createEmptyFormState());
+    setResponse(null);
     setApiError("");
   }
 
@@ -103,8 +105,8 @@ export default function LocationPredictor() {
         title="Route consistency and fraud validation"
         description="This tool now feels more like an internal trust-and-safety console: cleaner inputs, stronger result framing, and clearer suspicious route feedback."
         action={
-          <Button type="button" variant="secondary" onClick={loadSample}>
-            Load Sample Route
+          <Button type="button" variant="secondary" onClick={resetForm}>
+            Reset Form
           </Button>
         }
       />
@@ -122,7 +124,7 @@ export default function LocationPredictor() {
                   Compare route timing features against likely destinations and spot suspicious mismatches instantly.
                 </CardDescription>
               </div>
-              <Badge tone="violet">Flask + rules</Badge>
+              <Badge tone="violet">Backend + AI</Badge>
             </CardHeader>
 
             <div className="rounded-[24px] border border-cyan-400/20 bg-cyan-400/10 px-4 py-4 text-sm text-cyan-100">

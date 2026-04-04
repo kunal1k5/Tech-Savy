@@ -21,6 +21,8 @@ function SidebarContent({ onNavigate = () => {}, showClose = false }) {
   const navigate = useNavigate();
   const { platformState } = useGigShieldData();
   const worker = platformState.worker;
+  const displayName = worker.name || "Gig worker";
+  const displayArea = [worker.area, worker.city].filter(Boolean).join(", ") || "Complete profile";
 
   function handleSignOut() {
     clearSession();
@@ -92,13 +94,11 @@ function SidebarContent({ onNavigate = () => {}, showClose = false }) {
         <div className="rounded-2xl bg-slate-50 p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
-              {getInitials(worker.name)}
+              {getInitials(displayName)}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-900">{worker.name}</p>
-              <p className="truncate text-xs text-slate-500">
-                {worker.area}, {worker.city}
-              </p>
+              <p className="truncate text-sm font-semibold text-slate-900">{displayName}</p>
+              <p className="truncate text-xs text-slate-500">{displayArea}</p>
             </div>
           </div>
 

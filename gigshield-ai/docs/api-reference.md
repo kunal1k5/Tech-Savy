@@ -1,159 +1,220 @@
-# GigShield AI — API Reference
+# GigShield AI API Reference
 
-## Base URL: `http://localhost:5000/api`
+## Base URL
 
----
+`http://localhost:5000/api`
 
-## Health Check
-
-| Method | Endpoint      | Description        |
-|--------|---------------|--------------------|
-| GET    | `/api/health` | Service health check |
-
----
-
-## Workers
-
-| Method | Endpoint              | Auth | Description                    |
-|--------|-----------------------|------|--------------------------------|
-| POST   | `/api/workers/register` | No   | Register a new worker account |
-| POST   | `/api/workers/login`    | No   | Login and receive JWT         |
-| GET    | `/api/workers/profile`  | Yes  | Get authenticated worker profile |
-
-### POST /api/workers/register
+## Standard Response Envelope
 
 ```json
 {
-  "full_name": "Rahul Kumar",
-  "email": "rahul@example.com",
-  "phone": "9876543210",
-  "password": "securePassword123",
-  "platform": "zomato",
-  "city": "Mumbai",
-  "zone": "Andheri West",
-  "avg_weekly_income": 3500,
-  "vehicle_type": "motorcycle"
+  "success": true,
+  "data": {},
+  "message": "Request completed successfully."
 }
 ```
 
-### POST /api/workers/login
+## 1. POST /api/risk-premium
+
+Request:
 
 ```json
 {
-  "email": "rahul@example.com",
-  "password": "securePassword123"
+  "aqi": 340,
+  "rain": 24,
+  "wind": 35
 }
 ```
 
----
-
-## Risk Assessment
-
-| Method | Endpoint           | Auth | Description                      |
-|--------|--------------------|------|----------------------------------|
-| POST   | `/api/risk/assess` | Yes  | Trigger new risk assessment      |
-| GET    | `/api/risk/latest` | Yes  | Get latest assessment for worker |
-
----
-
-## Policies
-
-| Method | Endpoint                | Auth | Description                  |
-|--------|-------------------------|------|------------------------------|
-| GET    | `/api/policies/quote`   | Yes  | Get weekly premium quote    |
-| POST   | `/api/policies/purchase` | Yes  | Purchase a weekly policy    |
-| GET    | `/api/policies/active`  | Yes  | List active policies        |
-
-### POST /api/policies/purchase
+Response:
 
 ```json
 {
-  "assessment_id": "uuid-of-risk-assessment",
-  "payment_id": "razorpay_payment_id"
+  "success": true,
+  "data": {
+    "risk": "HIGH",
+    "premium": 30
+  },
+  "message": "Risk and premium calculated successfully."
 }
 ```
 
----
+## 2. POST /api/auto-claim
 
-## Claims
-
-| Method | Endpoint                  | Auth    | Description               |
-|--------|---------------------------|---------|---------------------------|
-| GET    | `/api/claims/my`          | Worker  | Get worker's claim history |
-| POST   | `/api/claims/:id/process` | Admin   | Process a pending claim   |
-
----
-
-## Triggers
-
-| Method | Endpoint                 | Auth          | Description                    |
-|--------|--------------------------|---------------|--------------------------------|
-| POST   | `/api/triggers/evaluate` | Yes           | Evaluate weather data          |
-| POST   | `/api/triggers/manual`   | Super Admin   | Fire manual trigger (curfew)   |
-
-### POST /api/triggers/evaluate
+Request:
 
 ```json
 {
-  "city": "Mumbai",
-  "zone": "Andheri West",
-  "rainfall_mm": 75.5,
-  "temperature_c": 28.0,
+  "risk": "HIGH",
+  "hoursLost": 3,
+  "hourlyRate": 150
+}
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "claimTriggered": true,
+    "payout": 450,
+    "status": "PAID",
+    "claimStates": ["CREATED", "PROCESSING", "PAID"],
+    "hoursLost": 3,
+    "hourlyRate": 150,
+    "message": "Claim automatically triggered due to high risk"
+  },
+  "message": "Auto-claim decision generated successfully."
+}
+```
+
+## 3. POST /api/fraud-check
+
+Request:
+
+```json
+{
+  "risk": "HIGH",
+  "locationMatch": false,
+  "claimsCount": 4,
+  "loginAttempts": 5,
+  "contextValid": false
+}
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "risk": "HIGH",
+    "fraudScore": 110,
+    "fraud_score": 110,
+    "status": "FRAUD",
+    "locationMatch": false,
+    "claimsCount": 4,
+    "loginAttempts": 5
+  },
+  "message": "Fraud check completed successfully."
+}
+```
+
+## 4. POST /api/ai-decision
+
+Request:
+
+```json
+{
   "aqi": 350,
-  "traffic_index": 8.5
+  "rain": 25,
+  "wind": 40,
+  "claimsCount": 4,
+  "loginAttempts": 5,
+  "locationMatch": false,
+  "contextValid": false
 }
 ```
 
-### POST /api/triggers/manual
+Response:
 
 ```json
 {
-  "trigger_type": "curfew",
-  "city": "Mumbai",
-  "zone": "Andheri West",
-  "severity": "high",
-  "threshold_met": "Government-imposed curfew due to protests"
+  "success": true,
+  "data": {
+    "risk": "HIGH",
+    "fraudScore": 110,
+    "status": "FRAUD",
+    "decision": "FRAUD",
+    "nextAction": "REJECT_CLAIM"
+  },
+  "message": "AI decision generated successfully."
 }
 ```
 
----
+## 5. POST /api/start-dispute
 
-## Payments
-
-| Method | Endpoint                     | Auth | Description                  |
-|--------|------------------------------|------|------------------------------|
-| POST   | `/api/payments/create-order` | Yes  | Create Razorpay order        |
-| POST   | `/api/payments/verify`       | Yes  | Verify payment signature     |
-
-### POST /api/payments/verify
+Request:
 
 ```json
 {
-  "order_id": "order_xxxxxxxxxxxx",
-  "payment_id": "pay_xxxxxxxxxxxx",
-  "signature": "hmac_sha256_signature"
+  "userId": "123",
+  "reason": "System failed to detect actual issue"
 }
 ```
 
----
+Response:
 
-## Admin
+```json
+{
+  "success": true,
+  "data": {
+    "disputeId": "D1001",
+    "status": "INITIATED"
+  },
+  "message": "Dispute started successfully."
+}
+```
 
-| Method | Endpoint                      | Auth  | Description                   |
-|--------|-------------------------------|-------|-------------------------------|
-| GET    | `/api/admin/dashboard`        | Admin | Platform-wide statistics      |
-| GET    | `/api/admin/triggers/recent`  | Admin | Recent trigger events         |
-| GET    | `/api/admin/claims/flagged`   | Admin | Claims flagged for review     |
+## 6. POST /api/upload-proof
 
----
+Form data fields:
 
-## AI Engine Endpoints (Internal)
+- `disputeId`
+- `geoImage`
+- `workScreenshot`
 
-Base URL: `http://localhost:8000`
+Response:
 
-| Method | Endpoint               | Description                     |
-|--------|------------------------|---------------------------------|
-| GET    | `/health`              | AI engine health check          |
-| POST   | `/api/risk/assess`     | Compute risk score              |
-| POST   | `/api/fraud/check`     | Run fraud detection             |
-| POST   | `/api/premium/calculate` | Calculate weekly premium      |
+```json
+{
+  "success": true,
+  "data": {
+    "status": "RECEIVED"
+  },
+  "message": "Proof uploaded successfully."
+}
+```
+
+## 7. POST /api/reverify-claim
+
+Request:
+
+```json
+{
+  "disputeId": "D1001",
+  "claimTime": "14:00",
+  "userLocation": "Zone-A"
+}
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "finalStatus": "APPROVED",
+    "confidence": 85,
+    "claimUpdate": {
+      "claimStatus": "PAID",
+      "payoutStatus": "PAYOUT_RELEASED",
+      "fraudStatus": "verified"
+    }
+  },
+  "message": "Claim re-verification completed."
+}
+```
+
+## Supporting Endpoints
+
+- `POST /api/auth/login`
+- `POST /api/auth/verify-otp`
+- `POST /api/auth/register`
+- `GET /api/policy`
+- `POST /api/policy/buy`
+- `GET /api/premium`
+- `GET /api/claims`
+- `POST /api/claim/trigger`
+- `GET /api/health`

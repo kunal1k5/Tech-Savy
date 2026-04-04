@@ -20,18 +20,20 @@ export default function ProfileCard({
   verificationStatus,
   trustLevel,
 }) {
+  const displayName = fullName || "Complete your profile";
+
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md">
       <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
         <div className="flex items-center gap-4">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-600 text-lg font-semibold text-white">
-            {getInitials(fullName)}
+            {getInitials(displayName)}
           </div>
 
           <div>
             <p className="text-sm font-medium text-slate-500">Profile</p>
             <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
-              {fullName}
+              {displayName}
             </h2>
             <div className="mt-3 flex flex-col gap-2 text-sm text-slate-600 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
               <span className="inline-flex items-center gap-2">
@@ -44,7 +46,7 @@ export default function ProfileCard({
               </span>
               <span className="inline-flex items-center gap-2">
                 <UserRound size={16} className="text-slate-400" />
-                {workType}
+                {workType || "Add work type"}
               </span>
             </div>
           </div>

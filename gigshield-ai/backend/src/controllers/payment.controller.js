@@ -3,13 +3,14 @@
  */
 
 const PaymentService = require("../services/payment.service");
+const { sendSuccess } = require("../utils/apiResponse");
 
 const PaymentController = {
   async createOrder(req, res, next) {
     try {
       const { amount } = req.body;
       const order = await PaymentService.createPremiumOrder(req.user.id, amount);
-      res.json({ data: order });
+      return sendSuccess(res, order, "Payment order created successfully.");
     } catch (err) {
       next(err);
     }
@@ -19,7 +20,7 @@ const PaymentController = {
     try {
       const { order_id, payment_id, signature } = req.body;
       const result = await PaymentService.verifyPayment(order_id, payment_id, signature);
-      res.json({ data: result });
+      return sendSuccess(res, result, "Payment verified successfully.");
     } catch (err) {
       next(err);
     }

@@ -3,6 +3,7 @@
  */
 
 const TriggerService = require("../services/trigger.service");
+const { sendSuccess } = require("../utils/apiResponse");
 
 const TriggerController = {
   /**
@@ -15,7 +16,7 @@ const TriggerController = {
       const triggers = TriggerService.evaluateTriggers(req.body);
 
       if (triggers.length === 0) {
-        return res.json({ message: "No thresholds exceeded", triggers_fired: 0 });
+        return sendSuccess(res, { triggers_fired: 0 }, "No thresholds exceeded.");
       }
 
       const results = [];
@@ -25,10 +26,7 @@ const TriggerController = {
         results.push(result);
       }
 
-      res.json({
-        message: `${results.length} trigger(s) fired`,
-        data: results,
-      });
+      return sendSuccess(res, results, `${results.length} trigger(s) fired.`);
     } catch (err) {
       next(err);
     }
@@ -44,7 +42,7 @@ const TriggerController = {
         ...req.body,
         data_snapshot: { source: "admin_manual", admin_id: req.user.id },
       });
-      res.status(201).json({ message: "Manual trigger fired", data: result });
+      return sendSuccess(res, result, "Manual trigger fired successfully.", 201);
     } catch (err) {
       next(err);
     }

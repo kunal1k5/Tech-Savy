@@ -5,6 +5,7 @@ import FileUploadCard from "../components/onboarding/FileUploadCard";
 import SelectInput from "../components/onboarding/SelectInput";
 import TextInput from "../components/onboarding/TextInput";
 import SurfaceButton from "../components/ui/SurfaceButton";
+import { extractApiErrorMessage } from "../services/api";
 import { registerWorker } from "../services/demoFlow";
 import { saveAuthSession } from "../utils/auth";
 import { assessAndSaveAuthRisk, sanitizePhoneNumber } from "../utils/authRisk";
@@ -125,31 +126,39 @@ export default function Register() {
           authRiskScore: authRiskSnapshot.riskScore,
           authRiskLevel: authRiskSnapshot.riskLevel,
           authRiskStatus: authRiskSnapshot.riskStatus,
-        },
-        { preferOfflineDemo: true }
+        }
       );
+
+      const registeredUser = {
+        ...(response.user || {}),
+        full_name: form.fullName.trim(),
+        phone: form.phone,
+        city: form.city.trim(),
+        zone: form.city.trim(),
+        platform: form.platform,
+        work_type: form.workType,
+        worker_id: form.workerId.trim(),
+        work_proof_name: proofFile.name,
+        work_verification_status: workVerificationStatus,
+        work_verification_flag: workVerificationFlag,
+        weekly_income: form.workType === "Driver" ? 22000 : 18000,
+        device_id: authRiskSnapshot.deviceId,
+        auth_risk_score: authRiskSnapshot.riskScore,
+        auth_risk_level: authRiskSnapshot.riskLevel,
+        auth_risk_status: authRiskSnapshot.riskStatus,
+        signup_time: authRiskSnapshot.signupTime,
+        location: authRiskSnapshot.location,
+      };
 
       saveAuthSession({
         ...response,
-        user: {
-          ...response.user,
-          platform: form.platform,
-          workType: form.workType,
-          workerId: form.workerId.trim(),
-          workProofName: proofFile.name,
-          workVerificationStatus,
-          workVerificationFlag,
-          deviceId: authRiskSnapshot.deviceId,
-          authRiskScore: authRiskSnapshot.riskScore,
-          authRiskLevel: authRiskSnapshot.riskLevel,
-          authRiskStatus: authRiskSnapshot.riskStatus,
-        },
+        user: registeredUser,
       });
 
       await wait(900);
       navigate("/dashboard", { replace: true });
     } catch (registerError) {
-      setError(registerError.response?.data?.error || "Could not complete onboarding right now.");
+      setError(extractApiErrorMessage(registerError, "Service unavailable."));
       setIsVerificationNoticeVisible(false);
     } finally {
       setLoading(false);
@@ -276,7 +285,7 @@ export default function Register() {
 
         {isVerificationNoticeVisible ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-            Verification in progress ⏳
+            Verification in progress...
           </div>
         ) : (
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">

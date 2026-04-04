@@ -1,5 +1,7 @@
-export { default as Dashboard } from "./dashboard";
-export { Login, Register } from "./auth";
-export { default as Claims } from "./claims";
-export { default as PolicyQuote } from "./policy";
-export { default as Profile } from "./profile";
+import Dashboard from "./dashboard/index.js";
+import { Login, Register } from "./auth/index.js";
+import Claims from "./claims/index.js";
+import PolicyQuote from "./policy/index.js";
+import Profile from "./profile/index.js";
+
+export { Dashboard, Login, Register, Claims, PolicyQuote, Profile };

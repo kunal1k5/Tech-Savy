@@ -8,16 +8,7 @@ import React, {
   useState,
 } from "react";
 import toast from "react-hot-toast";
-import {
-  createHistoryNote,
-  createInitialPlatformState,
-  createLiveClaimFromScenario,
-  disruptionScenarios,
-  evaluateFraudSignals,
-  getFraudStatusLabel,
-  getStatusLabel,
-  updateTrendWithPayout,
-} from "../data/mockPlatform";
+import { extractApiErrorMessage } from "../services/api";
 import {
   buyPolicy,
   getClaims,
@@ -25,7 +16,7 @@ import {
   getPremium,
   triggerClaim,
 } from "../services/demoFlow";
-import { getDemoSession, getToken, getUserFromToken } from "../utils/auth";
+import { getToken, getUserFromToken } from "../utils/auth";
 
 const GigShieldDataContext = createContext(null);
 
@@ -34,14 +25,84 @@ const BACKEND_SCENARIO_PAYLOADS = {
   airQualitySpike: { rainfall: 0, aqi: 428, mode: "auto" },
   gpsSpoof: { rainfall: 0, aqi: 0, mode: "fraud_drill" },
 };
+const SCENARIO_TITLES = {
+  rainBurst: "Heavy rain",
+  airQualitySpike: "AQI spike",
+  gpsSpoof: "Fraud drill",
+};
 
-function updateClaim(claims, claimId, updater) {
-  return claims.map((claim) => {
-    if (claim.id !== claimId) {
-      return claim;
-    }
-    return updater(claim);
+function createEmptyEarningsTrend() {
+  const formatter = new Intl.DateTimeFormat("en-US", { weekday: "short" });
+
+  return Array.from({ length: 7 }, (_value, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - index));
+
+    return {
+      day: formatter.format(date),
+      earnings: 0,
+      payouts: 0,
+      downtimeHours: 0,
+      riskScore: 0,
+    };
   });
+}
+
+function createInitialPlatformState(sessionUser = null) {
+  return applySessionWorker(
+    {
+      worker: {
+        name: "",
+        city: "",
+        area: "",
+        platform: "",
+        weeklyIncome: 0,
+        activeHoursToday: 0,
+      },
+      plans: [],
+      activePlanId: null,
+      recommendedPlanId: null,
+      riskFeed: [],
+      earningsTrend: createEmptyEarningsTrend(),
+      liveMonitor: {
+        stage: "syncing",
+        headline: "Loading live protection status",
+        summary: "Fetching your policy, claim, and fraud data from the backend.",
+        lastHeartbeatAt: new Date().toISOString(),
+        activeScenarioId: null,
+      },
+      fraudWatch: {
+        status: "verified",
+        summary: "Live fraud signals will appear after the first sync.",
+        activeFlags: [],
+        lastCheckedAt: null,
+        latestAudit: "Waiting for backend response.",
+      },
+      claims: [],
+    },
+    sessionUser
+  );
+}
+
+function getStatusLabel(status) {
+  const labels = {
+    pending: "Pending Review",
+    approved: "Approved",
+    paid: "Paid",
+    manual_review: "Manual Review",
+  };
+
+  return labels[status] || status;
+}
+
+function getFraudStatusLabel(status) {
+  const labels = {
+    in_progress: "Fraud Check in Progress",
+    verified: "Verified",
+    flagged: "Flagged",
+  };
+
+  return labels[status] || status;
 }
 
 function applySessionWorker(baseState, sessionUser) {
@@ -49,16 +110,23 @@ function applySessionWorker(baseState, sessionUser) {
     return baseState;
   }
 
+  const hasSessionIdentity = Boolean(sessionUser.id || sessionUser.phone);
+
   return {
     ...baseState,
     worker: {
       ...baseState.worker,
-      name: sessionUser.full_name || sessionUser.fullName || baseState.worker.name,
-      city: sessionUser.city || baseState.worker.city,
-      area: sessionUser.zone || baseState.worker.area,
-      platform: sessionUser.platform || baseState.worker.platform,
-      weeklyIncome:
-        Number(sessionUser.weekly_income ?? sessionUser.weeklyIncome) || baseState.worker.weeklyIncome,
+      name: hasSessionIdentity
+        ? sessionUser.full_name ?? sessionUser.fullName ?? ""
+        : baseState.worker.name,
+      city: hasSessionIdentity ? sessionUser.city ?? "" : baseState.worker.city,
+      area: hasSessionIdentity
+        ? sessionUser.zone ?? sessionUser.city ?? ""
+        : baseState.worker.area,
+      platform: hasSessionIdentity ? sessionUser.platform ?? "" : baseState.worker.platform,
+      weeklyIncome: Number(
+        sessionUser.weekly_income ?? sessionUser.weeklyIncome ?? baseState.worker.weeklyIncome
+      ),
     },
   };
 }
@@ -112,17 +180,19 @@ function buildRiskFeed(currentFeed, premiumData, workerArea) {
 
   const level = mapRiskLevel(premiumData.riskLevel);
   const score = premiumData.riskScore || 56;
-  const baseZone = workerArea || currentFeed[0]?.zone || "Koramangala";
-  const otherZones = ["Indiranagar", "HSR Layout", "Whitefield"];
+  const baseZone = workerArea || currentFeed[0]?.zone || "";
+
+  if (!baseZone) {
+    return [];
+  }
 
   return [
-    { zone: baseZone, level, score, change: level === "High" ? "+12" : level === "Medium" ? "+6" : "-4" },
-    ...otherZones.map((zone, index) => ({
-      zone,
-      level: index === 0 && level === "High" ? "Medium" : index === 2 ? "Low" : level,
-      score: Math.max(22, score - (index + 1) * 9),
-      change: index === 2 ? "-2" : `+${Math.max(1, 6 - index * 2)}`,
-    })),
+    {
+      zone: baseZone,
+      level,
+      score,
+      change: level === "High" ? "+12" : level === "Medium" ? "+6" : "-4",
+    },
   ];
 }
 
@@ -169,7 +239,7 @@ function mergeBackendState(current, { policyData, premiumData, claimsData } = {}
   const plansSource = policyData?.plans || premiumData?.plans;
   const activePolicy = policyData?.activePolicy || premiumData?.activePolicy;
 
-  if (plansSource?.length) {
+  if (plansSource) {
     nextState.plans = mapBackendPlans(plansSource);
   }
 
@@ -201,11 +271,10 @@ function mergeBackendState(current, { policyData, premiumData, claimsData } = {}
 
 export function GigShieldDataProvider({ children }) {
   const [platformState, setPlatformState] = useState(() => {
-    const baseState = createInitialPlatformState();
-    return applySessionWorker(baseState, getUserFromToken() || getDemoSession());
+    return createInitialPlatformState(getUserFromToken());
   });
   const [uiState, setUiState] = useState({
-    syncing: false,
+    syncing: Boolean(getToken()),
     riskUpdating: false,
     riskTarget: "",
     planUpdating: false,
@@ -243,7 +312,7 @@ export function GigShieldDataProvider({ children }) {
         );
       });
     } catch (error) {
-      toast.error(error.response?.data?.error || "Something went wrong.");
+      toast.error(extractApiErrorMessage(error, "Service unavailable."));
     } finally {
       setUiState((current) => ({ ...current, syncing: false }));
     }
@@ -258,10 +327,10 @@ export function GigShieldDataProvider({ children }) {
 
   useEffect(() => {
     function handleAuthChange() {
-      const nextSessionUser = getUserFromToken() || getDemoSession();
+      const nextSessionUser = getUserFromToken();
 
       startTransition(() => {
-        setPlatformState(applySessionWorker(createInitialPlatformState(), nextSessionUser));
+        setPlatformState(createInitialPlatformState(nextSessionUser));
       });
 
       if (getToken()) {
@@ -303,96 +372,55 @@ export function GigShieldDataProvider({ children }) {
   async function simulateRisk(riskKey, { silent = false } = {}) {
     setUiState((current) => ({ ...current, riskUpdating: true, riskTarget: riskKey }));
 
-    if (getToken()) {
-      try {
-        const premiumData = await getPremium(riskKey);
-
-        startTransition(() => {
-          setPlatformState((current) =>
-            mergeBackendState(current, { premiumData }, getUserFromToken())
-          );
-        });
-
-        if (!silent) {
-          toast.success(`Premium updated to ${premiumData.premium} INR.`);
-        }
-      } catch (error) {
-        toast.error(error.response?.data?.error || "Something went wrong.");
-      } finally {
-        setUiState((current) => ({ ...current, riskUpdating: false, riskTarget: "" }));
-      }
+    if (!getToken()) {
+      toast.error("Service unavailable.");
+      setUiState((current) => ({ ...current, riskUpdating: false, riskTarget: "" }));
       return;
     }
 
-    const scenario =
-      riskKey === "high"
-        ? disruptionScenarios.rainBurst
-        : riskKey === "low"
-          ? {
-              ...disruptionScenarios.airQualitySpike,
-              zoneUpdates: disruptionScenarios.airQualitySpike.zoneUpdates.map((zone, index) => ({
-                ...zone,
-                level: index === 0 ? "Low" : "Medium",
-                score: Math.max(28, zone.score - 22),
-              })),
-            }
-          : disruptionScenarios.airQualitySpike;
+    try {
+      const premiumData = await getPremium(riskKey);
 
-    startTransition(() => {
-      setPlatformState((current) => ({
-        ...current,
-        riskFeed: scenario.zoneUpdates,
-        liveMonitor: {
-          ...current.liveMonitor,
-          headline: `${mapRiskLevel(riskKey)} risk simulated`,
-          summary: `${scenario.summary} Premium cards are ready to update.`,
-          lastHeartbeatAt: new Date().toISOString(),
-        },
-      }));
-    });
+      startTransition(() => {
+        setPlatformState((current) =>
+          mergeBackendState(current, { premiumData }, getUserFromToken())
+        );
+      });
 
-    if (!silent) {
-      toast.success(`${mapRiskLevel(riskKey)} risk simulated.`);
+      if (!silent) {
+        toast.success(`Premium updated to ${premiumData.premium} INR.`);
+      }
+    } catch (error) {
+      toast.error(extractApiErrorMessage(error, "Service unavailable."));
+    } finally {
+      setUiState((current) => ({ ...current, riskUpdating: false, riskTarget: "" }));
     }
-
-    setUiState((current) => ({ ...current, riskUpdating: false, riskTarget: "" }));
   }
 
   async function selectPlan(planId) {
     setUiState((current) => ({ ...current, planUpdating: true, planTarget: planId }));
 
-    if (getToken()) {
-      try {
-        const policyData = await buyPolicy(planId);
-
-        startTransition(() => {
-          setPlatformState((current) =>
-            mergeBackendState(current, { policyData }, getUserFromToken())
-          );
-        });
-
-        toast.success("Policy activated");
-      } catch (error) {
-        toast.error(error.response?.data?.error || "Something went wrong.");
-      } finally {
-        setUiState((current) => ({ ...current, planUpdating: false, planTarget: "" }));
-      }
+    if (!getToken()) {
+      toast.error("Service unavailable.");
+      setUiState((current) => ({ ...current, planUpdating: false, planTarget: "" }));
       return;
     }
 
-    startTransition(() => {
-      setPlatformState((current) => ({
-        ...current,
-        activePlanId: planId,
-      }));
-    });
+    try {
+      const policyData = await buyPolicy(planId);
 
-    const chosenPlan = platformState.plans.find((plan) => plan.id === planId);
-    if (chosenPlan) {
+      startTransition(() => {
+        setPlatformState((current) =>
+          mergeBackendState(current, { policyData }, getUserFromToken())
+        );
+      });
+
       toast.success("Policy activated");
+    } catch (error) {
+      toast.error(extractApiErrorMessage(error, "Service unavailable."));
+    } finally {
+      setUiState((current) => ({ ...current, planUpdating: false, planTarget: "" }));
     }
-
-    setUiState((current) => ({ ...current, planUpdating: false, planTarget: "" }));
   }
 
   function refreshSignals() {
@@ -404,8 +432,7 @@ export function GigShieldDataProvider({ children }) {
   }
 
   async function triggerScenario(scenarioId, { origin = "manual" } = {}) {
-    const scenario = disruptionScenarios[scenarioId];
-    if (!scenario) {
+    if (!BACKEND_SCENARIO_PAYLOADS[scenarioId]) {
       return;
     }
 
@@ -415,194 +442,47 @@ export function GigShieldDataProvider({ children }) {
       claimScenarioId: scenarioId,
     }));
 
-    if (getToken()) {
-      const loadingToastId = toast.loading(`${scenario.title} detected. Checking for auto-claim.`);
-
-      try {
-        const response = await triggerClaim(BACKEND_SCENARIO_PAYLOADS[scenarioId] || {});
-
-        startTransition(() => {
-          setPlatformState((current) =>
-            mergeBackendState(current, { claimsData: response }, getUserFromToken())
-          );
-        });
-
-        if (!response.triggered) {
-          toast.error(response.message || "No claim was triggered.", { id: loadingToastId });
-          setUiState((current) => ({
-            ...current,
-            claimTriggering: false,
-            claimScenarioId: "",
-          }));
-          return;
-        }
-
-        toast.success(response.message, { id: loadingToastId });
-        schedule(() => syncBackendState(), 2100);
-        schedule(() => syncBackendState(), 4100);
-        setUiState((current) => ({
-          ...current,
-          claimTriggering: false,
-          claimScenarioId: "",
-        }));
-        return;
-      } catch (error) {
-        toast.error(error.response?.data?.error || "Something went wrong.", {
-          id: loadingToastId,
-        });
-        setUiState((current) => ({
-          ...current,
-          claimTriggering: false,
-          claimScenarioId: "",
-        }));
-        return;
-      }
-    }
-
-    const liveClaim = createLiveClaimFromScenario(scenario, platformState.claims.length);
-    const loadingToastId = toast.loading(
-      `${scenario.title} in ${scenario.area}. Automated logic started a claim.`
-    );
-
-    startTransition(() => {
-      setPlatformState((current) => ({
-        ...current,
-        claims: [liveClaim, ...current.claims].slice(0, 8),
-        riskFeed: scenario.zoneUpdates,
-        liveMonitor: {
-          stage: "event_detected",
-          headline: scenario.title,
-          summary:
-            origin === "auto"
-              ? scenario.summary
-              : `${scenario.summary} Demo controls triggered this run for judges.`,
-          lastHeartbeatAt: new Date().toISOString(),
-          activeScenarioId: scenario.id,
-        },
-        fraudWatch: {
-          status: "in_progress",
-          summary: "Fraud check in progress. Verifying route continuity and recent claim frequency.",
-          activeFlags: [],
-          lastCheckedAt: new Date().toISOString(),
-          latestAudit: "Reading device continuity, duplicate claims, and route stability.",
-        },
-      }));
-    });
-
-    schedule(() => {
+    if (!getToken()) {
+      toast.error("Service unavailable.");
       setUiState((current) => ({
         ...current,
         claimTriggering: false,
         claimScenarioId: "",
       }));
-    }, 700);
+      return;
+    }
 
-    schedule(() => {
-      let fraudResult;
+    const scenarioTitle = SCENARIO_TITLES[scenarioId] || "Risk event";
+    const loadingToastId = toast.loading(`${scenarioTitle} detected. Checking for auto-claim.`);
 
-      setPlatformState((current) => {
-        fraudResult = evaluateFraudSignals(scenario, current.claims);
+    try {
+      const response = await triggerClaim(BACKEND_SCENARIO_PAYLOADS[scenarioId]);
 
-        return {
-          ...current,
-          claims: updateClaim(current.claims, liveClaim.id, (claim) => ({
-            ...claim,
-            fraudStatus: fraudResult.status,
-            status: fraudResult.suspicious ? "manual_review" : claim.status,
-            flags: fraudResult.flags,
-            updatedAt: new Date().toISOString(),
-            payoutWindow: fraudResult.suspicious
-              ? "Held for analyst review"
-              : "Verification complete",
-            history: [
-              createHistoryNote(
-                fraudResult.suspicious ? "fraud_flagged" : "fraud_verified",
-                fraudResult.suspicious
-                  ? fraudResult.flags[0]
-                  : "Fraud check passed. Location continuity and claim timing were verified.",
-                fraudResult.suspicious ? "danger" : "info"
-              ),
-              ...claim.history,
-            ],
-          })),
-          fraudWatch: {
-            status: fraudResult.status,
-            summary: fraudResult.summary,
-            activeFlags: fraudResult.flags,
-            lastCheckedAt: new Date().toISOString(),
-            latestAudit: fraudResult.latestAudit,
-          },
-          liveMonitor: {
-            ...current.liveMonitor,
-            stage: fraudResult.suspicious ? "manual_review" : "claim_verified",
-          },
-        };
+      startTransition(() => {
+        setPlatformState((current) =>
+          mergeBackendState(current, { claimsData: response }, getUserFromToken())
+        );
       });
 
-      if (fraudResult.suspicious) {
-        toast.error("Claim flagged for manual review due to suspicious movement.", {
-          id: loadingToastId,
-        });
+      if (!response.triggered) {
+        toast.error(response.message || "No claim was triggered.", { id: loadingToastId });
         return;
       }
 
-      toast.success("Claim verified automatically. Approval is in progress.", {
+      toast.success(response.message, { id: loadingToastId });
+      schedule(() => syncBackendState(), 2100);
+      schedule(() => syncBackendState(), 4100);
+    } catch (error) {
+      toast.error(extractApiErrorMessage(error, "Service unavailable."), {
         id: loadingToastId,
       });
-
-      schedule(() => {
-        setPlatformState((current) => ({
-          ...current,
-          claims: updateClaim(current.claims, liveClaim.id, (claim) => ({
-            ...claim,
-            status: "approved",
-            updatedAt: new Date().toISOString(),
-            payoutWindow: "Funds queued for release",
-            history: [
-              createHistoryNote(
-                "approved",
-                "Coverage rules passed. Claim approved by automated payout logic.",
-                "success"
-              ),
-              ...claim.history,
-            ],
-          })),
-          liveMonitor: {
-            ...current.liveMonitor,
-            stage: "claim_approved",
-            summary: "Coverage conditions matched the policy terms. Funds are being prepared.",
-          },
-        }));
-      }, 1700);
-
-      schedule(() => {
-        setPlatformState((current) => ({
-          ...current,
-          earningsTrend: updateTrendWithPayout(current.earningsTrend, scenario.amount),
-          claims: updateClaim(current.claims, liveClaim.id, (claim) => ({
-            ...claim,
-            status: "paid",
-            updatedAt: new Date().toISOString(),
-            payoutWindow: "Released in 4 minutes",
-            history: [
-              createHistoryNote(
-                "paid",
-                "Payout released to your linked account. Settlement confirmation sent.",
-                "success"
-              ),
-              ...claim.history,
-            ],
-          })),
-          liveMonitor: {
-            ...current.liveMonitor,
-            stage: "paid",
-            summary: "Latest disruption was settled successfully and logged in the claim history.",
-          },
-        }));
-
-      toast.success("Payout released. Claim history has been updated.");
-      }, 3600);
-    }, 1400);
+    } finally {
+      setUiState((current) => ({
+        ...current,
+        claimTriggering: false,
+        claimScenarioId: "",
+      }));
+    }
   }
 
   function runFraudDrill() {
@@ -624,7 +504,10 @@ export function GigShieldDataProvider({ children }) {
     );
     const paidClaims = platformState.claims.filter((claim) => claim.status === "paid");
     const weeklyPayouts = paidClaims.reduce((sum, claim) => sum + claim.amount, 0);
-    const fraudFlags = platformState.claims.reduce((sum, claim) => sum + claim.flags.length, 0);
+    const fraudFlags = platformState.claims.reduce(
+      (sum, claim) => sum + (claim.flags?.length || 0),
+      0
+    );
     const downtimeThisWeek = platformState.earningsTrend.reduce(
       (sum, entry) => sum + entry.downtimeHours,
       0
@@ -641,7 +524,12 @@ export function GigShieldDataProvider({ children }) {
         : latestClaim?.status === "manual_review"
           ? "danger"
           : "warning";
-    const fraudTone = platformState.fraudWatch.status === "flagged" ? "danger" : "success";
+    const fraudTone =
+      platformState.fraudWatch.status === "flagged"
+        ? "danger"
+        : platformState.fraudWatch.status === "in_progress"
+          ? "warning"
+          : "success";
 
     return {
       activePlan,

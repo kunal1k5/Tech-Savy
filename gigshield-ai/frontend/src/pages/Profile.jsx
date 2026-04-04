@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   BadgeCheck,
@@ -8,6 +9,8 @@ import {
   Clock3,
   FileText,
   Fingerprint,
+  LogOut,
+  PencilLine,
   ShieldCheck,
 } from "lucide-react";
 import DocumentUploadCard from "../components/profile/DocumentUploadCard";
@@ -15,12 +18,17 @@ import InputField from "../components/profile/InputField";
 import ProfileCard from "../components/profile/ProfileCard";
 import SurfaceButton from "../components/ui/SurfaceButton";
 import StatusBadge from "../components/ui/StatusBadge";
-import { getToken, getUserFromToken, saveAuthSession } from "../utils/auth";
+import {
+  clearSession,
+  getStoredUser,
+  getToken,
+  getUserFromToken,
+  saveAuthSession,
+} from "../utils/auth";
 import { getAuthRiskProfile } from "../utils/authRisk";
 import { cn } from "../utils/cn";
-import { useGigShieldData } from "../context/GigShieldDataContext";
 
-const PROFILE_STORAGE_KEY = "gigshield_profile_kyc";
+const PROFILE_STORAGE_KEY_PREFIX = "gigshield_profile_kyc";
 const OFFLINE_USERS_KEY = "gigshield_offline_users";
 
 const containerVariants = {
@@ -84,6 +92,13 @@ const EMPTY_DOCUMENT_STATE = {
   uploadedAt: "",
 };
 
+const EMPTY_PROFILE_FORM = {
+  name: "",
+  phone: "",
+  city: "",
+  workType: "",
+};
+
 function readStorage(key, fallbackValue) {
   if (typeof window === "undefined") {
     return fallbackValue;
@@ -110,17 +125,8 @@ function sanitizePhone(value) {
   return String(value || "").replace(/\D/g, "").slice(0, 10);
 }
 
-function deriveWorkType(platform) {
-  const normalized = String(platform || "").toLowerCase();
-  if (["swiggy", "zomato", "zepto", "blinkit", "delivery"].includes(normalized)) {
-    return "Delivery";
-  }
-
-  if (normalized === "driver" || normalized.includes("driver") || normalized.includes("cab")) {
-    return "Driver";
-  }
-
-  return "Other";
+function getProfileStorageKey(user) {
+  return `${PROFILE_STORAGE_KEY_PREFIX}:${user?.id || user?.phone || "guest"}`;
 }
 
 function getInitialDocuments(storedDocuments = {}) {
@@ -133,26 +139,68 @@ function getInitialDocuments(storedDocuments = {}) {
   }, {});
 }
 
-function getInitialState(worker, sessionUser) {
-  const storedState = readStorage(PROFILE_STORAGE_KEY, {});
+function getCurrentStoredUser() {
+  return getStoredUser() || getUserFromToken();
+}
+
+function getEditableProfile(user) {
+  if (!user) {
+    return EMPTY_PROFILE_FORM;
+  }
 
   return {
-    personalDetails: {
-      fullName:
-        storedState.personalDetails?.fullName ||
-        sessionUser?.full_name ||
-        worker.name ||
-        "",
-      mobileNumber:
-        storedState.personalDetails?.mobileNumber ||
-        sessionUser?.phone ||
-        "",
-      city: storedState.personalDetails?.city || sessionUser?.city || worker.city || "",
-      workType:
-        storedState.personalDetails?.workType ||
-        deriveWorkType(sessionUser?.work_type || sessionUser?.platform || worker.platform),
-    },
-    documents: getInitialDocuments(storedState.documents),
+    name: user.full_name || user.fullName || user.name || "",
+    phone: user.phone || "",
+    city: user.city || "",
+    workType: user.work_type || user.workType || "",
+  };
+}
+
+function getMergedUser(currentUser, form) {
+  const fullName = form.name.trim();
+  const city = form.city.trim();
+  const workType = form.workType;
+
+  return {
+    ...(currentUser || {}),
+    name: fullName,
+    fullName,
+    full_name: fullName,
+    phone: form.phone,
+    city,
+    zone: city,
+    workType,
+    work_type: workType,
+    platform: currentUser?.platform || "",
+    weeklyIncome: Number(currentUser?.weeklyIncome ?? currentUser?.weekly_income ?? 0),
+    weekly_income: Number(currentUser?.weeklyIncome ?? currentUser?.weekly_income ?? 0),
+    workerId: currentUser?.workerId || currentUser?.worker_id || "",
+    worker_id: currentUser?.workerId || currentUser?.worker_id || "",
+    workProofName: currentUser?.workProofName || currentUser?.work_proof_name || "",
+    work_proof_name: currentUser?.workProofName || currentUser?.work_proof_name || "",
+    workVerificationStatus:
+      currentUser?.workVerificationStatus ||
+      currentUser?.work_verification_status ||
+      "pending",
+    work_verification_status:
+      currentUser?.workVerificationStatus ||
+      currentUser?.work_verification_status ||
+      "pending",
+    workVerificationFlag:
+      currentUser?.workVerificationFlag ?? currentUser?.work_verification_flag ?? null,
+    work_verification_flag:
+      currentUser?.workVerificationFlag ?? currentUser?.work_verification_flag ?? null,
+    deviceId: currentUser?.deviceId ?? currentUser?.device_id ?? null,
+    device_id: currentUser?.deviceId ?? currentUser?.device_id ?? null,
+    authRiskScore: Number(currentUser?.authRiskScore ?? currentUser?.auth_risk_score ?? 0),
+    auth_risk_score: Number(currentUser?.authRiskScore ?? currentUser?.auth_risk_score ?? 0),
+    authRiskLevel: currentUser?.authRiskLevel ?? currentUser?.auth_risk_level ?? "low",
+    auth_risk_level: currentUser?.authRiskLevel ?? currentUser?.auth_risk_level ?? "low",
+    authRiskStatus: currentUser?.authRiskStatus ?? currentUser?.auth_risk_status ?? "Safe",
+    auth_risk_status: currentUser?.authRiskStatus ?? currentUser?.auth_risk_status ?? "Safe",
+    signupTime: currentUser?.signupTime ?? currentUser?.signup_time ?? null,
+    signup_time: currentUser?.signupTime ?? currentUser?.signup_time ?? null,
+    location: currentUser?.location ?? null,
   };
 }
 
@@ -163,9 +211,9 @@ function getOverallStatus(documents, isProfileComplete) {
     return "rejected";
   }
 
-  const requiredDocumentsVerified = DOCUMENT_CONFIG
-    .filter((document) => document.required)
-    .every((document) => documents[document.id]?.status === "verified");
+  const requiredDocumentsVerified = DOCUMENT_CONFIG.filter((document) => document.required).every(
+    (document) => documents[document.id]?.status === "verified"
+  );
 
   if (isProfileComplete && requiredDocumentsVerified) {
     return "verified";
@@ -174,7 +222,7 @@ function getOverallStatus(documents, isProfileComplete) {
   return "pending";
 }
 
-function getPreviewState(documentId, file, currentPreview) {
+function getPreviewState(file, currentPreview) {
   if (currentPreview) {
     URL.revokeObjectURL(currentPreview);
   }
@@ -187,19 +235,49 @@ function getPreviewState(documentId, file, currentPreview) {
 }
 
 export default function Profile() {
-  const { platformState } = useGigShieldData();
-  const sessionUser = getUserFromToken();
-  const initialState = useMemo(
-    () => getInitialState(platformState.worker, sessionUser),
-    [platformState.worker, sessionUser]
-  );
-  const [personalDetails, setPersonalDetails] = useState(initialState.personalDetails);
-  const [documents, setDocuments] = useState(initialState.documents);
+  const navigate = useNavigate();
+  const [user, setUser] = useState(() => getCurrentStoredUser());
+  const [form, setForm] = useState(() => getEditableProfile(getCurrentStoredUser()));
+  const [isEditing, setIsEditing] = useState(false);
+  const [documents, setDocuments] = useState(() => getInitialDocuments());
   const [previewUrls, setPreviewUrls] = useState({});
 
+  const profileStorageKey = useMemo(
+    () => getProfileStorageKey(user),
+    [user?.id, user?.phone]
+  );
+
   useEffect(() => {
-    writeStorage(PROFILE_STORAGE_KEY, { personalDetails, documents });
-  }, [documents, personalDetails]);
+    function syncCurrentUser() {
+      const nextUser = getCurrentStoredUser();
+      setUser(nextUser);
+      setForm(getEditableProfile(nextUser));
+      setIsEditing(false);
+    }
+
+    window.addEventListener("gigshield-auth-changed", syncCurrentUser);
+    return () => {
+      window.removeEventListener("gigshield-auth-changed", syncCurrentUser);
+    };
+  }, []);
+
+  useEffect(() => {
+    const storedProfile = readStorage(profileStorageKey, {});
+    setDocuments(getInitialDocuments(storedProfile.documents));
+    setPreviewUrls((current) => {
+      Object.values(current).forEach((previewUrl) => {
+        if (previewUrl) {
+          URL.revokeObjectURL(previewUrl);
+        }
+      });
+
+      return {};
+    });
+  }, [profileStorageKey]);
+
+  useEffect(() => {
+    writeStorage(profileStorageKey, { documents });
+  }, [documents, profileStorageKey]);
 
   useEffect(() => {
     return () => {
@@ -213,12 +291,12 @@ export default function Profile() {
 
   const isProfileComplete = useMemo(() => {
     return Boolean(
-      personalDetails.fullName.trim() &&
-        personalDetails.mobileNumber.length === 10 &&
-        personalDetails.city.trim() &&
-        personalDetails.workType
+      form.name.trim() &&
+        form.phone.length === 10 &&
+        form.city.trim() &&
+        form.workType
     );
-  }, [personalDetails]);
+  }, [form]);
 
   const requiredDocumentIds = useMemo(
     () => DOCUMENT_CONFIG.filter((document) => document.required).map((document) => document.id),
@@ -235,30 +313,41 @@ export default function Profile() {
     () => getOverallStatus(documents, isProfileComplete),
     [documents, isProfileComplete]
   );
+
   const onboardingRiskProfile = useMemo(
-    () => getAuthRiskProfile(personalDetails.mobileNumber),
-    [personalDetails.mobileNumber]
+    () => getAuthRiskProfile(form.phone),
+    [form.phone]
   );
+
   const workVerificationDetails = useMemo(() => {
     return {
-      platform: sessionUser?.platform || platformState.worker.platform || "Not added",
-      workerId: sessionUser?.worker_id || "Not added",
-      proofName: sessionUser?.work_proof_name || "No proof uploaded",
-      status: sessionUser?.work_verification_status || "pending",
+      platform: user?.platform || "Not added",
+      workerId: user?.worker_id || user?.workerId || "Not added",
+      proofName: user?.work_proof_name || user?.workProofName || "No proof uploaded",
+      status:
+        user?.work_verification_status ||
+        user?.workVerificationStatus ||
+        "pending",
     };
-  }, [platformState.worker.platform, sessionUser]);
+  }, [
+    user?.platform,
+    user?.workProofName,
+    user?.workVerificationStatus,
+    user?.work_proof_name,
+    user?.work_verification_status,
+    user?.workerId,
+    user?.worker_id,
+  ]);
 
   const internalFraudFlags = useMemo(() => {
     const offlineUsers = readStorage(OFFLINE_USERS_KEY, {});
-    const phoneRecord = personalDetails.mobileNumber
-      ? offlineUsers[personalDetails.mobileNumber]
-      : null;
+    const phoneRecord = form.phone ? offlineUsers[form.phone] : null;
 
     return {
       duplicatePhoneAccount: Boolean(
         phoneRecord &&
           phoneRecord.full_name &&
-          phoneRecord.full_name !== personalDetails.fullName.trim()
+          phoneRecord.full_name !== form.name.trim()
       ),
       incompleteProfile: !isProfileComplete,
       missingDocuments: !requiredDocumentsUploaded,
@@ -266,10 +355,10 @@ export default function Profile() {
       onboardingFlagged: onboardingRiskProfile?.riskLevel === "high",
     };
   }, [
+    form.name,
+    form.phone,
     isProfileComplete,
     onboardingRiskProfile?.riskLevel,
-    personalDetails.fullName,
-    personalDetails.mobileNumber,
     requiredDocumentsUploaded,
   ]);
 
@@ -322,42 +411,55 @@ export default function Profile() {
   }, [documents, isProfileComplete]);
 
   function updateField(field, value) {
-    setPersonalDetails((current) => ({
+    setForm((current) => ({
       ...current,
-      [field]: field === "mobileNumber" ? sanitizePhone(value) : value,
+      [field]: field === "phone" ? sanitizePhone(value) : value,
     }));
+  }
+
+  function handleStartEdit() {
+    setIsEditing(true);
+  }
+
+  function handleCancelEdit() {
+    setForm(getEditableProfile(user));
+    setIsEditing(false);
   }
 
   function handleSaveDetails(event) {
     event.preventDefault();
 
     if (!isProfileComplete) {
-      toast.error("Complete all personal details first.");
+      toast.error("Complete all profile details first.");
       return;
     }
 
-    const mergedUser = {
-      ...(sessionUser || {}),
-      full_name: personalDetails.fullName.trim(),
-      phone: personalDetails.mobileNumber,
-      city: personalDetails.city.trim(),
-      zone: personalDetails.city.trim(),
-      work_type: personalDetails.workType,
-      platform: sessionUser?.platform || platformState.worker.platform,
-    };
+    const previousStorageKey = getProfileStorageKey(user);
+    const updatedUser = getMergedUser(user, form);
+    const nextStorageKey = getProfileStorageKey(updatedUser);
+
+    if (previousStorageKey !== nextStorageKey) {
+      writeStorage(nextStorageKey, { documents });
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(previousStorageKey);
+      }
+    }
 
     saveAuthSession({
       token: getToken(),
-      user: mergedUser,
+      user: updatedUser,
     });
 
-    toast.success("Profile details saved.");
+    setUser(updatedUser);
+    setForm(getEditableProfile(updatedUser));
+    setIsEditing(false);
+    toast.success("Profile updated successfully.");
   }
 
   function handleDocumentUpload(documentId, file) {
     setPreviewUrls((current) => ({
       ...current,
-      [documentId]: getPreviewState(documentId, file, current[documentId]),
+      [documentId]: getPreviewState(file, current[documentId]),
     }));
 
     setDocuments((current) => ({
@@ -375,7 +477,7 @@ export default function Profile() {
 
   function handleCheckStatus() {
     if (!isProfileComplete) {
-      toast.error("Complete your personal details before verification.");
+      toast.error("Complete your profile before verification.");
       return;
     }
 
@@ -407,6 +509,16 @@ export default function Profile() {
     toast.success("Verification status updated.");
   }
 
+  function handleLogout() {
+    clearSession();
+    setUser(null);
+    setForm(EMPTY_PROFILE_FORM);
+    setDocuments(getInitialDocuments());
+    setIsEditing(false);
+    toast.success("Logged out successfully.");
+    navigate("/login", { replace: true });
+  }
+
   return (
     <motion.div
       className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 md:px-6 md:py-8 xl:px-8"
@@ -416,10 +528,10 @@ export default function Profile() {
     >
       <motion.div variants={itemVariants}>
         <ProfileCard
-          fullName={personalDetails.fullName}
-          mobileNumber={personalDetails.mobileNumber}
-          city={personalDetails.city}
-          workType={personalDetails.workType}
+          fullName={form.name}
+          mobileNumber={form.phone}
+          city={form.city}
+          workType={form.workType}
           verificationStatus={overallStatus}
           trustLevel={trustLevel}
         />
@@ -429,51 +541,101 @@ export default function Profile() {
         variants={itemVariants}
         className="rounded-2xl border border-slate-200 bg-white p-6 shadow-md"
       >
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-sm font-medium text-slate-500">Personal Details</p>
+            <p className="text-sm font-medium text-slate-500">Profile Settings</p>
             <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
-              Basic worker information
+              Dynamic worker profile
             </h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Profile data is loaded from your saved session and updates instantly after every save.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            {isEditing ? (
+              <>
+                <SurfaceButton
+                  type="button"
+                  variant="secondary"
+                  onClick={handleCancelEdit}
+                >
+                  Cancel
+                </SurfaceButton>
+                <SurfaceButton type="submit" form="profile-details-form">
+                  Save Changes
+                </SurfaceButton>
+              </>
+            ) : (
+              <SurfaceButton
+                type="button"
+                onClick={handleStartEdit}
+                leftIcon={PencilLine}
+              >
+                Edit Profile
+              </SurfaceButton>
+            )}
+
+            <SurfaceButton
+              type="button"
+              variant="secondary"
+              leftIcon={LogOut}
+              onClick={handleLogout}
+            >
+              Logout
+            </SurfaceButton>
           </div>
         </div>
 
-        <form onSubmit={handleSaveDetails} className="mt-6 space-y-6">
+        <form id="profile-details-form" onSubmit={handleSaveDetails} className="mt-6 space-y-6">
           <div className="grid gap-4 md:grid-cols-2">
             <InputField
               id="full-name"
               label="Full Name"
-              value={personalDetails.fullName}
-              onChange={(value) => updateField("fullName", value)}
+              value={form.name}
+              onChange={(value) => updateField("name", value)}
               placeholder="Kunal Sharma"
+              disabled={!isEditing}
             />
             <InputField
               id="mobile-number"
               label="Mobile Number"
-              value={personalDetails.mobileNumber}
-              onChange={(value) => updateField("mobileNumber", value)}
+              value={form.phone}
+              onChange={(value) => updateField("phone", value)}
               placeholder="9876543210"
               inputMode="numeric"
+              disabled={!isEditing}
             />
             <InputField
               id="city"
               label="City"
-              value={personalDetails.city}
+              value={form.city}
               onChange={(value) => updateField("city", value)}
               placeholder="Bengaluru"
+              disabled={!isEditing}
             />
             <InputField
               id="work-type"
               label="Work Type"
-              value={personalDetails.workType}
+              value={form.workType}
               onChange={(value) => updateField("workType", value)}
               options={WORK_TYPE_OPTIONS}
+              disabled={!isEditing}
             />
           </div>
 
-          <SurfaceButton type="submit" className="w-full sm:w-auto">
-            Save details
-          </SurfaceButton>
+          <div
+            className={cn(
+              "rounded-2xl border px-4 py-3 text-sm",
+              isEditing
+                ? "border-blue-100 bg-blue-50 text-blue-700"
+                : "border-slate-200 bg-slate-50 text-slate-600"
+            )}
+          >
+            {isEditing
+              ? "Editing is active. Save changes to update the profile everywhere."
+              : "Profile is locked. Use Edit Profile to update your details."}
+          </div>
         </form>
       </motion.section>
 
@@ -485,10 +647,10 @@ export default function Profile() {
           <div>
             <p className="text-sm font-medium text-slate-500">Work Verification</p>
             <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
-              Verified worker profile
+              Saved worker identity
             </h3>
             <p className="mt-2 text-sm text-slate-600">
-              Your work profile details are reviewed before protection is fully activated.
+              These details come from the logged-in user and remain persistent across reloads.
             </p>
           </div>
 

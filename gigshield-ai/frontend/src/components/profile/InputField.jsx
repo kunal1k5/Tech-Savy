@@ -9,9 +9,10 @@ export default function InputField({
   type = "text",
   inputMode,
   options,
+  disabled = false,
 }) {
   const baseClassName =
-    "mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100";
+    "mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500";
 
   return (
     <label htmlFor={id} className="block">
@@ -22,6 +23,7 @@ export default function InputField({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           className={baseClassName}
+          disabled={disabled}
         >
           {options.map((option) => (
             <option key={option.value} value={option.value}>
@@ -38,6 +40,7 @@ export default function InputField({
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
           className={baseClassName}
+          disabled={disabled}
         />
       )}
     </label>

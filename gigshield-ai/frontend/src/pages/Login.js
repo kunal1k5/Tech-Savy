@@ -5,8 +5,9 @@ import AuthField from "../components/auth/AuthField";
 import AuthShell from "../components/auth/AuthShell";
 import OtpInputGroup from "../components/auth/OtpInputGroup";
 import SurfaceButton from "../components/ui/SurfaceButton";
+import { extractApiErrorMessage } from "../services/api";
 import { requestOtp, verifyOtp } from "../services/demoFlow";
-import { saveAuthSession } from "../utils/auth";
+import { findStoredUserByPhone, saveAuthSession } from "../utils/auth";
 import {
   assessAndSaveAuthRisk,
   recordLoginAttempt,
@@ -50,14 +51,14 @@ export default function Login() {
 
     try {
       recordLoginAttempt(sanitizedPhone);
-      const response = await requestOtp(sanitizedPhone, { preferOfflineDemo: true });
+      const response = await requestOtp(sanitizedPhone);
 
       setPhone(sanitizedPhone);
       setSessionId(response.sessionId);
       setStep(2);
       setMessage("OTP sent. Use 1234 to continue.");
     } catch (requestError) {
-      setError(requestError.response?.data?.error || "Could not send OTP right now.");
+      setError(extractApiErrorMessage(requestError, "Service unavailable."));
     } finally {
       setLoading(false);
     }
@@ -84,13 +85,29 @@ export default function Login() {
         flow: "login",
         formStartedAt: formStartedAtRef.current,
       });
+      const savedUser = findStoredUserByPhone(sanitizedPhone);
+      const persistedProfile = savedUser
+        ? {
+            full_name: savedUser.full_name,
+            city: savedUser.city,
+            zone: savedUser.zone,
+            platform: savedUser.platform,
+            weekly_income: savedUser.weekly_income,
+            work_type: savedUser.work_type,
+            worker_id: savedUser.worker_id,
+            work_proof_name: savedUser.work_proof_name,
+            work_verification_status: savedUser.work_verification_status,
+            work_verification_flag: savedUser.work_verification_flag,
+            signup_time: savedUser.signup_time,
+          }
+        : {};
 
       const response = await verifyOtp({
         sessionId,
         phone: sanitizedPhone,
         otp: combinedOtp,
-        preferOfflineDemo: true,
         profile: {
+          ...persistedProfile,
           deviceId: authRiskSnapshot.deviceId,
           authRiskScore: authRiskSnapshot.riskScore,
           authRiskLevel: authRiskSnapshot.riskLevel,
@@ -103,10 +120,13 @@ export default function Login() {
         ...response,
         user: {
           ...response.user,
+          ...persistedProfile,
+          phone: sanitizedPhone,
           deviceId: authRiskSnapshot.deviceId,
           authRiskScore: authRiskSnapshot.riskScore,
           authRiskLevel: authRiskSnapshot.riskLevel,
           authRiskStatus: authRiskSnapshot.riskStatus,
+          location: authRiskSnapshot.location,
         },
       });
 
@@ -114,7 +134,7 @@ export default function Login() {
       navigate(redirectPath, { replace: true });
     } catch (verifyError) {
       recordLoginAttempt(sanitizedPhone);
-      setError(verifyError.response?.data?.error || "OTP verification failed.");
+      setError(extractApiErrorMessage(verifyError, "Service unavailable."));
       setIsVerificationNoticeVisible(false);
     } finally {
       setLoading(false);
@@ -126,13 +146,13 @@ export default function Login() {
 
     try {
       recordLoginAttempt(sanitizedPhone);
-      const response = await requestOtp(sanitizedPhone, { preferOfflineDemo: true });
+      const response = await requestOtp(sanitizedPhone);
       setSessionId(response.sessionId);
       setOtp(new Array(OTP_LENGTH).fill(""));
       setError("");
       setMessage("A new OTP is ready. Use 1234 to continue.");
     } catch (requestError) {
-      setError(requestError.response?.data?.error || "Could not resend OTP right now.");
+      setError(extractApiErrorMessage(requestError, "Service unavailable."));
     }
   }
 

@@ -3,12 +3,13 @@
  */
 
 const RiskService = require("../services/risk.service");
+const { sendError, sendSuccess } = require("../utils/apiResponse");
 
 const RiskController = {
   async assess(req, res, next) {
     try {
       const assessment = await RiskService.assessRisk(req.user.id);
-      res.json({ data: assessment });
+      return sendSuccess(res, assessment, "Risk assessment completed successfully.");
     } catch (err) {
       next(err);
     }
@@ -18,9 +19,9 @@ const RiskController = {
     try {
       const assessment = await RiskService.getLatestAssessment(req.user.id);
       if (!assessment) {
-        return res.status(404).json({ error: "No risk assessment found" });
+        return sendError(res, 404, "No risk assessment found");
       }
-      res.json({ data: assessment });
+      return sendSuccess(res, assessment, "Latest risk assessment loaded successfully.");
     } catch (err) {
       next(err);
     }

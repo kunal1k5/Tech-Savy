@@ -148,16 +148,28 @@ def predict_from_payload(payload: object) -> Dict[str, object]:
 def predict_weather_risk(payload: object) -> Dict[str, object]:
     """Serve the trained weather risk model through a simple Flask-friendly contract."""
     values = parse_weather_risk_payload(payload)
-    feature_frame = build_weather_risk_frame(values)
-    model, model_path, model_feature_count = _get_model()
-    feature_frame = _align_weather_risk_frame(feature_frame, model, model_feature_count)
-    score = _extract_weather_risk_score(model, feature_frame)
+    try:
+        feature_frame = build_weather_risk_frame(values)
+        model, model_path, model_feature_count = _get_model()
+        feature_frame = _align_weather_risk_frame(feature_frame, model, model_feature_count)
+        score = _extract_weather_risk_score(model, feature_frame)
 
-    return {
-        "risk": map_weather_risk_level(score),
-        "score": round(score, 4),
-        "model_path": str(model_path),
-    }
+        return {
+            "risk": map_weather_risk_level(score),
+            "score": round(score, 4),
+            "model_path": str(model_path),
+            "source": "trained_model",
+        }
+    except Exception as error:
+        LOGGER.warning("Weather risk model unavailable, using fallback scoring: %s", error)
+        score = _fallback_weather_risk_score(values)
+        return {
+            "risk": map_weather_risk_level(score),
+            "score": round(score, 4),
+            "model_path": "rule-fallback",
+            "source": "rule-fallback",
+            "warning": str(error),
+        }
 
 
 def parse_weather_risk_payload(payload: object) -> Dict[str, float]:
@@ -200,6 +212,37 @@ def map_weather_risk_level(score: float) -> str:
     if score < 0.7:
         return "MEDIUM"
     return "HIGH"
+
+
+def _fallback_weather_risk_score(values: Dict[str, float]) -> float:
+    score = 0.0
+
+    if values["precip_mm"] >= 20:
+        score += 0.35
+    elif values["precip_mm"] >= 8:
+        score += 0.18
+
+    if values["aqi"] >= 220:
+        score += 0.3
+    elif values["aqi"] >= 120:
+        score += 0.16
+
+    if values["wind_kph"] >= 30:
+        score += 0.18
+    elif values["wind_kph"] >= 18:
+        score += 0.1
+
+    if values["humidity"] >= 85:
+        score += 0.1
+    elif values["humidity"] >= 70:
+        score += 0.05
+
+    if values["temperature"] >= 38:
+        score += 0.07
+    elif values["temperature"] >= 33:
+        score += 0.03
+
+    return clamp_score(score, 0.0, 1.0)
 
 
 def fetch_live_weather(city: str) -> Dict[str, object]:

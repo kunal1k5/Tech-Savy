@@ -91,6 +91,16 @@ function buildJwt(user) {
       zone: user.zone,
       platform: user.platform,
       weekly_income: user.weekly_income,
+      work_type: user.work_type,
+      worker_id: user.worker_id,
+      work_proof_name: user.work_proof_name,
+      work_verification_status: user.work_verification_status,
+      work_verification_flag: user.work_verification_flag,
+      device_id: user.device_id,
+      auth_risk_score: user.auth_risk_score,
+      auth_risk_level: user.auth_risk_level,
+      auth_risk_status: user.auth_risk_status,
+      signup_time: user.signup_time,
     },
     JWT_SECRET,
     { expiresIn: "7d" }
@@ -99,6 +109,78 @@ function buildJwt(user) {
 
 function sanitizePhone(phone) {
   return String(phone || "").replace(/\D/g, "").slice(0, 10);
+}
+
+function normalizeString(value, fallback = "") {
+  if (value === undefined || value === null) {
+    return fallback;
+  }
+
+  return String(value).trim();
+}
+
+function normalizeNumber(value, fallback = 0) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : fallback;
+}
+
+function buildDemoUser(profile = {}, existingUser = {}) {
+  const phone = sanitizePhone(profile.phone || existingUser.phone);
+
+  return {
+    id: existingUser.id || profile.id || uuidv4(),
+    full_name: normalizeString(
+      profile.full_name ?? profile.fullName,
+      existingUser.full_name || "Rahul Singh"
+    ),
+    phone,
+    city: normalizeString(profile.city, existingUser.city || "Bengaluru"),
+    zone: normalizeString(profile.zone, existingUser.zone || profile.city || "Koramangala"),
+    platform: normalizeString(profile.platform, existingUser.platform || "Swiggy"),
+    weekly_income: normalizeNumber(
+      profile.weekly_income ?? profile.weeklyIncome,
+      existingUser.weekly_income || 18350
+    ),
+    work_type: normalizeString(
+      profile.work_type ?? profile.workType,
+      existingUser.work_type || ""
+    ),
+    worker_id: normalizeString(
+      profile.worker_id ?? profile.workerId,
+      existingUser.worker_id || ""
+    ),
+    work_proof_name: normalizeString(
+      profile.work_proof_name ?? profile.workProofName,
+      existingUser.work_proof_name || ""
+    ),
+    work_verification_status: normalizeString(
+      profile.work_verification_status ?? profile.workVerificationStatus,
+      existingUser.work_verification_status || "pending"
+    ),
+    work_verification_flag:
+      profile.work_verification_flag ??
+      profile.workVerificationFlag ??
+      existingUser.work_verification_flag ??
+      null,
+    device_id:
+      normalizeString(profile.device_id ?? profile.deviceId, existingUser.device_id || "") || null,
+    auth_risk_score: normalizeNumber(
+      profile.auth_risk_score ?? profile.authRiskScore,
+      existingUser.auth_risk_score || 0
+    ),
+    auth_risk_level: normalizeString(
+      profile.auth_risk_level ?? profile.authRiskLevel,
+      existingUser.auth_risk_level || "low"
+    ),
+    auth_risk_status: normalizeString(
+      profile.auth_risk_status ?? profile.authRiskStatus,
+      existingUser.auth_risk_status || "Safe"
+    ),
+    signup_time:
+      normalizeString(profile.signup_time ?? profile.signupTime, existingUser.signup_time || "") ||
+      null,
+    location: profile.location ?? existingUser.location ?? null,
+  };
 }
 
 function clone(value) {
@@ -151,6 +233,17 @@ function ensureState(user) {
       zone: user.zone,
       platform: user.platform,
       weekly_income: user.weekly_income,
+      work_type: user.work_type,
+      worker_id: user.worker_id,
+      work_proof_name: user.work_proof_name,
+      work_verification_status: user.work_verification_status,
+      work_verification_flag: user.work_verification_flag,
+      device_id: user.device_id,
+      auth_risk_score: user.auth_risk_score,
+      auth_risk_level: user.auth_risk_level,
+      auth_risk_status: user.auth_risk_status,
+      signup_time: user.signup_time,
+      location: user.location,
     },
     risk: {
       ...RISK_LEVELS.medium,
@@ -174,6 +267,17 @@ function syncUserState(user) {
     zone: user.zone,
     platform: user.platform,
     weekly_income: user.weekly_income,
+    work_type: user.work_type,
+    worker_id: user.worker_id,
+    work_proof_name: user.work_proof_name,
+    work_verification_status: user.work_verification_status,
+    work_verification_flag: user.work_verification_flag,
+    device_id: user.device_id,
+    auth_risk_score: user.auth_risk_score,
+    auth_risk_level: user.auth_risk_level,
+    auth_risk_status: user.auth_risk_status,
+    signup_time: user.signup_time,
+    location: user.location,
   };
   return state;
 }
@@ -397,18 +501,12 @@ const DemoStoreService = {
 
     let user = usersByPhone.get(phone);
     if (!user) {
-      user = {
-        id: uuidv4(),
-        full_name: profile.fullName || "Rahul Singh",
-        phone,
-        city: profile.city || "Bengaluru",
-        zone: profile.zone || "Koramangala",
-        platform: profile.platform || "Swiggy",
-        weekly_income: Number(profile.weeklyIncome) || 18350,
-      };
-      usersByPhone.set(phone, user);
+      user = buildDemoUser({ ...profile, phone });
+    } else {
+      user = buildDemoUser({ ...profile, phone }, user);
     }
 
+    usersByPhone.set(phone, user);
     syncUserState(user);
     otpSessions.delete(sessionId);
 
@@ -426,15 +524,7 @@ const DemoStoreService = {
       throw err;
     }
 
-    const user = {
-      id: uuidv4(),
-      full_name: profile.fullName || "Rahul Singh",
-      phone,
-      city: profile.city || "Bengaluru",
-      zone: profile.zone || "Koramangala",
-      platform: profile.platform || "Swiggy",
-      weekly_income: Number(profile.weeklyIncome) || 18350,
-    };
+    const user = buildDemoUser({ ...profile, phone }, usersByPhone.get(phone) || {});
 
     usersByPhone.set(phone, user);
     syncUserState(user);

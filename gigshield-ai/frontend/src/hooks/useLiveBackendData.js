@@ -1,11 +1,46 @@
-import { useEffect, useRef, useState } from "react";
-import { DEFAULT_FRAUD_PAYLOAD, getSystemSnapshot } from "../services/api";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { extractApiErrorMessage, getFraudStatus } from "../services/api";
+import { fetchBehaviorCheck } from "../services/behaviorCheck";
+import { getPremium as getLivePremium } from "../services/demoFlow";
+import { fetchLocationCheck } from "../services/locationCheck";
+import { getUserFromToken } from "../utils/auth";
+import { getAuthRiskProfile } from "../utils/authRisk";
 
 const SNAPSHOT_CACHE_TTL_MS = 10000;
 const snapshotCache = new Map();
 const snapshotRequests = new Map();
 
-async function loadSharedSnapshot(payloadKey, payload) {
+function formatTime(date = new Date()) {
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+function buildBehaviorPayload(user, authRiskProfile) {
+  const workType = String(user?.work_type || user?.workType || "").toLowerCase();
+
+  return {
+    claims_count: 0,
+    last_claim_time: formatTime(),
+    working_hours: workType === "driver" ? [6, 22] : [8, 20],
+    login_attempts: authRiskProfile?.signals?.loginAttempts ?? 0,
+  };
+}
+
+function buildLocationPayload(user) {
+  const currentLocation = user?.zone || user?.city || "";
+  if (!currentLocation) {
+    return null;
+  }
+
+  return {
+    current_location: currentLocation,
+    actual_location: currentLocation,
+    time: formatTime(),
+  };
+}
+
+async function loadSharedSnapshot(payloadKey, loader) {
   const cachedSnapshot = snapshotCache.get(payloadKey);
   if (cachedSnapshot && Date.now() - cachedSnapshot.updatedAt < SNAPSHOT_CACHE_TTL_MS) {
     return cachedSnapshot.data;
@@ -16,7 +51,7 @@ async function loadSharedSnapshot(payloadKey, payload) {
     return existingRequest;
   }
 
-  const request = getSystemSnapshot(payload)
+  const request = loader()
     .then((data) => {
       snapshotCache.set(payloadKey, {
         data,
@@ -33,7 +68,6 @@ async function loadSharedSnapshot(payloadKey, payload) {
 }
 
 export default function useLiveBackendData({
-  payload = DEFAULT_FRAUD_PAYLOAD,
   refreshIntervalMs = 20000,
 } = {}) {
   const [data, setData] = useState(null);
@@ -42,7 +76,30 @@ export default function useLiveBackendData({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const mountedRef = useRef(true);
   const dataRef = useRef(null);
-  const payloadKey = JSON.stringify(payload);
+  const sessionUser = getUserFromToken();
+  const authRiskProfile = getAuthRiskProfile(sessionUser?.phone);
+  const sessionSnapshot = useMemo(() => {
+    return {
+      user: sessionUser,
+      authRiskProfile,
+      payloadKey: JSON.stringify({
+        userId: sessionUser?.id || "",
+        phone: sessionUser?.phone || "",
+        city: sessionUser?.city || "",
+        zone: sessionUser?.zone || "",
+        workType: sessionUser?.work_type || sessionUser?.workType || "",
+        loginAttempts: authRiskProfile?.signals?.loginAttempts ?? 0,
+      }),
+    };
+  }, [
+    authRiskProfile?.signals?.loginAttempts,
+    sessionUser?.city,
+    sessionUser?.id,
+    sessionUser?.phone,
+    sessionUser?.work_type,
+    sessionUser?.workType,
+    sessionUser?.zone,
+  ]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -56,7 +113,48 @@ export default function useLiveBackendData({
       }
 
       try {
-        const nextData = await loadSharedSnapshot(payloadKey, payload);
+        const nextData = await loadSharedSnapshot(sessionSnapshot.payloadKey, async () => {
+          const behaviorPayload = buildBehaviorPayload(
+            sessionSnapshot.user,
+            sessionSnapshot.authRiskProfile
+          );
+          const locationPayload = buildLocationPayload(sessionSnapshot.user);
+          const premiumData = await getLivePremium();
+          const behaviorData = await fetchBehaviorCheck(behaviorPayload);
+          const locationData = locationPayload
+            ? await fetchLocationCheck(locationPayload)
+            : null;
+          const fraudData = await getFraudStatus({
+            risk: premiumData?.riskLevel || premiumData?.risk || "MEDIUM",
+            locationMatch: locationData?.match ?? true,
+            claimsCount: behaviorPayload.claims_count ?? 0,
+            loginAttempts: behaviorPayload.login_attempts ?? 0,
+            contextValid: Boolean(sessionSnapshot.user?.id || sessionSnapshot.user?.phone),
+          });
+
+          return {
+            ...fraudData,
+            premium: premiumData?.premium ?? fraudData?.premium ?? null,
+            premium_risk: premiumData?.riskLevel || premiumData?.risk || fraudData?.risk || null,
+            premium_source: premiumData?.source || fraudData?.source || null,
+            premium_warning: premiumData?.warning || null,
+            intelligence: {
+              ...(fraudData?.intelligence || {}),
+              behavior: {
+                ...(fraudData?.intelligence?.behavior || {}),
+                ...behaviorData,
+                suspicious: behaviorData?.suspicious || false,
+              },
+              location: locationData
+                ? {
+                    ...(fraudData?.intelligence?.location || {}),
+                    ...locationData,
+                    suspicious: locationData?.suspicious || false,
+                  }
+                : fraudData?.intelligence?.location || null,
+            },
+          };
+        });
         if (!mountedRef.current) {
           return;
         }
@@ -70,7 +168,11 @@ export default function useLiveBackendData({
         if (!mountedRef.current) {
           return;
         }
-        setError(requestError.response?.data?.error || requestError.message || "Backend data unavailable.");
+        setError(
+          dataRef.current
+            ? "Service unavailable. Showing the last known values."
+            : extractApiErrorMessage(requestError, "Service unavailable.")
+        );
       } finally {
         if (!mountedRef.current) {
           return;
@@ -93,7 +195,7 @@ export default function useLiveBackendData({
       mountedRef.current = false;
       window.clearInterval(intervalId);
     };
-  }, [payloadKey, refreshIntervalMs]);
+  }, [refreshIntervalMs, sessionSnapshot]);
 
   return {
     data,

@@ -33,6 +33,7 @@ logs/
 *.log
 npm-debug.log*
 .runlogs/
+.run-logs/
 
 # AI model artifacts
 ai-engine/models/*.pkl

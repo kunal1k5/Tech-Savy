@@ -1,131 +1,33 @@
-/**
- * API Service — Centralised Axios instance for backend communication.
- *
- * Automatically attaches JWT token from localStorage to every request.
- * Base URL is configured via REACT_APP_API_URL environment variable.
- */
-
 import axios from "axios";
+import { clearSession } from "../utils/auth";
 
-const API_BASE_CACHE_KEY = "gigshield_api_base_url";
-const BACKEND_SERVICE_NAME = "gigshield-ai-backend";
-const DISCOVERY_TIMEOUT_MS = 1200;
+export const API_BASE_URL =
+  (process.env.REACT_APP_API_URL || "http://localhost:5000/api").replace(/\/$/, "");
 
-let resolvedApiBaseUrl =
-  (typeof window !== "undefined" && window.localStorage.getItem(API_BASE_CACHE_KEY)) ||
-  process.env.REACT_APP_API_URL ||
-  "";
-let discoveryPromise = null;
-
-function normalizeBaseUrl(url) {
-  return String(url || "").replace(/\/$/, "");
+export function buildApiUrl(path = "") {
+  const normalizedPath = String(path || "").startsWith("/") ? path : `/${path}`;
+  return `${API_BASE_URL}${normalizedPath}`;
 }
 
-function isLocalHostname(hostname) {
-  return hostname === "localhost" || hostname === "127.0.0.1";
+export function unwrapApiPayload(payload) {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    !Array.isArray(payload) &&
+    Object.prototype.hasOwnProperty.call(payload, "success")
+  ) {
+    return payload.data;
+  }
+
+  return payload;
 }
 
-function buildCandidateApiBaseUrls() {
-  const candidates = [];
-  const configuredBaseUrl = normalizeBaseUrl(process.env.REACT_APP_API_URL);
-  if (configuredBaseUrl) {
-    candidates.push(configuredBaseUrl);
-  }
-
-  if (typeof window === "undefined") {
-    return candidates.length ? candidates : ["/api"];
-  }
-
-  const { origin, hostname } = window.location;
-  if (!isLocalHostname(hostname)) {
-    candidates.push(`${origin}/api`);
-  } else {
-    candidates.push("http://localhost:5001/api");
-    candidates.push("http://127.0.0.1:5001/api");
-    candidates.push("http://localhost:5000/api");
-    candidates.push("http://127.0.0.1:5000/api");
-    candidates.push(`${origin}/api`);
-  }
-
-  return [...new Set(candidates.map(normalizeBaseUrl).filter(Boolean))];
-}
-
-async function probeApiBaseUrl(baseUrl) {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), DISCOVERY_TIMEOUT_MS);
-
-  try {
-    const response = await fetch(`${baseUrl}/health`, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      return false;
-    }
-
-    const data = await response.json();
-    return data?.service === BACKEND_SERVICE_NAME;
-  } catch {
-    return false;
-  } finally {
-    window.clearTimeout(timeoutId);
-  }
-}
-
-async function discoverApiBaseUrl() {
-  const candidates = buildCandidateApiBaseUrls();
-  for (const candidate of candidates) {
-    // eslint-disable-next-line no-await-in-loop
-    const isValid = await probeApiBaseUrl(candidate);
-    if (isValid) {
-      return candidate;
-    }
-  }
-
-  return candidates[0] || "/api";
-}
-
-async function ensureApiBaseUrl(forceRefresh = false) {
-  if (!forceRefresh && resolvedApiBaseUrl) {
-    return resolvedApiBaseUrl;
-  }
-
-  if (!forceRefresh && discoveryPromise) {
-    return discoveryPromise;
-  }
-
-  discoveryPromise = discoverApiBaseUrl()
-    .then((baseUrl) => {
-      resolvedApiBaseUrl = normalizeBaseUrl(baseUrl) || "/api";
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(API_BASE_CACHE_KEY, resolvedApiBaseUrl);
-      }
-      return resolvedApiBaseUrl;
-    })
-    .finally(() => {
-      discoveryPromise = null;
-    });
-
-  return discoveryPromise;
-}
-
-function resolveApiBaseUrl() {
-  if (resolvedApiBaseUrl) {
-    return resolvedApiBaseUrl;
-  }
-
-  const candidates = buildCandidateApiBaseUrls();
-  return candidates[0] || "/api";
+function unwrapAxiosResponse(response) {
+  return unwrapApiPayload(response?.data);
 }
 
 const api = axios.create({
-  baseURL: resolveApiBaseUrl(),
+  baseURL: API_BASE_URL,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -135,6 +37,28 @@ export const DEFAULT_WEATHER_PAYLOAD = {
   precip_mm: 20,
   wind_kph: 25,
   aqi: 200,
+};
+
+export const DEFAULT_RISK_PREMIUM_INPUT = {
+  aqi: 90,
+  rain: 2,
+  wind: 12,
+};
+
+export const DEFAULT_AUTO_CLAIM_INPUT = {
+  risk: "LOW",
+  hoursLost: 1,
+  hourlyRate: 150,
+};
+
+export const DEFAULT_AI_DECISION_INPUT = {
+  aqi: 90,
+  rain: 2,
+  wind: 12,
+  claimsCount: 1,
+  loginAttempts: 1,
+  locationMatch: true,
+  contextValid: true,
 };
 
 export const DEFAULT_LOCATION_PAYLOAD = {
@@ -161,6 +85,25 @@ const WEATHER_FIELDS = ["temperature", "humidity", "precip_mm", "wind_kph", "aqi
 const LOCATION_FIELDS = ["current_location", "actual_location", "time", "day_of_week"];
 const BEHAVIOR_FIELDS = ["claims_count", "last_claim_time", "working_hours", "login_attempts"];
 
+function hasDirectSignalOverrides(overrides = {}) {
+  return [
+    "risk",
+    "locationMatch",
+    "location_match",
+    "location_signal",
+    "claimsCount",
+    "claims_count",
+    "loginAttempts",
+    "login_attempts",
+    "contextValid",
+    "context_valid",
+    "behavior_status",
+    "behavior_score",
+    "fraud_score",
+    "status",
+  ].some((fieldName) => overrides[fieldName] !== undefined);
+}
+
 function pickFields(source, fieldNames) {
   return fieldNames.reduce((result, fieldName) => {
     if (source[fieldName] !== undefined) {
@@ -170,86 +113,133 @@ function pickFields(source, fieldNames) {
   }, {});
 }
 
+export function extractApiErrorMessage(error, fallbackMessage = "Service unavailable.") {
+  const validationDetails = error?.response?.data?.details;
+  if (Array.isArray(validationDetails) && validationDetails.length > 0) {
+    return validationDetails.join(", ");
+  }
+
+  return (
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    error?.response?.data?.detail ||
+    error?.message ||
+    fallbackMessage
+  );
+}
+
 export function buildFraudPayload(overrides = {}) {
   const normalizedOverrides =
     overrides && typeof overrides === "object" && !Array.isArray(overrides) ? overrides : {};
 
-  const {
-    weather,
-    location,
-    behavior,
-    ...topLevelOverrides
-  } = normalizedOverrides;
-
-  return {
-    ...DEFAULT_FRAUD_PAYLOAD,
+  const { weather, location, behavior, ...topLevelOverrides } = normalizedOverrides;
+  const payload = {
     ...topLevelOverrides,
-    weather: {
-      ...DEFAULT_WEATHER_PAYLOAD,
-      ...pickFields(topLevelOverrides, WEATHER_FIELDS),
-      ...(weather || {}),
-    },
-    location: {
-      ...DEFAULT_LOCATION_PAYLOAD,
-      ...pickFields(topLevelOverrides, LOCATION_FIELDS),
-      ...(location || {}),
-    },
-    behavior: {
-      ...DEFAULT_BEHAVIOR_PAYLOAD,
-      ...pickFields(topLevelOverrides, BEHAVIOR_FIELDS),
-      ...(behavior || {}),
-    },
     context_valid:
       normalizedOverrides.context_valid !== undefined
         ? normalizedOverrides.context_valid
+        : normalizedOverrides.contextValid !== undefined
+          ? normalizedOverrides.contextValid
         : DEFAULT_FRAUD_PAYLOAD.context_valid,
   };
+  const shouldIncludeDefaultStructures =
+    !hasDirectSignalOverrides(topLevelOverrides) || weather || location || behavior;
+
+  if (shouldIncludeDefaultStructures) {
+    payload.weather = {
+      ...DEFAULT_WEATHER_PAYLOAD,
+      ...pickFields(topLevelOverrides, WEATHER_FIELDS),
+      ...(weather || {}),
+    };
+    payload.location = {
+      ...DEFAULT_LOCATION_PAYLOAD,
+      ...pickFields(topLevelOverrides, LOCATION_FIELDS),
+      ...(location || {}),
+    };
+    payload.behavior = {
+      ...DEFAULT_BEHAVIOR_PAYLOAD,
+      ...pickFields(topLevelOverrides, BEHAVIOR_FIELDS),
+      ...(behavior || {}),
+    };
+  }
+
+  return payload;
 }
 
 export function buildWeatherPayload(overrides = {}) {
   return buildFraudPayload(overrides).weather;
 }
 
+export function apiGet(path, config) {
+  return api.get(buildApiUrl(path), config);
+}
+
+export function apiPost(path, data, config) {
+  return api.post(buildApiUrl(path), data, config);
+}
+
 export async function getFraudStatus(payload = DEFAULT_FRAUD_PAYLOAD) {
-  const response = await api.post("/fraud-check", buildFraudPayload(payload));
-  return response.data;
+  const response = await apiPost("/fraud-check", buildFraudPayload(payload));
+  return unwrapAxiosResponse(response);
 }
 
 export async function getRisk(payload = DEFAULT_FRAUD_PAYLOAD) {
   const fraudData = await getFraudStatus(payload);
   return {
-    risk: fraudData.risk,
-    fraud_score: fraudData.fraud_score,
-    status: fraudData.status,
-    source: "fraud-check",
-    intelligence: fraudData.intelligence,
+    risk: fraudData?.risk || null,
+    premium: fraudData?.premium ?? null,
+    fraud_score: fraudData?.fraud_score ?? null,
+    status: fraudData?.status || null,
+    source: fraudData?.source || "fraud-check",
+    intelligence: fraudData?.intelligence || null,
   };
 }
 
 export async function getPremium(payload = DEFAULT_FRAUD_PAYLOAD) {
-  const response = await api.post("/calculate-premium", buildWeatherPayload(payload));
-  return response.data;
+  const response = await apiPost("/calculate-premium", buildWeatherPayload(payload));
+  return unwrapAxiosResponse(response);
+}
+
+export async function getRiskPremium(payload = DEFAULT_RISK_PREMIUM_INPUT) {
+  const response = await apiPost("/risk-premium", payload);
+  return unwrapAxiosResponse(response);
+}
+
+export async function getAutoClaim(payload = DEFAULT_AUTO_CLAIM_INPUT) {
+  const response = await apiPost("/auto-claim", payload);
+  return unwrapAxiosResponse(response);
+}
+
+export async function getAiDecision(payload = DEFAULT_AI_DECISION_INPUT) {
+  const response = await apiPost("/ai-decision", payload);
+  return unwrapAxiosResponse(response);
+}
+
+export async function startDispute(payload) {
+  const response = await apiPost("/start-dispute", payload);
+  return unwrapAxiosResponse(response);
+}
+
+export async function uploadProof({ disputeId, geoImage, workScreenshot }) {
+  const response = await api.postForm(buildApiUrl("/upload-proof"), {
+    disputeId,
+    geoImage,
+    workScreenshot,
+  });
+
+  return unwrapAxiosResponse(response);
+}
+
+export async function reverifyClaim(payload) {
+  const response = await apiPost("/reverify-claim", payload);
+  return unwrapAxiosResponse(response);
 }
 
 export async function getSystemSnapshot(payload = DEFAULT_FRAUD_PAYLOAD) {
-  const [fraudData, premiumData] = await Promise.all([
-    getFraudStatus(payload),
-    getPremium(payload),
-  ]);
-
-  return {
-    ...fraudData,
-    premium: premiumData.premium,
-    premium_risk: premiumData.risk,
-    premium_source: premiumData.source,
-    premium_warning: premiumData.warning || null,
-    refreshed_at: new Date().toISOString(),
-  };
+  return getFraudStatus(payload);
 }
 
-// Attach token to outgoing requests
-api.interceptors.request.use(async (config) => {
-  config.baseURL = await ensureApiBaseUrl();
+api.interceptors.request.use((config) => {
   const token = localStorage.getItem("gigshield_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -257,24 +247,11 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Handle 401 responses globally
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    if (
-      error.response?.status === 404 &&
-      typeof window !== "undefined" &&
-      error.config &&
-      !error.config.__gigshieldRetried
-    ) {
-      const refreshedBaseUrl = await ensureApiBaseUrl(true);
-      error.config.__gigshieldRetried = true;
-      error.config.baseURL = refreshedBaseUrl;
-      return api.request(error.config);
-    }
-
+  (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem("gigshield_token");
+      clearSession();
       window.location.href = "/login";
     }
     return Promise.reject(error);

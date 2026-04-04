@@ -1,1 +1,3 @@
-export { default } from "../../pages/Profile";
+import Profile from "../../pages/Profile.jsx";
+
+export default Profile;

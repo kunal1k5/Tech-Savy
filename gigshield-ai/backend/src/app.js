@@ -20,12 +20,20 @@ const triggerRoutes = require("./routes/trigger.routes");
 const paymentRoutes = require("./routes/payment.routes");
 const adminRoutes = require("./routes/admin.routes");
 const behaviorRoutes = require("./routes/behavior.routes");
+const autoClaimRoutes = require("./routes/autoClaim.routes");
 const fraudOrchestratorRoutes = require("./routes/fraudOrchestrator.routes");
 const riskRoutes = require("./routes/risk.routes");
 const demoRoutes = require("./routes/demo.routes");
 const locationFlowRoutes = require("./routes/locationFlow.routes");
 const premiumFlowRoutes = require("./routes/premiumFlow.routes");
+const riskPremiumRoutes = require("./routes/riskPremium.routes");
+const aiProxyRoutes = require("./routes/aiProxy.routes");
 const testFlowRoutes = require("./routes/testFlow.routes");
+const aiDecisionRoutes = require("./routes/aiDecision.routes");
+const disputeRoutes = require("./routes/dispute.routes");
+const proofUploadRoutes = require("./routes/proofUpload.routes");
+const reverificationRoutes = require("./routes/reverification.routes");
+const { sendError, sendSuccess } = require("./utils/apiResponse");
 
 // Middleware
 const { errorHandler } = require("./middleware/errorHandler");
@@ -95,7 +103,9 @@ app.use(cors({
   },
 }));
 app.use(express.json({ limit: "1mb" }));
-app.use(morgan("dev"));
+if (process.env.NODE_ENV !== "test") {
+  app.use(morgan("dev"));
+}
 
 // ── Rate Limiting ───────────────────────────────────────────
 const isProduction = process.env.NODE_ENV === "production";
@@ -105,7 +115,9 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: {
-    error: "Too many requests. Slow down for a moment and try again.",
+    success: false,
+    data: null,
+    message: "Too many requests. Slow down for a moment and try again.",
   },
   skip(req) {
     return req.path === "/health" || (!isProduction && isLocalRequest(req));
@@ -115,7 +127,15 @@ app.use("/api", limiter);
 
 // ── Health Check ────────────────────────────────────────────
 app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok", service: "gigshield-ai-backend", timestamp: new Date().toISOString() });
+  return sendSuccess(
+    res,
+    {
+      status: "ok",
+      service: "gigshield-ai-backend",
+      timestamp: new Date().toISOString(),
+    },
+    "Health check passed."
+  );
 });
 
 // ── API Routes ──────────────────────────────────────────────
@@ -126,20 +146,23 @@ app.use("/api/triggers", triggerRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api", behaviorRoutes);
+app.use("/api", autoClaimRoutes);
 app.use("/api", fraudOrchestratorRoutes);
 app.use("/api/risk", riskRoutes);
 app.use("/api", demoRoutes);
 app.use("/api", locationFlowRoutes);
 app.use("/api", premiumFlowRoutes);
-app.use("/", behaviorRoutes);
-app.use("/", fraudOrchestratorRoutes);
-app.use("/", locationFlowRoutes);
-app.use("/", premiumFlowRoutes);
-app.use("/", testFlowRoutes);
+app.use("/api", riskPremiumRoutes);
+app.use("/api", aiProxyRoutes);
+app.use("/api", testFlowRoutes);
+app.use("/api", aiDecisionRoutes);
+app.use("/api", disputeRoutes);
+app.use("/api", proofUploadRoutes);
+app.use("/api", reverificationRoutes);
 
 // ── 404 Catch-All ───────────────────────────────────────────
 app.use((_req, res) => {
-  res.status(404).json({ error: "Route not found" });
+  return sendError(res, 404, "Route not found");
 });
 
 // ── Global Error Handler ────────────────────────────────────

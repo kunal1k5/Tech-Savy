@@ -37,6 +37,8 @@ TEXT_REQUEST_FIELDS = ("current_location", "actual_location", "time")
 MODEL_ENV_VARS = ("LOCATION_MODEL_PATH", "NEXT_LOCATION_MODEL_PATH")
 REFERENCE_ENV_VARS = ("LOCATION_REFERENCE_PATH", "NEXT_LOCATION_REFERENCE_PATH")
 LOCATION_CODE_PATTERN = re.compile(r"([A-Za-z]+|\d+)$")
+_LOCATION_MODEL_CACHE = None
+_LOCATION_MODEL_ERROR = None
 
 
 def _first_env_value(names: tuple[str, ...]) -> str:
@@ -75,12 +77,27 @@ def _candidate_paths() -> Tuple[List[Path], List[Path]]:
     return normalized_models, normalized_references
 
 
-@lru_cache(maxsize=1)
 def load_location_model():
+    global _LOCATION_MODEL_CACHE
+    global _LOCATION_MODEL_ERROR
+
+    if _LOCATION_MODEL_CACHE is not None:
+        return _LOCATION_MODEL_CACHE
+
+    if _LOCATION_MODEL_ERROR is not None:
+        raise RuntimeError(_LOCATION_MODEL_ERROR)
+
     model_paths, _ = _candidate_paths()
     model_path = resolve_existing_path(model_paths, "location model")
-    model = safe_load_joblib(model_path, mmap_mode="r")
-    return model, model_path
+
+    try:
+        model = safe_load_joblib(model_path, mmap_mode="r")
+    except Exception as error:
+        _LOCATION_MODEL_ERROR = f"{type(error).__name__}: {error}"
+        raise RuntimeError(_LOCATION_MODEL_ERROR) from error
+
+    _LOCATION_MODEL_CACHE = (model, model_path)
+    return _LOCATION_MODEL_CACHE
 
 
 @lru_cache(maxsize=1)
@@ -123,21 +140,32 @@ def get_location_model_health() -> Dict[str, object]:
         "input_modes": ["numeric", "location_text"],
     }
 
-    try:
-        model, model_path = load_location_model()
-    except Exception as error:
+    model_paths, _ = _candidate_paths()
+    model_path = next((path for path in model_paths if path and path.exists()), None)
+
+    if _LOCATION_MODEL_ERROR is not None:
         return {
             **health,
             "model_ready": False,
             "fallback_mode": True,
-            "warning": str(error),
+            "warning": _LOCATION_MODEL_ERROR,
         }
 
+    if _LOCATION_MODEL_CACHE is None:
+        return {
+            **health,
+            "model_ready": bool(model_path),
+            "fallback_mode": False,
+            "model_path": str(model_path) if model_path else None,
+            "lazy_loaded": True,
+        }
+
+    model, loaded_model_path = _LOCATION_MODEL_CACHE
     return {
         **health,
         "model_ready": True,
         "fallback_mode": False,
-        "model_path": str(model_path),
+        "model_path": str(loaded_model_path),
         "expected_features": int(getattr(model, "n_features_in_", len(LOCATION_FEATURE_COLUMNS))),
         "class_count": int(len(getattr(model, "classes_", []))),
     }

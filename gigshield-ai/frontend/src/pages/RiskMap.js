@@ -15,11 +15,7 @@ import Button from "../components/ui/Button";
 import { LoadingPanel } from "../components/ui/Loader";
 import SectionHeader from "../components/ui/SectionHeader";
 import { useGigShieldData } from "../context/GigShieldDataContext";
-import {
-  SAMPLE_RISK_PAYLOAD,
-  predictLiveRisk,
-  predictRisk,
-} from "../services/riskPrediction";
+import { predictLiveRisk, predictRisk } from "../services/riskPrediction";
 import { getUserFromToken } from "../utils/auth";
 
 const FIELD_CONFIG = [
@@ -36,36 +32,6 @@ const FIELD_CONFIG = [
   { name: "gust", label: "Gust", unit: "km/h" },
 ];
 
-const PRESET_PAYLOADS = {
-  "Low Risk": {
-    temperature: 24,
-    humidity: 45,
-    wind: 8,
-    pressure: 1014,
-    rain: 0,
-    cloud: 12,
-    uv: 4,
-    pm25: 18,
-    pm10: 32,
-    visibility: 10,
-    gust: 12,
-  },
-  "Medium Risk": {
-    temperature: 31,
-    humidity: 68,
-    wind: 18,
-    pressure: 1008,
-    rain: 6,
-    cloud: 56,
-    uv: 7,
-    pm25: 60,
-    pm10: 98,
-    visibility: 6,
-    gust: 24,
-  },
-  "High Risk": SAMPLE_RISK_PAYLOAD,
-};
-
 const RISK_STYLES = {
   "Low Risk": { tone: "success", glow: "emerald" },
   "Medium Risk": { tone: "warning", glow: "amber" },
@@ -75,6 +41,10 @@ const RISK_STYLES = {
 
 function toFormState(payload) {
   return Object.fromEntries(FIELD_CONFIG.map(({ name }) => [name, String(payload[name] ?? "")]));
+}
+
+function createEmptyFormState() {
+  return Object.fromEntries(FIELD_CONFIG.map(({ name }) => [name, ""]));
 }
 
 function toNumericPayload(formData) {
@@ -104,11 +74,11 @@ export default function RiskMap() {
     const sessionUser = getUserFromToken();
     return sessionUser?.city || platformState.worker.city || "Bengaluru";
   }, [platformState.worker.city]);
-  const [formData, setFormData] = useState(() => toFormState(SAMPLE_RISK_PAYLOAD));
+  const [formData, setFormData] = useState(createEmptyFormState);
   const [city, setCity] = useState(profileCity);
   const [prediction, setPrediction] = useState("");
   const [predictionDetails, setPredictionDetails] = useState(null);
-  const [submittedPayload, setSubmittedPayload] = useState(SAMPLE_RISK_PAYLOAD);
+  const [submittedPayload, setSubmittedPayload] = useState(null);
   const [apiError, setApiError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingLiveWeather, setIsFetchingLiveWeather] = useState(false);
@@ -125,8 +95,13 @@ export default function RiskMap() {
     setFormData((current) => ({ ...current, [name]: value }));
   }
 
-  function applyPreset(payload) {
-    setFormData(toFormState(payload));
+  function resetForm() {
+    setFormData(createEmptyFormState());
+    setSubmittedPayload(null);
+    setPrediction("");
+    setPredictionDetails(null);
+    setLiveWeatherSource("");
+    setLiveWeatherMeta(null);
     setApiError("");
   }
 
@@ -232,14 +207,6 @@ export default function RiskMap() {
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap gap-3">
-          {Object.entries(PRESET_PAYLOADS).map(([label, payload]) => (
-            <Button key={label} type="button" variant="ghost" onClick={() => applyPreset(payload)}>
-              {label}
-            </Button>
-          ))}
-        </div>
-
         <div className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
           <Card glow="violet">
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -250,10 +217,10 @@ export default function RiskMap() {
                 </div>
                 <CardTitle className="mt-2">POST /predict payload</CardTitle>
                 <CardDescription className="mt-2">
-                  Feed manual weather and air-quality values or pull live city data from the Flask service.
+                  Feed manual weather and air-quality values or pull live city data through the backend API.
                 </CardDescription>
               </div>
-              <Badge tone="violet">React → Flask</Badge>
+              <Badge tone="violet">React -> Backend -> AI</Badge>
             </CardHeader>
 
             <div className="rounded-[24px] border border-emerald-400/20 bg-emerald-400/10 px-4 py-4 text-sm text-emerald-100">
@@ -290,13 +257,13 @@ export default function RiskMap() {
               </div>
             ) : (
               <div className="rounded-[22px] border border-sky-400/20 bg-sky-400/10 px-4 py-3 text-sm text-sky-100">
-                Use presets for a quick demo or enter custom weather data to show the full scoring flow.
+                Enter live or manual weather inputs to score the current risk state.
               </div>
             )}
 
             <div className="flex flex-wrap gap-3">
-              <Button type="button" variant="secondary" leftIcon={RefreshCcw} onClick={() => applyPreset(SAMPLE_RISK_PAYLOAD)}>
-                Reset Sample
+              <Button type="button" variant="secondary" leftIcon={RefreshCcw} onClick={resetForm}>
+                Reset Form
               </Button>
               <Button type="submit" variant="primary" rightIcon={Send} loading={isSubmitting}>
                 {isSubmitting ? "Predicting Risk" : "Predict Risk"}
@@ -330,7 +297,9 @@ export default function RiskMap() {
                   <CloudRain size={15} className="text-sky-300" />
                   Rain
                 </div>
-                <div className="mt-3 text-2xl font-semibold text-white">{submittedPayload.rain} mm</div>
+                <div className="mt-3 text-2xl font-semibold text-white">
+                  {submittedPayload?.rain ?? "-"} mm
+                </div>
               </div>
               <div className="rounded-[22px] border border-white/10 bg-slate-950/55 p-4">
                 <div className="flex items-center gap-2 text-sm text-slate-400">
@@ -338,7 +307,7 @@ export default function RiskMap() {
                   AQ snapshot
                 </div>
                 <div className="mt-3 text-2xl font-semibold text-white">
-                  {Math.max(submittedPayload.pm25, submittedPayload.pm10)}
+                  {submittedPayload ? Math.max(submittedPayload.pm25, submittedPayload.pm10) : "-"}
                 </div>
               </div>
               <div className="rounded-[22px] border border-white/10 bg-slate-950/55 p-4">
@@ -346,7 +315,9 @@ export default function RiskMap() {
                   <Wind size={15} className="text-cyan-300" />
                   Gust
                 </div>
-                <div className="mt-3 text-2xl font-semibold text-white">{submittedPayload.gust} km/h</div>
+                <div className="mt-3 text-2xl font-semibold text-white">
+                  {submittedPayload?.gust ?? "-"} km/h
+                </div>
               </div>
             </div>
 

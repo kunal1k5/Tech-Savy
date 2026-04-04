@@ -1,0 +1,138 @@
+const request = require("supertest");
+
+const app = require("../app");
+const { resetDisputeStore } = require("../services/dispute.service");
+
+describe("GigShield AI workflow audit", () => {
+  beforeEach(() => {
+    resetDisputeStore();
+  });
+
+  it("runs the full decision, dispute, upload, and re-verification flow", async () => {
+    const riskPremiumResponse = await request(app).post("/api/risk-premium").send({
+      aqi: 340,
+      rain: 24,
+      wind: 35,
+    });
+
+    expect(riskPremiumResponse.status).toBe(200);
+    expect(riskPremiumResponse.body).toEqual({
+      success: true,
+      data: {
+        risk: "HIGH",
+        premium: 30,
+      },
+      message: "Risk and premium calculated successfully.",
+    });
+
+    const autoClaimResponse = await request(app).post("/api/auto-claim").send({
+      risk: riskPremiumResponse.body.data.risk,
+      hoursLost: 3,
+      hourlyRate: 150,
+    });
+
+    expect(autoClaimResponse.status).toBe(200);
+    expect(autoClaimResponse.body).toMatchObject({
+      success: true,
+      data: {
+        claimTriggered: true,
+        payout: 450,
+        status: "PAID",
+      },
+    });
+
+    const fraudResponse = await request(app).post("/api/fraud-check").send({
+      risk: riskPremiumResponse.body.data.risk,
+      locationMatch: false,
+      claimsCount: 4,
+      loginAttempts: 5,
+      contextValid: false,
+    });
+
+    expect(fraudResponse.status).toBe(200);
+    expect(fraudResponse.body).toMatchObject({
+      success: true,
+      data: {
+        status: "FRAUD",
+        fraudScore: 110,
+      },
+    });
+
+    const aiDecisionResponse = await request(app).post("/api/ai-decision").send({
+      aqi: 340,
+      rain: 24,
+      wind: 35,
+      claimsCount: 4,
+      loginAttempts: 5,
+      locationMatch: false,
+      contextValid: false,
+    });
+
+    expect(aiDecisionResponse.status).toBe(200);
+    expect(aiDecisionResponse.body).toMatchObject({
+      success: true,
+      data: {
+        risk: "HIGH",
+        decision: "FRAUD",
+        nextAction: "REJECT_CLAIM",
+      },
+    });
+
+    const disputeResponse = await request(app).post("/api/start-dispute").send({
+      userId: "worker-123",
+      reason: "System failed to detect actual issue",
+    });
+
+    expect(disputeResponse.status).toBe(201);
+    expect(disputeResponse.body).toEqual({
+      success: true,
+      data: {
+        disputeId: "D1001",
+        status: "INITIATED",
+      },
+      message: "Dispute started successfully.",
+    });
+
+    const uploadResponse = await request(app)
+      .post("/api/upload-proof")
+      .field("disputeId", disputeResponse.body.data.disputeId)
+      .attach("geoImage", Buffer.from("geo-image"), {
+        filename: "geo-proof.png",
+        contentType: "image/png",
+      })
+      .attach("workScreenshot", Buffer.from("work-image"), {
+        filename: "active-order.png",
+        contentType: "image/png",
+      });
+
+    expect(uploadResponse.status).toBe(200);
+    expect(uploadResponse.body).toEqual({
+      success: true,
+      data: {
+        status: "RECEIVED",
+      },
+      message: "Proof uploaded successfully.",
+    });
+
+    const reverificationResponse = await request(app).post("/api/reverify-claim").send({
+      disputeId: disputeResponse.body.data.disputeId,
+      claimTime: "14:00",
+      userLocation: "Zone-A",
+    });
+
+    expect(reverificationResponse.status).toBe(200);
+    expect(reverificationResponse.body).toEqual({
+      success: true,
+      data: {
+        finalStatus: "APPROVED",
+        confidence: 85,
+        claimUpdate: {
+          claimStatus: "PAID",
+          payoutStatus: "PAYOUT_RELEASED",
+          fraudStatus: "verified",
+        },
+      },
+      message: "Claim re-verification completed.",
+    });
+  });
+});

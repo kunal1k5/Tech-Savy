@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import api from "../services/api";
+import { apiGet, extractApiErrorMessage } from "../services/api";
 import StatCard from "../components/StatCard";
 import { formatINR } from "../utils/helpers";
 
@@ -11,20 +11,21 @@ function AdminDashboard() {
   const [triggers, setTriggers] = useState([]);
   const [flagged, setFlagged] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     async function fetchAdmin() {
       try {
         const [statsRes, triggerRes, flaggedRes] = await Promise.all([
-          api.get("/admin/dashboard"),
-          api.get("/admin/triggers/recent"),
-          api.get("/admin/claims/flagged"),
+          apiGet("/admin/dashboard"),
+          apiGet("/admin/triggers/recent"),
+          apiGet("/admin/claims/flagged"),
         ]);
         setStats(statsRes.data.data);
         setTriggers(triggerRes.data.data);
         setFlagged(flaggedRes.data.data);
       } catch (err) {
-        console.error("Admin dashboard error:", err);
+        setError(extractApiErrorMessage(err, "Service unavailable."));
       } finally {
         setLoading(false);
       }
@@ -34,6 +35,10 @@ function AdminDashboard() {
 
   if (loading) {
     return <div className="flex justify-center items-center h-64 text-gray-500">Loading analytics...</div>;
+  }
+
+  if (error) {
+    return <div className="flex justify-center items-center h-64 text-red-600">{error}</div>;
   }
 
   return (

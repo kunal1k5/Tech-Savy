@@ -1,35 +1,15 @@
-const SAMPLE_RISK_PAYLOAD = {
-  temperature: 38,
-  humidity: 88,
-  wind: 32,
-  pressure: 996,
-  rain: 28,
-  cloud: 90,
-  uv: 10,
-  pm25: 140,
-  pm10: 220,
-  visibility: 2,
-  gust: 44,
-};
+import { buildApiUrl, unwrapApiPayload } from "./api";
 
-function resolveRiskApiBaseUrl() {
-  if (process.env.REACT_APP_FLASK_API_URL) {
-    return process.env.REACT_APP_FLASK_API_URL.replace(/\/$/, "");
+async function readJson(response) {
+  try {
+    return await response.json();
+  } catch {
+    return null;
   }
-
-  if (typeof window !== "undefined") {
-    const { hostname, origin } = window.location;
-    if (hostname === "localhost" || hostname === "127.0.0.1") {
-      return "http://localhost:8000";
-    }
-    return origin;
-  }
-
-  return "http://localhost:8000";
 }
 
 export async function predictRisk(payload) {
-  const response = await fetch(`${resolveRiskApiBaseUrl()}/predict`, {
+  const response = await fetch(buildApiUrl("/predict"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -37,40 +17,28 @@ export async function predictRisk(payload) {
     body: JSON.stringify(payload),
   });
 
-  let data = null;
-  try {
-    data = await response.json();
-  } catch (error) {
-    data = null;
-  }
-
+  const data = await readJson(response);
   if (!response.ok) {
-    throw new Error(data?.error || "Unable to fetch risk prediction.");
+    throw new Error(data?.message || data?.error || "Service unavailable.");
   }
 
-  return data;
+  return unwrapApiPayload(data);
 }
 
 export async function fetchLiveWeather(city) {
   const query = new URLSearchParams({ city }).toString();
-  const response = await fetch(`${resolveRiskApiBaseUrl()}/weather/live?${query}`);
-
-  let data = null;
-  try {
-    data = await response.json();
-  } catch (error) {
-    data = null;
-  }
+  const response = await fetch(`${buildApiUrl("/weather/live")}?${query}`);
+  const data = await readJson(response);
 
   if (!response.ok) {
-    throw new Error(data?.error || "Unable to fetch live weather.");
+    throw new Error(data?.message || data?.error || "Service unavailable.");
   }
 
-  return data;
+  return unwrapApiPayload(data);
 }
 
 export async function predictLiveRisk(city) {
-  const response = await fetch(`${resolveRiskApiBaseUrl()}/predict/live`, {
+  const response = await fetch(buildApiUrl("/predict/live"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -78,18 +46,10 @@ export async function predictLiveRisk(city) {
     body: JSON.stringify({ city }),
   });
 
-  let data = null;
-  try {
-    data = await response.json();
-  } catch (error) {
-    data = null;
-  }
-
+  const data = await readJson(response);
   if (!response.ok) {
-    throw new Error(data?.error || "Unable to predict live risk.");
+    throw new Error(data?.message || data?.error || "Service unavailable.");
   }
 
-  return data;
+  return unwrapApiPayload(data);
 }
-
-export { SAMPLE_RISK_PAYLOAD };
