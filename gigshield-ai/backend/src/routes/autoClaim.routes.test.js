@@ -221,4 +221,39 @@ describe("POST /api/auto-claim", () => {
       message: "Auto-claim decision generated successfully.",
     });
   });
+
+  it("blocks repeated auto-claim triggering when the last claim is within five minutes", async () => {
+    const response = await request(app).post("/api/auto-claim").send({
+      risk: "HIGH",
+      isWorking: true,
+      ordersCompleted: 0,
+      duration: 180,
+      workingMinutes: 180,
+      earnings: 0,
+      hoursLost: 3,
+      hourlyRate: 150,
+      lastClaimTime: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+    });
+
+    expect(response.status).toBe(429);
+    expect(response.body).toMatchObject({
+      success: false,
+      message: expect.stringContaining("Claim blocked by cooldown."),
+      data: {
+        blocked: true,
+        claimTriggered: false,
+        payout: 0,
+        status: null,
+        cooldown: {
+          active: true,
+          cooldownMs: 300000,
+          lastClaimTime: expect.any(String),
+          remainingMs: expect.any(Number),
+          remainingSeconds: expect.any(Number),
+          retryAfterAt: expect.any(String),
+        },
+      },
+    });
+    expect(response.body.data.cooldown.remainingMs).toBeGreaterThan(0);
+  });
 });

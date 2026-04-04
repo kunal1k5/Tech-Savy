@@ -6,6 +6,7 @@ function dedupe(values = []) {
 
 function buildWarnings({
   imageValidation = {},
+  locationValidation = {},
   activityValidation = {},
   weatherValidation = {},
   workValidation = {},
@@ -34,6 +35,13 @@ function buildWarnings({
   if (imageValidation.is_live_capture === false) {
     reasons.push("Proof was not captured live");
     explanation.push("Capture metadata does not look like a recent live camera capture.");
+  }
+
+  if (locationValidation.match === false) {
+    reasons.push("Proof location mismatch");
+    explanation.push(
+      locationValidation.reason || "Uploaded proof location does not match the expected claim area."
+    );
   }
 
   if (activityValidation.was_active === false) {

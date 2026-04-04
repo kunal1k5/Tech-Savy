@@ -86,7 +86,15 @@ function calculateReverificationScore({ locationMatch, timeMatch, activityValid 
   return score;
 }
 
-function getFinalStatus(score) {
+function hasCriticalProofMismatch({ locationMatch, activityValid }) {
+  return !locationMatch || !activityValid;
+}
+
+function getFinalStatus({ score, locationMatch, activityValid }) {
+  if (hasCriticalProofMismatch({ locationMatch, activityValid })) {
+    return REVERIFICATION_OUTCOMES.REJECTED;
+  }
+
   return score > 60
     ? REVERIFICATION_OUTCOMES.APPROVED
     : REVERIFICATION_OUTCOMES.REJECTED;
@@ -132,7 +140,11 @@ function reverifyClaim({ disputeId, claimTime, userLocation }) {
     timeMatch,
     activityValid,
   });
-  const finalStatus = getFinalStatus(score);
+  const finalStatus = getFinalStatus({
+    score,
+    locationMatch,
+    activityValid,
+  });
   const confidence = calculateConfidence(score);
   const claimUpdate = buildClaimUpdate(finalStatus);
 
@@ -165,6 +177,7 @@ module.exports = {
   calculateConfidence,
   calculateReverificationScore,
   getFinalStatus,
+  hasCriticalProofMismatch,
   reverifyClaim,
   reverifyClaimSchema,
 };

@@ -15,6 +15,10 @@
 const { pool } = require("../database/connection");
 const ClaimModel = require("../models/claim.model");
 const PolicyModel = require("../models/policy.model");
+const {
+  getClaimCooldownState,
+  formatCooldownWait,
+} = require("./claimCooldown.service");
 const logger = require("../utils/logger");
 
 // Configurable thresholds
@@ -104,7 +108,21 @@ const TriggerService = {
 
     // 3. Auto-create claims for each affected policy
     const claims = [];
+    const cooldownBlocks = [];
     for (const policy of activePolicies) {
+      const latestClaim = await ClaimModel.findLatestByWorker(policy.worker_id);
+      const cooldown = getClaimCooldownState(latestClaim?.created_at);
+
+      if (cooldown.active) {
+        cooldownBlocks.push({
+          worker_id: policy.worker_id,
+          policy_id: policy.id,
+          reason: `Claim cooldown active. Retry in ${formatCooldownWait(cooldown.remainingMs)}.`,
+          cooldown,
+        });
+        continue;
+      }
+
       // Payout = coverage_amount × severity multiplier
       const severityMultiplier = { low: 0.25, medium: 0.5, high: 0.75, critical: 1.0 };
       const claimAmount = Math.round(
@@ -121,10 +139,15 @@ const TriggerService = {
     }
 
     logger.info(
-      `Trigger ${trigger.id} fired: ${triggerData.trigger_type} in ${triggerData.city}/${triggerData.zone} — ${claims.length} claims auto-created`
+      `Trigger ${trigger.id} fired: ${triggerData.trigger_type} in ${triggerData.city}/${triggerData.zone} — ${claims.length} claims auto-created, ${cooldownBlocks.length} blocked by cooldown`
     );
 
-    return { trigger, claims_created: claims.length };
+    return {
+      trigger,
+      claims_created: claims.length,
+      claims_blocked_by_cooldown: cooldownBlocks.length,
+      cooldown_blocks: cooldownBlocks,
+    };
   },
 };
 

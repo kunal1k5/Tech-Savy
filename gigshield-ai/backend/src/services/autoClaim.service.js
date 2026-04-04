@@ -1,6 +1,10 @@
 const DEFAULT_HOURLY_RATE = 150;
 const { buildRiskReason, joinReasonParts } = require("../utils/explanations");
 const { clampInteger, clampNumber, ensureObject, sanitizeBoolean } = require("../utils/inputSafety");
+const {
+  getClaimCooldownState,
+  formatCooldownWait,
+} = require("./claimCooldown.service");
 const CLAIM_STATES = ["CREATED", "PROCESSING", "PAID"];
 const ELIGIBLE_RISK = "HIGH";
 const CLAIM_DURATION_THRESHOLD_MINUTES = 30;
@@ -72,6 +76,7 @@ function validateAutoClaimPayload(payload) {
     earnings,
     isWorking,
     explicitIncomeLoss,
+    lastClaimTime: safePayload?.lastClaimTime ?? safePayload?.last_claim_time ?? null,
   };
 }
 
@@ -157,6 +162,7 @@ function getAutoClaimDecision(payload) {
     earnings,
     isWorking,
     explicitIncomeLoss,
+    lastClaimTime,
   } = validateAutoClaimPayload(payload);
   const { incomeLoss, reason } = deriveIncomeLoss({
     isWorking,
@@ -182,6 +188,38 @@ function getAutoClaimDecision(payload) {
     [riskReason, claimReason],
     "Claim decision explanation unavailable."
   );
+  const cooldown = claimTriggered ? getClaimCooldownState(lastClaimTime) : null;
+
+  if (cooldown?.active) {
+    return {
+      blocked: true,
+      claimTriggered: false,
+      payout: 0,
+      status: null,
+      claimStates: CLAIM_STATES,
+      hoursLost,
+      hourlyRate,
+      isWorking,
+      incomeLoss,
+      incomeLossReason: reason,
+      riskReason,
+      claimReason,
+      reason: explanation,
+      ordersCompleted,
+      duration,
+      workingMinutes: duration,
+      earnings,
+      lastClaimTime: cooldown.lastClaimTime,
+      cooldown,
+      eligibility: {
+        riskEligible: risk === ELIGIBLE_RISK,
+        activeWorkConfirmed: isWorking,
+        incomeLossDetected: incomeLoss,
+        durationThresholdMet: duration > CLAIM_DURATION_THRESHOLD_MINUTES,
+      },
+      message: `Claim blocked by cooldown. Try again in ${formatCooldownWait(cooldown.remainingMs)}.`,
+    };
+  }
 
   return {
     claimTriggered,

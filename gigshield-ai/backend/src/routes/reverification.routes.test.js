@@ -2,6 +2,7 @@ const request = require("supertest");
 
 const app = require("../app");
 const { getDisputeById, resetDisputeStore, startDispute } = require("../services/dispute.service");
+const { getFinalStatus } = require("../services/reverification.service");
 
 describe("POST /api/reverify-claim", () => {
   beforeEach(() => {
@@ -100,6 +101,118 @@ describe("POST /api/reverify-claim", () => {
       },
       message: "Claim re-verification completed.",
     });
+  });
+
+  it("rejects a claim when location proof does not match even if activity looks valid", async () => {
+    const dispute = startDispute({
+      userId: "123",
+      reason: "System failed to detect actual issue",
+    });
+
+    await request(app)
+      .post("/api/upload-proof")
+      .field("disputeId", dispute.disputeId)
+      .attach("geoImage", Buffer.from("geo-image"), {
+        filename: "outside-proof.png",
+        contentType: "image/png",
+      })
+      .attach("workScreenshot", Buffer.from("work-image"), {
+        filename: "active-order.png",
+        contentType: "image/png",
+      });
+
+    const response = await request(app).post("/api/reverify-claim").send({
+      disputeId: dispute.disputeId,
+      claimTime: "14:00",
+      userLocation: "Zone-A",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        finalStatus: "REJECTED",
+        claimUpdate: {
+          claimStatus: "REJECTED",
+          payoutStatus: "BLOCKED",
+          fraudStatus: "flagged",
+        },
+      },
+    });
+
+    expect(getDisputeById(dispute.disputeId)).toMatchObject({
+      verification: {
+        checks: {
+          locationMatch: false,
+          activityValid: true,
+        },
+      },
+    });
+  });
+
+  it("rejects a claim when activity proof is invalid even if location matches", async () => {
+    const dispute = startDispute({
+      userId: "123",
+      reason: "System failed to detect actual issue",
+    });
+
+    await request(app)
+      .post("/api/upload-proof")
+      .field("disputeId", dispute.disputeId)
+      .attach("geoImage", Buffer.from("geo-image"), {
+        filename: "geo-proof.png",
+        contentType: "image/png",
+      })
+      .attach("workScreenshot", Buffer.from("work-image"), {
+        filename: "inactive-screen.png",
+        contentType: "image/png",
+      });
+
+    const response = await request(app).post("/api/reverify-claim").send({
+      disputeId: dispute.disputeId,
+      claimTime: "14:00",
+      userLocation: "Zone-A",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        finalStatus: "REJECTED",
+        claimUpdate: {
+          claimStatus: "REJECTED",
+          payoutStatus: "BLOCKED",
+          fraudStatus: "flagged",
+        },
+      },
+    });
+
+    expect(getDisputeById(dispute.disputeId)).toMatchObject({
+      verification: {
+        checks: {
+          locationMatch: true,
+          activityValid: false,
+        },
+      },
+    });
+  });
+
+  it("hard-rejects when a critical proof check fails even if the score is otherwise high", () => {
+    expect(
+      getFinalStatus({
+        score: 80,
+        locationMatch: false,
+        activityValid: true,
+      })
+    ).toBe("REJECTED");
+
+    expect(
+      getFinalStatus({
+        score: 80,
+        locationMatch: true,
+        activityValid: false,
+      })
+    ).toBe("REJECTED");
   });
 
   it("requires uploaded proof before re-verification", async () => {

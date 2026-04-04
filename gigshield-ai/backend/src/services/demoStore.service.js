@@ -2,6 +2,10 @@ const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
 
 const aiService = require("../integrations/aiService");
+const {
+  getClaimCooldownState,
+  formatCooldownWait,
+} = require("./claimCooldown.service");
 const { clampNumber, ensureObject } = require("../utils/inputSafety");
 
 const JWT_SECRET = process.env.JWT_SECRET || "default-dev-secret";
@@ -65,6 +69,7 @@ const RISK_LEVELS = {
 const otpSessions = new Map();
 const usersByPhone = new Map();
 const userStates = new Map();
+const claimProgressTimeouts = new Set();
 let claimSequence = 3001;
 
 function nowIso() {
@@ -403,7 +408,8 @@ function scheduleClaimProgress(userId, claimId, mode) {
     return;
   }
 
-  setTimeout(() => {
+  const approvalTimeoutId = setTimeout(() => {
+    claimProgressTimeouts.delete(approvalTimeoutId);
     const state = userStates.get(userId);
     if (!state) {
       return;
@@ -421,8 +427,10 @@ function scheduleClaimProgress(userId, claimId, mode) {
       createHistory("approved", "Coverage conditions matched. Claim approved.", "success")
     );
   }, 1800);
+  claimProgressTimeouts.add(approvalTimeoutId);
 
-  setTimeout(() => {
+  const payoutTimeoutId = setTimeout(() => {
+    claimProgressTimeouts.delete(payoutTimeoutId);
     const state = userStates.get(userId);
     if (!state) {
       return;
@@ -440,6 +448,22 @@ function scheduleClaimProgress(userId, claimId, mode) {
       createHistory("paid", "Money released to the worker account.", "success")
     );
   }, 3600);
+  claimProgressTimeouts.add(payoutTimeoutId);
+}
+
+function getLatestClaimTime(claims = []) {
+  return claims[0]?.detectedAt || null;
+}
+
+function buildCooldownBlockResult(state, cooldown) {
+  return {
+    triggered: false,
+    blocked: true,
+    cooldown,
+    message: `Claim blocked by cooldown. Try again in ${formatCooldownWait(cooldown.remainingMs)}.`,
+    claims: clone(state.claims),
+    fraudWatch: buildFraudWatch(state.claims),
+  };
 }
 
 async function resolveRiskScore(user, requestedRisk) {
@@ -634,6 +658,11 @@ const DemoStoreService = {
       };
     }
 
+    const cooldown = getClaimCooldownState(getLatestClaimTime(state.claims));
+    if (cooldown.active) {
+      return buildCooldownBlockResult(state, cooldown);
+    }
+
     const claim = buildClaim(state, safePayload);
     state.claims.unshift(claim);
     scheduleClaimProgress(state.user.id, claim.id, mode);
@@ -648,6 +677,15 @@ const DemoStoreService = {
       claims: clone(state.claims),
       fraudWatch: buildFraudWatch(state.claims),
     };
+  },
+
+  resetDemoStore() {
+    claimProgressTimeouts.forEach((timeoutId) => clearTimeout(timeoutId));
+    claimProgressTimeouts.clear();
+    otpSessions.clear();
+    usersByPhone.clear();
+    userStates.clear();
+    claimSequence = 3001;
   },
 };
 

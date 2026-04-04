@@ -14,6 +14,7 @@ const { buildWarnings } = require("./warningService");
 const PROOF_UPLOAD_DIR = path.resolve(__dirname, "../../uploads/proofs");
 const DEFAULT_CITY = process.env.DEFAULT_WEATHER_CITY || "Bengaluru";
 const DEFAULT_ZONE = process.env.DEFAULT_WORK_ZONE || "Central";
+const PROOF_LOCATION_TOLERANCE_KM = 2;
 const DEFAULT_COORDINATES = Object.freeze({
   Bengaluru: { latitude: 12.9716, longitude: 77.5946 },
   Bangalore: { latitude: 12.9716, longitude: 77.5946 },
@@ -183,14 +184,20 @@ async function resolveClaimContext({
     const row = claimResult?.rows?.[0];
     if (row) {
       const coordinates = getDefaultCoordinates(row.city || city || DEFAULT_CITY);
+      const proofLatitude = normalizeNumber(latitude, null);
+      const proofLongitude = normalizeNumber(longitude, null);
       return {
         claim_id: row.id,
         user_id: row.worker_id || normalizedUserId,
         claim_timestamp: row.claim_timestamp ? new Date(row.claim_timestamp).toISOString() : nowIso(),
         city: row.city || city || DEFAULT_CITY,
         zone: row.zone || zone || DEFAULT_ZONE,
-        latitude: normalizeNumber(latitude, coordinates.latitude),
-        longitude: normalizeNumber(longitude, coordinates.longitude),
+        latitude: proofLatitude ?? coordinates.latitude,
+        longitude: proofLongitude ?? coordinates.longitude,
+        proof_latitude: proofLatitude,
+        proof_longitude: proofLongitude,
+        expected_latitude: coordinates.latitude,
+        expected_longitude: coordinates.longitude,
         existing_fraud_score: normalizeNumber(row.fraud_score, 0) || 0,
         persisted: true,
       };
@@ -201,6 +208,8 @@ async function resolveClaimContext({
   const resolvedCity = city || worker?.city || DEFAULT_CITY;
   const resolvedZone = zone || worker?.zone || DEFAULT_ZONE;
   const coordinates = getDefaultCoordinates(resolvedCity);
+  const proofLatitude = normalizeNumber(latitude, null);
+  const proofLongitude = normalizeNumber(longitude, null);
 
   return {
     claim_id: normalizedClaimId,
@@ -208,8 +217,12 @@ async function resolveClaimContext({
     claim_timestamp: normalizeString(claimTime, nowIso()),
     city: resolvedCity,
     zone: resolvedZone,
-    latitude: normalizeNumber(latitude, coordinates.latitude),
-    longitude: normalizeNumber(longitude, coordinates.longitude),
+    latitude: proofLatitude ?? coordinates.latitude,
+    longitude: proofLongitude ?? coordinates.longitude,
+    proof_latitude: proofLatitude,
+    proof_longitude: proofLongitude,
+    expected_latitude: coordinates.latitude,
+    expected_longitude: coordinates.longitude,
     existing_fraud_score: 0,
     persisted: false,
   };
@@ -271,6 +284,56 @@ function haversineDistanceKm(lat1, lon1, lat2, lon2) {
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
+}
+
+function validateProofLocation(claimContext) {
+  const proofLatitude = normalizeNumber(claimContext.proof_latitude, null);
+  const proofLongitude = normalizeNumber(claimContext.proof_longitude, null);
+  const expectedLatitude = normalizeNumber(claimContext.expected_latitude, null);
+  const expectedLongitude = normalizeNumber(claimContext.expected_longitude, null);
+
+  if (
+    proofLatitude === null ||
+    proofLongitude === null ||
+    expectedLatitude === null ||
+    expectedLongitude === null
+  ) {
+    return {
+      checked: false,
+      match: false,
+      locationMatch: false,
+      proof_latitude: proofLatitude,
+      proof_longitude: proofLongitude,
+      expected_latitude: expectedLatitude,
+      expected_longitude: expectedLongitude,
+      distance_km: null,
+      tolerance_km: PROOF_LOCATION_TOLERANCE_KM,
+      reason: "Proof location metadata is missing, so location could not be validated.",
+    };
+  }
+
+  const distanceKm = haversineDistanceKm(
+    proofLatitude,
+    proofLongitude,
+    expectedLatitude,
+    expectedLongitude
+  );
+  const match = distanceKm <= PROOF_LOCATION_TOLERANCE_KM;
+
+  return {
+    checked: true,
+    match,
+    locationMatch: match,
+    proof_latitude: proofLatitude,
+    proof_longitude: proofLongitude,
+    expected_latitude: expectedLatitude,
+    expected_longitude: expectedLongitude,
+    distance_km: Number(distanceKm.toFixed(2)),
+    tolerance_km: PROOF_LOCATION_TOLERANCE_KM,
+    reason: match
+      ? "Proof location matches the expected claim area."
+      : `Proof location is ${distanceKm.toFixed(2)}km away from the expected claim area.`,
+  };
 }
 
 async function validateActivity({ userId, claimTimestamp, fileName }) {
@@ -420,6 +483,7 @@ function calculateFraudScore({
   baseFraudScore,
   proofType,
   imageValidation,
+  locationValidation,
   activityValidation,
   weatherValidation,
   workValidation,
@@ -439,6 +503,10 @@ function calculateFraudScore({
 
   if (imageValidation.duplicate_found) {
     fraudScore += 20;
+  }
+
+  if (locationValidation.match === false) {
+    fraudScore += 35;
   }
 
   if (proofType === "SELFIE" && weatherValidation.mismatch) {
@@ -466,6 +534,7 @@ async function persistProofArtifacts({
   file,
   fileHash,
   imageValidation,
+  locationValidation,
   weatherValidation,
   activityValidation,
   workValidation,
@@ -511,6 +580,7 @@ async function persistProofArtifacts({
     warning_reasons: warningPayload.reasons,
     analysis_json: {
       image_validation: imageValidation,
+      location_validation: locationValidation,
       weather_validation: weatherValidation,
       activity_validation: activityValidation,
       work_validation: workValidation,
@@ -740,6 +810,9 @@ async function uploadProofAndAnalyze(input) {
     claimTimestamp: claimContext.claim_timestamp,
     fileName: file.originalname,
   });
+  const locationValidation = validateProofLocation(claimContext);
+  const activityValid =
+    activityValidation.was_active !== false && activityValidation.within_working_hours !== false;
   const trustScore = await getTrustScore(claimContext.user_id);
   const anomalyResult = await calculateAnomalyScore({
     userId: claimContext.user_id,
@@ -750,6 +823,7 @@ async function uploadProofAndAnalyze(input) {
     baseFraudScore: claimContext.existing_fraud_score,
     proofType,
     imageValidation,
+    locationValidation,
     activityValidation,
     weatherValidation,
     workValidation,
@@ -757,6 +831,7 @@ async function uploadProofAndAnalyze(input) {
 
   const warningPayload = buildWarnings({
     imageValidation,
+    locationValidation,
     activityValidation,
     weatherValidation,
     workValidation,
@@ -768,6 +843,9 @@ async function uploadProofAndAnalyze(input) {
     anomaly_score: anomalyResult.anomaly_score,
     trust_score: trustScore.score,
     image_validation: imageValidation,
+    locationMatch: locationValidation.match,
+    location_validation: locationValidation,
+    activityValid,
     activity_validation: activityValidation,
     weather_validation: weatherValidation,
     work_validation: workValidation,
@@ -789,6 +867,7 @@ async function uploadProofAndAnalyze(input) {
     file,
     fileHash,
     imageValidation,
+    locationValidation,
     weatherValidation,
     activityValidation,
     workValidation,
@@ -818,12 +897,15 @@ async function uploadProofAndAnalyze(input) {
     ai_generated_probability: imageValidation.ai_generated_probability,
     tampering_detected: imageValidation.tampering_detected,
     duplicate_found: imageValidation.duplicate_found,
+    locationMatch: locationValidation.match,
+    activityValid,
     warning: warningPayload.warning,
     message: warningPayload.message,
     reasons: warningPayload.reasons,
     decision: finalDecision,
     analysis: {
       image_validation: imageValidation,
+      location_validation: locationValidation,
       weather_validation: weatherValidation,
       activity_validation: activityValidation,
       work_validation: workValidation,

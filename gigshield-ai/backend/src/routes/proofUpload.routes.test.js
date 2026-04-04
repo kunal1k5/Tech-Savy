@@ -108,6 +108,8 @@ describe("POST /api/upload-proof", () => {
     expect(response.body.data).toMatchObject({
       status: "RECEIVED",
       proof_type: "SELFIE",
+      locationMatch: true,
+      activityValid: true,
       warning: false,
       decision: expect.objectContaining({
         decision: expect.any(String),
@@ -116,8 +118,80 @@ describe("POST /api/upload-proof", () => {
       }),
       analysis: expect.objectContaining({
         image_validation: expect.any(Object),
+        location_validation: expect.objectContaining({
+          match: true,
+        }),
         weather_validation: expect.any(Object),
         activity_validation: expect.any(Object),
+      }),
+    });
+  });
+
+  it("rejects uploaded proof when the proof location does not match the claim area", async () => {
+    const response = await request(app)
+      .post("/api/upload-proof")
+      .field("user_id", "demo-user-3")
+      .field("claim_id", "claim-demo-3")
+      .field("proof_type", "SELFIE")
+      .field("city", "Bengaluru")
+      .field("zone", "Central")
+      .field("latitude", "28.6139")
+      .field("longitude", "77.2090")
+      .attach("file", Buffer.from("demo-selfie-proof"), {
+        filename: "live-selfie-outdoor.png",
+        contentType: "image/png",
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data).toMatchObject({
+      locationMatch: false,
+      activityValid: true,
+      reasons: expect.arrayContaining(["Proof location mismatch"]),
+      decision: expect.objectContaining({
+        decision: "REJECTED",
+      }),
+      analysis: expect.objectContaining({
+        location_validation: expect.objectContaining({
+          checked: true,
+          match: false,
+        }),
+      }),
+    });
+  });
+
+  it("rejects uploaded proof when the worker activity is invalid", async () => {
+    const response = await request(app)
+      .post("/api/upload-proof")
+      .field("user_id", "demo-user-4")
+      .field("claim_id", "claim-demo-4")
+      .field("proof_type", "SELFIE")
+      .field("city", "Bengaluru")
+      .field("zone", "Central")
+      .field("latitude", "12.9716")
+      .field("longitude", "77.5946")
+      .attach("file", Buffer.from("demo-selfie-proof"), {
+        filename: "idle-selfie-proof.png",
+        contentType: "image/png",
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+    expect(response.body.data).toMatchObject({
+      locationMatch: true,
+      activityValid: false,
+      reasons: expect.arrayContaining([
+        "User inactive during claim",
+        "Claim outside active work hours",
+      ]),
+      decision: expect.objectContaining({
+        decision: "REJECTED",
+      }),
+      analysis: expect.objectContaining({
+        activity_validation: expect.objectContaining({
+          was_active: false,
+          within_working_hours: false,
+        }),
       }),
     });
   });

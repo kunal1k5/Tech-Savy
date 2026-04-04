@@ -17,6 +17,7 @@ const pool = new Pool({
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
+  allowExitOnIdle: process.env.NODE_ENV === "test",
 });
 
 pool.on("error", (err) => {

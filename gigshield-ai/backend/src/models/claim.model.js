@@ -28,6 +28,14 @@ const ClaimModel = {
     return result.rows;
   },
 
+  async findLatestByWorker(worker_id) {
+    const result = await pool.query(
+      "SELECT * FROM claims WHERE worker_id = $1 ORDER BY created_at DESC LIMIT 1",
+      [worker_id]
+    );
+    return result.rows[0] || null;
+  },
+
   async updateStatus(id, status, extras = {}) {
     const setClauses = ["status = $2"];
     const values = [id, status];

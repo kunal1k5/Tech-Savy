@@ -3,7 +3,7 @@ const Joi = require("joi");
 const DemoStoreService = require("../services/demoStore.service");
 const { authenticate } = require("../middleware/auth");
 const { validate } = require("../middleware/validate");
-const { sendSuccess } = require("../utils/apiResponse");
+const { sendError, sendSuccess } = require("../utils/apiResponse");
 
 const router = Router();
 
@@ -143,6 +143,10 @@ router.get("/claims", authenticate, (req, res, next) => {
 router.post("/claim/trigger", authenticate, validate(triggerClaimSchema), (req, res, next) => {
   try {
     const result = DemoStoreService.triggerClaim(req.user, req.body);
+    if (result.blocked) {
+      return sendError(res, 429, result.message, { data: result });
+    }
+
     return sendSuccess(
       res,
       result,

@@ -2,8 +2,11 @@ const {
   calculateTrustScore,
   DECISION_LEVELS,
   NEXT_ACTIONS,
+  CLAIM_DECISIONS,
+  createClaimDecision,
   getDecision,
   getNextAction,
+  hasCriticalProofValidationFailure,
 } = require("./aiDecision.service");
 
 describe("aiDecision.service smart decision layer", () => {
@@ -36,5 +39,50 @@ describe("aiDecision.service smart decision layer", () => {
     expect(calculateTrustScore(18)).toBe(82);
     expect(calculateTrustScore(40)).toBe(60);
     expect(calculateTrustScore(110)).toBe(0);
+  });
+
+  it("treats location or activity proof failures as critical rejection signals", () => {
+    expect(
+      hasCriticalProofValidationFailure({
+        locationMatch: false,
+        activityValid: true,
+      })
+    ).toBe(true);
+
+    expect(
+      hasCriticalProofValidationFailure({
+        locationMatch: true,
+        activityValid: false,
+      })
+    ).toBe(true);
+
+    expect(
+      hasCriticalProofValidationFailure({
+        locationMatch: true,
+        activityValid: true,
+      })
+    ).toBe(false);
+  });
+
+  it("rejects a proof decision when location or activity validation fails", () => {
+    expect(
+      createClaimDecision({
+        fraud_score: 10,
+        locationMatch: false,
+        activityValid: true,
+        warnings: [],
+        explanation: [],
+      }).decision
+    ).toBe(CLAIM_DECISIONS.REJECTED);
+
+    expect(
+      createClaimDecision({
+        fraud_score: 10,
+        locationMatch: true,
+        activityValid: false,
+        warnings: [],
+        explanation: [],
+      }).decision
+    ).toBe(CLAIM_DECISIONS.REJECTED);
   });
 });

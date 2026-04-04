@@ -286,6 +286,10 @@ function clampScore(value, min = 0, max = 100) {
   return Math.min(max, Math.max(min, numericValue));
 }
 
+function hasCriticalProofValidationFailure({ locationMatch, activityValid }) {
+  return locationMatch === false || activityValid === false;
+}
+
 function createClaimDecision(input = {}) {
   const baseFraudScore = clampScore(input.fraud_score ?? input.fraudScore ?? 0);
   const aiImageScore = clampScore(input.ai_image_score ?? input.aiImageScore ?? 0);
@@ -293,7 +297,15 @@ function createClaimDecision(input = {}) {
   const trustScore = clampScore(input.trust_score ?? input.trustScore ?? 50);
   const warnings = Array.isArray(input.warnings) ? input.warnings.filter(Boolean) : [];
   const explanation = Array.isArray(input.explanation) ? input.explanation.filter(Boolean) : [];
-  const activityValid = input.activity_validation?.was_active !== false;
+  const locationMatch =
+    input.locationMatch ?? input.location_match ?? input.location_validation?.match ?? null;
+  const activityValid =
+    input.activityValid ??
+    input.activity_validation?.activityValid ??
+    (
+      input.activity_validation?.was_active !== false &&
+      input.activity_validation?.within_working_hours !== false
+    );
   const withinWorkHours = input.activity_validation?.within_working_hours !== false;
   const weatherMismatch = input.weather_validation?.mismatch === true;
   const workScreenValid =
@@ -329,7 +341,11 @@ function createClaimDecision(input = {}) {
   compositeScore = clampScore(compositeScore);
 
   let decision = CLAIM_DECISIONS.APPROVED;
-  if (compositeScore >= 70 || tamperingDetected) {
+  if (
+    hasCriticalProofValidationFailure({ locationMatch, activityValid }) ||
+    compositeScore >= 70 ||
+    tamperingDetected
+  ) {
     decision = CLAIM_DECISIONS.REJECTED;
   } else if (compositeScore >= 35 || warnings.length > 0) {
     decision = CLAIM_DECISIONS.VERIFY;
@@ -374,5 +390,6 @@ module.exports = {
   sanitizeAiDecisionInput,
   getDecisionBand,
   getNextAction,
+  hasCriticalProofValidationFailure,
   normalizeSuspiciousPattern,
 };
