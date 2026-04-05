@@ -3,7 +3,7 @@ import { extractApiErrorMessage, getFraudStatus } from "../services/api";
 import { fetchBehaviorCheck } from "../services/behaviorCheck";
 import { getPremium as getLivePremium } from "../services/workerFlow";
 import { fetchLocationCheck } from "../services/locationCheck";
-import { getUserFromToken } from "../utils/auth";
+import { getToken, getUserFromToken } from "../utils/auth";
 import { getAuthRiskProfile } from "../utils/authRisk";
 
 const SNAPSHOT_CACHE_TTL_MS = 10000;
@@ -76,6 +76,7 @@ export default function useLiveBackendData({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const mountedRef = useRef(true);
   const dataRef = useRef(null);
+  const hasBackendSession = Boolean(getToken());
   const sessionUser = getUserFromToken();
   const authRiskProfile = getAuthRiskProfile(sessionUser?.phone);
   const sessionSnapshot = useMemo(() => {
@@ -119,7 +120,7 @@ export default function useLiveBackendData({
             sessionSnapshot.authRiskProfile
           );
           const locationPayload = buildLocationPayload(sessionSnapshot.user);
-          const premiumData = await getLivePremium();
+          const premiumData = hasBackendSession ? await getLivePremium() : null;
           const behaviorData = await fetchBehaviorCheck(behaviorPayload);
           const locationData = locationPayload
             ? await fetchLocationCheck(locationPayload)
@@ -195,7 +196,7 @@ export default function useLiveBackendData({
       mountedRef.current = false;
       window.clearInterval(intervalId);
     };
-  }, [refreshIntervalMs, sessionSnapshot]);
+  }, [hasBackendSession, refreshIntervalMs, sessionSnapshot]);
 
   return {
     data,

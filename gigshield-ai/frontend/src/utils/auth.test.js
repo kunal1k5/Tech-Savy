@@ -1,8 +1,11 @@
 import {
+  DEMO_ACCOUNT,
   findStoredUserByPhone,
   getToken,
   getUserFromToken,
+  isAuthenticated,
   saveAuthSession,
+  signInWithDemoAccount,
 } from "./auth";
 
 describe("auth session helpers", () => {
@@ -36,6 +39,7 @@ describe("auth session helpers", () => {
       workType: "",
       phone: "1234567890",
     });
+    expect(isAuthenticated()).toBe(true);
   });
 
   it("keeps the latest active session while preserving separate cached user records", () => {
@@ -97,6 +101,22 @@ describe("auth session helpers", () => {
       phone: "9999999999",
       city: "Pune",
       work_type: "Delivery",
+    });
+  });
+
+  it("creates a working local demo session without a JWT", () => {
+    const demoUser = signInWithDemoAccount();
+
+    expect(getToken()).toBeNull();
+    expect(isAuthenticated()).toBe(true);
+    expect(demoUser).toMatchObject({
+      full_name: DEMO_ACCOUNT.full_name,
+      phone: DEMO_ACCOUNT.phone,
+    });
+    expect(getUserFromToken()).toMatchObject({
+      full_name: DEMO_ACCOUNT.full_name,
+      phone: DEMO_ACCOUNT.phone,
+      platform: DEMO_ACCOUNT.platform,
     });
   });
 });

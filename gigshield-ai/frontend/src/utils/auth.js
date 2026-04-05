@@ -3,6 +3,23 @@ const SESSION_CACHE_KEY = "gigpredict_ai_session_cache";
 const USER_KEY = "user";
 const LEGACY_USER_KEY = "gigpredict_ai_user";
 const KNOWN_USERS_KEY = "gigpredict_ai_known_users";
+export const DEMO_ACCOUNT = Object.freeze({
+  id: "demo-worker-local",
+  full_name: "Demo Rider",
+  phone: "9876543210",
+  city: "Bengaluru",
+  zone: "Koramangala",
+  platform: "Swiggy",
+  weekly_income: 18500,
+  work_type: "Delivery",
+  worker_id: "DEMO-2026",
+  work_proof_name: "demo-profile.png",
+  work_verification_status: "verified",
+  work_verification_flag: null,
+  auth_risk_score: 24,
+  auth_risk_level: "low",
+  auth_risk_status: "Safe",
+});
 
 function notifyAuthChange() {
   if (typeof window !== "undefined") {
@@ -231,9 +248,23 @@ function isValidJwt(token) {
   }
 }
 
+function hasSessionIdentity() {
+  const storedUser = getStoredUser();
+  if (storedUser?.id || storedUser?.phone) {
+    return true;
+  }
+
+  const sessionCache = getSessionCache();
+  return Boolean(sessionCache?.id || sessionCache?.phone);
+}
+
 export function isAuthenticated() {
   const token = getToken();
-  return Boolean(token && isValidJwt(token));
+  if (token) {
+    return isValidJwt(token);
+  }
+
+  return hasSessionIdentity();
 }
 
 export function getUserFromToken() {
@@ -279,4 +310,14 @@ export function getUserFromToken() {
     auth_risk_level: sessionCache.authRiskLevel,
     auth_risk_status: sessionCache.authRiskStatus,
   });
+}
+
+export function signInWithDemoAccount(overrides = {}) {
+  const demoUser = normalizeUser({
+    ...DEMO_ACCOUNT,
+    ...overrides,
+  });
+
+  saveAuthSession({ user: demoUser });
+  return demoUser;
 }

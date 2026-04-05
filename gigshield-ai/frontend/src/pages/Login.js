@@ -7,7 +7,7 @@ import OtpInputGroup from "../components/auth/OtpInputGroup";
 import SurfaceButton from "../components/ui/SurfaceButton";
 import { extractApiErrorMessage } from "../services/api";
 import { requestOtp, verifyOtp } from "../services/workerFlow";
-import { findStoredUserByPhone, saveAuthSession } from "../utils/auth";
+import { findStoredUserByPhone, saveAuthSession, signInWithDemoAccount } from "../utils/auth";
 import {
   assessAndSaveAuthRisk,
   recordLoginAttempt,
@@ -178,6 +178,14 @@ export default function Login() {
     formStartedAtRef.current = Date.now();
   }
 
+  function handleContinueWithDemo() {
+    setError("");
+    setMessage("");
+    setIsVerificationNoticeVisible(false);
+    signInWithDemoAccount();
+    navigate(redirectPath, { replace: true });
+  }
+
   return (
     <AuthShell
       eyebrow="Login"
@@ -216,7 +224,7 @@ export default function Login() {
                 autoFocus
                 prefix="+91"
                 disabled={loading}
-                helperText="Use your registered 10-digit mobile number. The local API returns the current OTP while SMS delivery is not configured."
+                helperText="Use your registered 10-digit mobile number. If the API is unavailable, you can still continue with the demo account below."
               />
             </motion.div>
           ) : (
@@ -289,6 +297,18 @@ export default function Login() {
         <SurfaceButton type="submit" className="w-full" loading={loading}>
           {step === 1 ? "Send OTP" : "Verify and continue"}
         </SurfaceButton>
+
+        {step === 1 ? (
+          <SurfaceButton
+            type="button"
+            variant="secondary"
+            className="w-full"
+            onClick={handleContinueWithDemo}
+            disabled={loading}
+          >
+            Continue with demo account
+          </SurfaceButton>
+        ) : null}
       </form>
     </AuthShell>
   );

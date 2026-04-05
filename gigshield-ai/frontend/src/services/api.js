@@ -1,5 +1,5 @@
 import axios from "axios";
-import { clearSession } from "../utils/auth";
+import { clearSession, getToken } from "../utils/auth";
 
 const LOCAL_API_BASE_URL = "http://localhost:5000/api";
 
@@ -314,7 +314,12 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const requestHeaders = error?.config?.headers || {};
+    const requestHadAuthorization = Boolean(
+      requestHeaders.Authorization || requestHeaders.authorization
+    );
+
+    if (error.response?.status === 401 && requestHadAuthorization && getToken()) {
       clearSession();
       window.location.href = "/login";
     }
