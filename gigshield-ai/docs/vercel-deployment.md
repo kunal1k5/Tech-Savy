@@ -28,11 +28,37 @@ Notes:
 - The root `api/[...route].js` file exposes the Express app as a Vercel serverless function.
 - The root `vercel.json` keeps `/api/*` available and rewrites all non-API routes to `index.html`.
 
+## Frontend subdirectory deploy with demo auth
+
+If your Vercel project uses `gigshield-ai/frontend` as the Root Directory, the repo now also includes a colocated serverless API bridge for demo auth flows.
+
+Use these settings in Vercel:
+
+| Setting | Value |
+| --- | --- |
+| Root Directory | `gigshield-ai/frontend` |
+| Framework | Create React App |
+| Install Command | from `frontend/vercel.json` |
+| Build Command | default |
+| Output Directory | default |
+
+Recommended environment variables:
+
+```env
+JWT_SECRET=change-me
+FRONTEND_URLS=https://your-project.vercel.app
+```
+
+Notes:
+- `frontend/api/[...route].js` exposes the backend Express app inside the frontend deployment.
+- `frontend/vercel.json` now preserves `/api/*` requests instead of rewriting them to `index.html`.
+- This fixes the `405 Method Not Allowed` error that happens when OTP POST requests hit the SPA rewrite instead of an API function.
+
 ## Frontend-only deploy for the current demo
 
 If you only want to deploy the project exactly as it works right now, deploy just the React app.
 
-Use these settings in Vercel:
+Use these settings in Vercel only if you do not need login, signup, or any live API routes:
 
 | Setting | Value |
 | --- | --- |

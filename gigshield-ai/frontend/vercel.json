@@ -1,5 +1,10 @@
 {
+  "installCommand": "npm --prefix ../backend ci && npm ci",
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
