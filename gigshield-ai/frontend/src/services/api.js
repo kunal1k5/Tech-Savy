@@ -1,11 +1,42 @@
 import axios from "axios";
 import { clearSession } from "../utils/auth";
 
-export const API_BASE_URL =
-  (process.env.REACT_APP_API_URL || "http://localhost:5000/api").replace(/\/$/, "");
+const LOCAL_API_BASE_URL = "http://localhost:5000/api";
+
+function normalizeBaseUrl(value) {
+  return String(value || "").trim().replace(/\/+$/, "");
+}
+
+function isLocalHostname(value) {
+  return /^(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0)$/i.test(String(value || "").trim());
+}
+
+export function resolveApiBaseUrl(runtimeLocation = typeof window !== "undefined" ? window.location : undefined) {
+  const configuredBaseUrl = normalizeBaseUrl(process.env.REACT_APP_API_URL);
+  if (configuredBaseUrl) {
+    return configuredBaseUrl;
+  }
+
+  if (runtimeLocation) {
+    return isLocalHostname(runtimeLocation.hostname) ? LOCAL_API_BASE_URL : "/api";
+  }
+
+  return LOCAL_API_BASE_URL;
+}
+
+function normalizeRequestPath(path = "") {
+  const value = String(path || "").trim();
+  if (!value) {
+    return "";
+  }
+
+  return value.startsWith("/") ? value : `/${value}`;
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
 
 export function buildApiUrl(path = "") {
-  const normalizedPath = String(path || "").startsWith("/") ? path : `/${path}`;
+  const normalizedPath = normalizeRequestPath(path);
   return `${API_BASE_URL}${normalizedPath}`;
 }
 
@@ -176,11 +207,11 @@ export function buildWeatherPayload(overrides = {}) {
 }
 
 export function apiGet(path, config) {
-  return api.get(buildApiUrl(path), config);
+  return api.get(normalizeRequestPath(path), config);
 }
 
 export function apiPost(path, data, config) {
-  return api.post(buildApiUrl(path), data, config);
+  return api.post(normalizeRequestPath(path), data, config);
 }
 
 export async function getFraudStatus(payload = DEFAULT_FRAUD_PAYLOAD) {
@@ -226,7 +257,7 @@ export async function startDispute(payload) {
 }
 
 export async function uploadProof({ disputeId, geoImage, workScreenshot }) {
-  const response = await api.postForm(buildApiUrl("/upload-proof"), {
+  const response = await api.postForm(normalizeRequestPath("/upload-proof"), {
     disputeId,
     geoImage,
     workScreenshot,
@@ -247,7 +278,7 @@ export async function uploadClaimProof({
   zone,
   metadata = {},
 }) {
-  const response = await api.postForm(buildApiUrl("/upload-proof"), {
+  const response = await api.postForm(normalizeRequestPath("/upload-proof"), {
     user_id: userId,
     claim_id: claimId,
     proof_type: proofType,

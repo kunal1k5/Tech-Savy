@@ -1,9 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "npm --prefix gigshield-ai/frontend ci",
+  "installCommand": "npm --prefix gigshield-ai/backend ci && npm --prefix gigshield-ai/frontend ci",
   "buildCommand": "npm --prefix gigshield-ai/frontend run build",
   "outputDirectory": "gigshield-ai/frontend/build",
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"

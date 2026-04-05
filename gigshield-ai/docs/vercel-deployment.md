@@ -1,5 +1,33 @@
 # Vercel Deployment Guide
 
+## Single Vercel project for demo auth
+
+The repo root now supports a single Vercel deployment that serves:
+
+- the React app from `gigshield-ai/frontend`
+- the Express demo auth and dashboard API from `/api/*`
+
+Use these settings in Vercel when you want login and signup to work in the same deployment:
+
+| Setting | Value |
+| --- | --- |
+| Root Directory | `.` |
+| Build Command | from `vercel.json` |
+| Output Directory | from `vercel.json` |
+
+Environment variables for this root deployment:
+
+```env
+JWT_SECRET=change-me
+FRONTEND_URLS=https://your-project.vercel.app
+AI_ENGINE_URL=https://your-ai-engine-project.vercel.app
+```
+
+Notes:
+- If `REACT_APP_API_URL` is not set, the frontend now uses `/api` on deployed hosts and `http://localhost:5000/api` locally.
+- The root `api/[...route].js` file exposes the Express app as a Vercel serverless function.
+- The root `vercel.json` keeps `/api/*` available and rewrites all non-API routes to `index.html`.
+
 ## Frontend-only deploy for the current demo
 
 If you only want to deploy the project exactly as it works right now, deploy just the React app.
@@ -13,7 +41,7 @@ Use these settings in Vercel:
 | Build Command | default |
 | Output Directory | default |
 
-For the current demo build, no environment variables are required.
+For the current demo build, no environment variables are required if you do not need live auth APIs.
 
 Why this works:
 - The routes currently wired in `frontend/src/App.js` are demo pages and do not require the backend.
