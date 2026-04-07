@@ -2,11 +2,13 @@ const jwt = require("jsonwebtoken");
 const { v4: uuidv4 } = require("uuid");
 
 const aiService = require("../integrations/aiService");
+const { getMongoDb } = require("../database/mongo");
 const {
   getClaimCooldownState,
   formatCooldownWait,
 } = require("./claimCooldown.service");
 const { clampNumber, ensureObject } = require("../utils/inputSafety");
+const logger = require("../utils/logger");
 
 const JWT_SECRET = process.env.JWT_SECRET || "default-dev-secret";
 const OTP_CODE = "1234";
@@ -70,6 +72,8 @@ const otpSessions = new Map();
 const usersByPhone = new Map();
 const userStates = new Map();
 const claimProgressTimeouts = new Set();
+const DEMO_USERS_COLLECTION = "demo_users";
+const DEMO_USER_STATES_COLLECTION = "demo_user_states";
 let claimSequence = 3001;
 
 function nowIso() {
@@ -203,6 +207,18 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function getMongoCollections() {
+  const db = getMongoDb();
+  if (!db) {
+    return null;
+  }
+
+  return {
+    users: db.collection(DEMO_USERS_COLLECTION),
+    states: db.collection(DEMO_USER_STATES_COLLECTION),
+  };
+}
+
 function getRiskMeta(riskLevel = "medium") {
   return RISK_LEVELS[riskLevel] || RISK_LEVELS.medium;
 }
@@ -234,48 +250,8 @@ function buildPlans(state) {
   return PLAN_CATALOG.map((plan) => buildPlan(plan, state));
 }
 
-function ensureState(user) {
-  const existing = userStates.get(user.id);
-  if (existing) {
-    return existing;
-  }
-
-  const state = {
-    user: {
-      id: user.id,
-      full_name: user.full_name,
-      phone: user.phone,
-      city: user.city,
-      zone: user.zone,
-      platform: user.platform,
-      weekly_income: user.weekly_income,
-      work_type: user.work_type,
-      worker_id: user.worker_id,
-      work_proof_name: user.work_proof_name,
-      work_verification_status: user.work_verification_status,
-      work_verification_flag: user.work_verification_flag,
-      device_id: user.device_id,
-      auth_risk_score: user.auth_risk_score,
-      auth_risk_level: user.auth_risk_level,
-      auth_risk_status: user.auth_risk_status,
-      signup_time: user.signup_time,
-      location: user.location,
-    },
-    risk: {
-      ...RISK_LEVELS.medium,
-      source: "fallback",
-    },
-    activePolicy: null,
-    claims: [],
-  };
-
-  userStates.set(user.id, state);
-  return state;
-}
-
-function syncUserState(user) {
-  const state = ensureState(user);
-  state.user = {
+function buildStateUser(user) {
+  return {
     id: user.id,
     full_name: user.full_name,
     phone: user.phone,
@@ -295,6 +271,164 @@ function syncUserState(user) {
     signup_time: user.signup_time,
     location: user.location,
   };
+}
+
+function createDefaultState(user) {
+  return {
+    user: buildStateUser(user),
+    risk: {
+      ...RISK_LEVELS.medium,
+      source: "fallback",
+    },
+    activePolicy: null,
+    claims: [],
+  };
+}
+
+function normalizeStoredState(document = {}, fallbackUser = {}) {
+  const storedUser = buildSessionUser(document.user || fallbackUser, document.user || fallbackUser);
+  const fallbackRisk = getRiskMeta(
+    normalizeString(document?.risk?.key, RISK_LEVELS.medium.key).toLowerCase()
+  );
+
+  return {
+    user: buildStateUser(storedUser),
+    risk: {
+      ...fallbackRisk,
+      ...ensureObject(document.risk),
+      key: fallbackRisk.key,
+      label: fallbackRisk.label,
+      score: normalizeNumber(document?.risk?.score, fallbackRisk.score),
+      premium: normalizeNumber(document?.risk?.premium, fallbackRisk.premium),
+      zone: normalizeString(document?.risk?.zone, storedUser.zone),
+      source: normalizeString(document?.risk?.source, "fallback"),
+    },
+    activePolicy: document.activePolicy || null,
+    claims: Array.isArray(document.claims) ? document.claims : [],
+  };
+}
+
+async function loadUserByPhone(phone) {
+  if (usersByPhone.has(phone)) {
+    return usersByPhone.get(phone);
+  }
+
+  const collections = getMongoCollections();
+  if (!collections) {
+    return null;
+  }
+
+  const document = await collections.users.findOne({ phone });
+  if (!document) {
+    return null;
+  }
+
+  const user = buildSessionUser(document, document);
+  usersByPhone.set(phone, user);
+  return user;
+}
+
+async function persistUser(user) {
+  usersByPhone.set(user.phone, user);
+
+  const collections = getMongoCollections();
+  if (!collections) {
+    return;
+  }
+
+  await collections.users.updateOne(
+    { phone: user.phone },
+    {
+      $set: {
+        ...clone(user),
+        updatedAt: nowIso(),
+      },
+      $setOnInsert: {
+        createdAt: nowIso(),
+      },
+    },
+    { upsert: true }
+  );
+}
+
+async function loadStateByUserId(userId) {
+  if (userStates.has(userId)) {
+    return userStates.get(userId);
+  }
+
+  const collections = getMongoCollections();
+  if (!collections) {
+    return null;
+  }
+
+  const document = await collections.states.findOne({ _id: userId });
+  if (!document) {
+    return null;
+  }
+
+  const state = normalizeStoredState(document, document.user || {});
+  usersByPhone.set(state.user.phone, state.user);
+  userStates.set(userId, state);
+  return state;
+}
+
+async function persistState(state) {
+  userStates.set(state.user.id, state);
+
+  const collections = getMongoCollections();
+  if (!collections) {
+    return;
+  }
+
+  const payload = {
+    user: buildStateUser(state.user),
+    risk: clone(state.risk),
+    activePolicy: state.activePolicy ? clone(state.activePolicy) : null,
+    claims: clone(state.claims || []),
+    updatedAt: nowIso(),
+  };
+
+  await collections.states.updateOne(
+    { _id: state.user.id },
+    {
+      $set: payload,
+      $setOnInsert: {
+        createdAt: nowIso(),
+      },
+    },
+    { upsert: true }
+  );
+}
+
+async function persistStateSilently(state, context) {
+  try {
+    await persistState(state);
+  } catch (error) {
+    logger.warn(`MongoDB state persistence failed during ${context}: ${error.message}`);
+  }
+}
+
+async function ensureState(user) {
+  const existing = await loadStateByUserId(user.id);
+  if (existing) {
+    return existing;
+  }
+
+  const state = createDefaultState(user);
+  userStates.set(user.id, state);
+  return state;
+}
+
+async function syncUserState(user) {
+  const phone = sanitizePhone(user.phone);
+  const persistedUser = phone ? await loadUserByPhone(phone) : null;
+  const normalizedUser = buildSessionUser(user, persistedUser || user);
+  const state = await ensureState(normalizedUser);
+
+  state.user = buildStateUser(normalizedUser);
+  await persistUser(normalizedUser);
+  await persistState(state);
+
   return state;
 }
 
@@ -408,7 +542,7 @@ function scheduleClaimProgress(userId, claimId, mode) {
     return;
   }
 
-  const approvalTimeoutId = setTimeout(() => {
+  const approvalTimeoutId = setTimeout(async () => {
     claimProgressTimeouts.delete(approvalTimeoutId);
     const state = userStates.get(userId);
     if (!state) {
@@ -426,10 +560,11 @@ function scheduleClaimProgress(userId, claimId, mode) {
     claim.history.unshift(
       createHistory("approved", "Coverage conditions matched. Claim approved.", "success")
     );
+    await persistStateSilently(state, "claim approval");
   }, 1800);
   claimProgressTimeouts.add(approvalTimeoutId);
 
-  const payoutTimeoutId = setTimeout(() => {
+  const payoutTimeoutId = setTimeout(async () => {
     claimProgressTimeouts.delete(payoutTimeoutId);
     const state = userStates.get(userId);
     if (!state) {
@@ -447,6 +582,7 @@ function scheduleClaimProgress(userId, claimId, mode) {
     claim.history.unshift(
       createHistory("paid", "Money released to the worker account.", "success")
     );
+    await persistStateSilently(state, "claim payout");
   }, 3600);
   claimProgressTimeouts.add(payoutTimeoutId);
 }
@@ -520,7 +656,7 @@ const SessionStoreService = {
     };
   },
 
-  verifyOtp({ sessionId, rawPhone, otp, profile = {} }) {
+  async verifyOtp({ sessionId, rawPhone, otp, profile = {} }) {
     const phone = sanitizePhone(rawPhone);
     const session = otpSessions.get(sessionId);
 
@@ -536,15 +672,14 @@ const SessionStoreService = {
       throw err;
     }
 
-    let user = usersByPhone.get(phone);
+    let user = await loadUserByPhone(phone);
     if (!user) {
       user = buildSessionUser({ ...profile, phone });
     } else {
       user = buildSessionUser({ ...profile, phone }, user);
     }
 
-    usersByPhone.set(phone, user);
-    syncUserState(user);
+    await syncUserState(user);
     otpSessions.delete(sessionId);
 
     return {
@@ -553,7 +688,7 @@ const SessionStoreService = {
     };
   },
 
-  register(profile = {}) {
+  async register(profile = {}) {
     const phone = sanitizePhone(profile.phone);
     if (phone.length !== 10) {
       const err = new Error("A valid 10-digit mobile number is required.");
@@ -561,10 +696,10 @@ const SessionStoreService = {
       throw err;
     }
 
-    const user = buildSessionUser({ ...profile, phone }, usersByPhone.get(phone) || {});
+    const existingUser = (await loadUserByPhone(phone)) || {};
+    const user = buildSessionUser({ ...profile, phone }, existingUser);
 
-    usersByPhone.set(phone, user);
-    syncUserState(user);
+    await syncUserState(user);
 
     return {
       token: buildJwt(user),
@@ -573,7 +708,7 @@ const SessionStoreService = {
   },
 
   async getPremium(user, requestedRisk) {
-    const state = syncUserState(user);
+    const state = await syncUserState(user);
     const nextRiskKey = requestedRisk ? String(requestedRisk).toLowerCase() : state.risk.key;
     const riskMeta = getRiskMeta(nextRiskKey);
     const scoreMeta = await resolveRiskScore(state.user, riskMeta.key);
@@ -584,6 +719,8 @@ const SessionStoreService = {
       source: scoreMeta.source,
       zone: state.user.zone,
     };
+
+    await persistState(state);
 
     return {
       riskLevel: state.risk.label,
@@ -597,8 +734,8 @@ const SessionStoreService = {
     };
   },
 
-  getPolicy(user) {
-    const state = syncUserState(user);
+  async getPolicy(user) {
+    const state = await syncUserState(user);
     return {
       plans: buildPlans(state),
       activePolicy: buildActivePolicy(state),
@@ -608,8 +745,8 @@ const SessionStoreService = {
     };
   },
 
-  buyPolicy(user, planId) {
-    const state = syncUserState(user);
+  async buyPolicy(user, planId) {
+    const state = await syncUserState(user);
     const selectedPlan = getPlanTemplate(planId);
 
     if (!selectedPlan) {
@@ -623,6 +760,8 @@ const SessionStoreService = {
       activatedAt: nowIso(),
     };
 
+    await persistState(state);
+
     return {
       activePolicy: buildActivePolicy(state),
       plans: buildPlans(state),
@@ -630,8 +769,8 @@ const SessionStoreService = {
     };
   },
 
-  getClaims(user) {
-    const state = syncUserState(user);
+  async getClaims(user) {
+    const state = await syncUserState(user);
     const claims = [...state.claims].sort(
       (left, right) => new Date(right.detectedAt).getTime() - new Date(left.detectedAt).getTime()
     );
@@ -642,8 +781,8 @@ const SessionStoreService = {
     };
   },
 
-  triggerClaim(user, payload = {}) {
-    const state = syncUserState(user);
+  async triggerClaim(user, payload = {}) {
+    const state = await syncUserState(user);
     const safePayload = sanitizeClaimTriggerPayload(payload);
     const rainfall = safePayload.rainfall;
     const aqi = safePayload.aqi;
@@ -665,6 +804,7 @@ const SessionStoreService = {
 
     const claim = buildClaim(state, safePayload);
     state.claims.unshift(claim);
+    await persistState(state);
     scheduleClaimProgress(state.user.id, claim.id, mode);
 
     return {
@@ -686,6 +826,16 @@ const SessionStoreService = {
     usersByPhone.clear();
     userStates.clear();
     claimSequence = 3001;
+
+    const collections = getMongoCollections();
+    if (collections) {
+      void Promise.allSettled([
+        collections.users.deleteMany({}),
+        collections.states.deleteMany({}),
+      ]).catch((error) => {
+        logger.warn(`MongoDB demo store reset failed: ${error.message}`);
+      });
+    }
   },
 };
 

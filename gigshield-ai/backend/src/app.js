@@ -35,7 +35,9 @@ const proofUploadRoutes = require("./routes/proofUpload.routes");
 const reverificationRoutes = require("./routes/reverification.routes");
 const activityRoutes = require("./routes/activity.routes");
 const fraudAnalysisRoutes = require("./routes/fraudAnalysis.routes");
+const realAuthRoutes = require("./routes/realAuth.routes");
 const { sendError, sendSuccess } = require("./utils/apiResponse");
+const { getMongoStatus } = require("./database/mongo");
 
 // Middleware
 const { errorHandler } = require("./middleware/errorHandler");
@@ -141,6 +143,9 @@ app.get("/api/health", (_req, res) => {
       status: "ok",
       service: "gigshield-ai-backend",
       timestamp: new Date().toISOString(),
+      storage: {
+        mongo: getMongoStatus(),
+      },
     },
     "Health check passed."
   );
@@ -158,6 +163,7 @@ app.use("/api", autoClaimRoutes);
 app.use("/api", fraudOrchestratorRoutes);
 app.use("/api/risk", riskRoutes);
 app.use("/api", sessionRoutes);
+app.use("/api", realAuthRoutes);
 app.use("/api", locationFlowRoutes);
 app.use("/api", premiumFlowRoutes);
 app.use("/api", riskPremiumRoutes);

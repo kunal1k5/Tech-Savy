@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import AuthShell from "../components/auth/AuthShell";
+import OtpInputGroup from "../components/auth/OtpInputGroup";
 import FileUploadCard from "../components/onboarding/FileUploadCard";
 import SelectInput from "../components/onboarding/SelectInput";
 import TextInput from "../components/onboarding/TextInput";
 import SurfaceButton from "../components/ui/SurfaceButton";
 import { extractApiErrorMessage } from "../services/api";
-import { registerWorker } from "../services/workerFlow";
+import { isRealAuthEnabled, registerWorker, requestOtp, verifyOtp } from "../services/workerFlow";
 import { saveAuthSession } from "../utils/auth";
 import { assessAndSaveAuthRisk, sanitizePhoneNumber } from "../utils/authRisk";
 
@@ -33,6 +34,7 @@ const INITIAL_FORM = {
   workerId: "",
   declarationAccepted: false,
 };
+const DEFAULT_OTP_LENGTH = 6;
 
 function wait(durationMs) {
   return new Promise((resolve) => {
@@ -42,13 +44,35 @@ function wait(durationMs) {
 
 export default function Register() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectedPhone = sanitizePhoneNumber(location.state?.phone || "");
+  const redirectedRegistrationToken = location.state?.registrationToken || "";
   const formStartedAtRef = useRef(Date.now());
-  const [form, setForm] = useState(INITIAL_FORM);
+  const [form, setForm] = useState({
+    ...INITIAL_FORM,
+    phone: redirectedPhone,
+  });
   const [proofFile, setProofFile] = useState(null);
   const [proofPreviewUrl, setProofPreviewUrl] = useState("");
+  const [authMode, setAuthMode] = useState(
+    redirectedRegistrationToken ? "real" : isRealAuthEnabled() ? "real" : "demo"
+  );
+  const [sessionId, setSessionId] = useState("");
+  const [registrationToken, setRegistrationToken] = useState(redirectedRegistrationToken);
+  const [otpLength, setOtpLength] = useState(DEFAULT_OTP_LENGTH);
+  const [otp, setOtp] = useState(new Array(DEFAULT_OTP_LENGTH).fill(""));
+  const [isOtpStepActive, setIsOtpStepActive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState(
+    redirectedRegistrationToken
+      ? "Phone number already verified. Complete your profile to finish signup."
+      : ""
+  );
+  const [activeOtpCode, setActiveOtpCode] = useState("");
   const [isVerificationNoticeVisible, setIsVerificationNoticeVisible] = useState(false);
+  const isRealRegistrationFlow = authMode === "real";
+  const isOtpStep = isRealRegistrationFlow && !registrationToken && isOtpStepActive;
 
   useEffect(() => {
     return () => {
@@ -74,8 +98,195 @@ export default function Register() {
     setProofPreviewUrl(file.type.startsWith("image/") ? URL.createObjectURL(file) : "");
   }
 
-  const isContinueDisabled =
-    loading ||
+  function buildRegisteredUser(authRiskSnapshot, responseUser = {}) {
+    const workVerificationStatus = "pending";
+    const workVerificationFlag = authRiskSnapshot.internalFlags?.sameDeviceMultipleAccounts
+      ? "suspicious_device_reuse"
+      : null;
+
+    return {
+      ...(responseUser || {}),
+      full_name: form.fullName.trim(),
+      phone: form.phone,
+      city: form.city.trim(),
+      zone: form.city.trim(),
+      platform: form.platform,
+      work_type: form.workType,
+      worker_id: form.workerId.trim(),
+      work_proof_name: proofFile?.name || "",
+      work_verification_status:
+        responseUser?.work_verification_status || workVerificationStatus,
+      work_verification_flag:
+        responseUser?.work_verification_flag !== undefined
+          ? responseUser.work_verification_flag
+          : workVerificationFlag,
+      weekly_income: form.workType === "Driver" ? 22000 : 18000,
+      device_id: authRiskSnapshot.deviceId,
+      auth_risk_score: authRiskSnapshot.riskScore,
+      auth_risk_level: authRiskSnapshot.riskLevel,
+      auth_risk_status: authRiskSnapshot.riskStatus,
+      signup_time: responseUser?.signup_time || authRiskSnapshot.signupTime,
+      location: authRiskSnapshot.location,
+    };
+  }
+
+  async function finalizeRegistration(currentRegistrationToken) {
+    const authRiskSnapshot = await assessAndSaveAuthRisk({
+      phone: form.phone,
+      flow: "signup",
+      formStartedAt: formStartedAtRef.current,
+    });
+
+    const response = await registerWorker(
+      {
+        fullName: form.fullName.trim(),
+        phone: form.phone,
+        city: form.city.trim(),
+        zone: form.city.trim(),
+        platform: form.platform,
+        workType: form.workType,
+        workerId: form.workerId.trim(),
+        workProofName: proofFile.name,
+        weeklyIncome: form.workType === "Driver" ? 22000 : 18000,
+        deviceId: authRiskSnapshot.deviceId,
+        location: authRiskSnapshot.location,
+      },
+      {
+        authMode,
+        registrationToken: currentRegistrationToken,
+      }
+    );
+
+    saveAuthSession({
+      ...response,
+      user: buildRegisteredUser(authRiskSnapshot, response.user),
+    });
+
+    await wait(900);
+    navigate("/dashboard", { replace: true });
+  }
+
+  async function handleSendRegistrationOtp() {
+    const response = await requestOtp(form.phone, {
+      purpose: "register",
+      allowDemoFallback: false,
+    });
+
+    setAuthMode(response.authMode || "real");
+    setSessionId(response.sessionId);
+    setOtpLength(response.otpLength || DEFAULT_OTP_LENGTH);
+    setOtp(new Array(response.otpLength || DEFAULT_OTP_LENGTH).fill(""));
+    setActiveOtpCode(response.otp ? String(response.otp) : "");
+    setIsOtpStepActive(true);
+    setMessage(
+      response.otp
+        ? `OTP sent successfully. Use ${response.otp} to continue signup.`
+        : "OTP sent successfully. Enter the verification code to continue signup."
+    );
+    setIsVerificationNoticeVisible(false);
+  }
+
+  async function handleVerifyAndRegister() {
+    const combinedOtp = otp.join("");
+    if (combinedOtp.length !== otpLength) {
+      setError(`Enter all ${otpLength} OTP digits to continue.`);
+      return;
+    }
+
+    const response = await verifyOtp({
+      sessionId,
+      phone: form.phone,
+      otp: combinedOtp,
+      authMode: "real",
+    });
+
+    if (response.registrationRequired && response.registrationToken) {
+      setRegistrationToken(response.registrationToken);
+      setMessage("Phone verified successfully. Completing your registration...");
+      await finalizeRegistration(response.registrationToken);
+      return;
+    }
+
+    if (response.token && response.user) {
+      saveAuthSession(response);
+      await wait(600);
+      navigate("/dashboard", { replace: true });
+      return;
+    }
+
+    throw new Error("Unable to complete OTP verification.");
+  }
+
+  async function handleDemoRegistration() {
+    const authRiskSnapshot = await assessAndSaveAuthRisk({
+      phone: form.phone,
+      flow: "signup",
+      formStartedAt: formStartedAtRef.current,
+    });
+
+    const workVerificationStatus = "pending";
+    const workVerificationFlag = authRiskSnapshot.internalFlags?.sameDeviceMultipleAccounts
+      ? "suspicious_device_reuse"
+      : null;
+
+    const response = await registerWorker({
+      fullName: form.fullName.trim(),
+      phone: form.phone,
+      city: form.city.trim(),
+      zone: form.city.trim(),
+      platform: form.platform,
+      workType: form.workType,
+      workerId: form.workerId.trim(),
+      workProofName: proofFile.name,
+      workVerificationStatus,
+      workVerificationFlag,
+      weeklyIncome: form.workType === "Driver" ? 22000 : 18000,
+      deviceId: authRiskSnapshot.deviceId,
+      signupTime: authRiskSnapshot.signupTime,
+      location: authRiskSnapshot.location,
+      authRiskScore: authRiskSnapshot.riskScore,
+      authRiskLevel: authRiskSnapshot.riskLevel,
+      authRiskStatus: authRiskSnapshot.riskStatus,
+    });
+
+    saveAuthSession({
+      ...response,
+      user: buildRegisteredUser(authRiskSnapshot, response.user),
+    });
+
+    await wait(900);
+    navigate("/dashboard", { replace: true });
+  }
+
+  function handleBackToForm() {
+    setIsOtpStepActive(false);
+    setSessionId("");
+    setOtpLength(DEFAULT_OTP_LENGTH);
+    setOtp(new Array(DEFAULT_OTP_LENGTH).fill(""));
+    setActiveOtpCode("");
+    setMessage("");
+    setError("");
+    formStartedAtRef.current = Date.now();
+  }
+
+  async function handleResendOtp() {
+    const response = await requestOtp(form.phone, {
+      purpose: "register",
+      allowDemoFallback: false,
+    });
+
+    setSessionId(response.sessionId);
+    setOtpLength(response.otpLength || DEFAULT_OTP_LENGTH);
+    setOtp(new Array(response.otpLength || DEFAULT_OTP_LENGTH).fill(""));
+    setActiveOtpCode(response.otp ? String(response.otp) : "");
+    setMessage(
+      response.otp
+        ? `A fresh OTP is ready. Use ${response.otp} to continue signup.`
+        : "A fresh OTP has been sent. Enter it to continue signup."
+    );
+  }
+
+  const isFormInvalid =
     !form.fullName.trim() ||
     form.phone.length !== 10 ||
     !form.city.trim() ||
@@ -84,6 +295,7 @@ export default function Register() {
     !form.workerId.trim() ||
     !proofFile ||
     !form.declarationAccepted;
+  const isContinueDisabled = loading || (isOtpStep ? otp.join("").length !== otpLength : isFormInvalid);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -96,67 +308,17 @@ export default function Register() {
     setIsVerificationNoticeVisible(true);
 
     try {
-      const authRiskSnapshot = await assessAndSaveAuthRisk({
-        phone: form.phone,
-        flow: "signup",
-        formStartedAt: formStartedAtRef.current,
-      });
-
-      const workVerificationStatus = "pending";
-      const workVerificationFlag = authRiskSnapshot.internalFlags?.sameDeviceMultipleAccounts
-        ? "suspicious_device_reuse"
-        : null;
-
-      const response = await registerWorker(
-        {
-          fullName: form.fullName.trim(),
-          phone: form.phone,
-          city: form.city.trim(),
-          zone: form.city.trim(),
-          platform: form.platform,
-          workType: form.workType,
-          workerId: form.workerId.trim(),
-          workProofName: proofFile.name,
-          workVerificationStatus,
-          workVerificationFlag,
-          weeklyIncome: form.workType === "Driver" ? 22000 : 18000,
-          deviceId: authRiskSnapshot.deviceId,
-          signupTime: authRiskSnapshot.signupTime,
-          location: authRiskSnapshot.location,
-          authRiskScore: authRiskSnapshot.riskScore,
-          authRiskLevel: authRiskSnapshot.riskLevel,
-          authRiskStatus: authRiskSnapshot.riskStatus,
+      if (isRealRegistrationFlow) {
+        if (registrationToken) {
+          await finalizeRegistration(registrationToken);
+        } else if (isOtpStep) {
+          await handleVerifyAndRegister();
+        } else {
+          await handleSendRegistrationOtp();
         }
-      );
-
-      const registeredUser = {
-        ...(response.user || {}),
-        full_name: form.fullName.trim(),
-        phone: form.phone,
-        city: form.city.trim(),
-        zone: form.city.trim(),
-        platform: form.platform,
-        work_type: form.workType,
-        worker_id: form.workerId.trim(),
-        work_proof_name: proofFile.name,
-        work_verification_status: workVerificationStatus,
-        work_verification_flag: workVerificationFlag,
-        weekly_income: form.workType === "Driver" ? 22000 : 18000,
-        device_id: authRiskSnapshot.deviceId,
-        auth_risk_score: authRiskSnapshot.riskScore,
-        auth_risk_level: authRiskSnapshot.riskLevel,
-        auth_risk_status: authRiskSnapshot.riskStatus,
-        signup_time: authRiskSnapshot.signupTime,
-        location: authRiskSnapshot.location,
-      };
-
-      saveAuthSession({
-        ...response,
-        user: registeredUser,
-      });
-
-      await wait(900);
-      navigate("/dashboard", { replace: true });
+      } else {
+        await handleDemoRegistration();
+      }
     } catch (registerError) {
       setError(extractApiErrorMessage(registerError, "Service unavailable."));
       setIsVerificationNoticeVisible(false);
@@ -189,14 +351,14 @@ export default function Register() {
           <div className="sm:col-span-2">
             <TextInput
               id="full-name"
-            label="Full Name"
-            value={form.fullName}
-            onChange={(value) => updateField("fullName", value)}
-            placeholder="Kunal Sharma"
-            autoComplete="name"
-            autoFocus
-            disabled={loading}
-          />
+              label="Full Name"
+              value={form.fullName}
+              onChange={(value) => updateField("fullName", value)}
+              placeholder="Kunal Sharma"
+              autoComplete="name"
+              autoFocus
+              disabled={loading || isOtpStep}
+            />
           </div>
 
           <TextInput
@@ -208,7 +370,7 @@ export default function Register() {
             inputMode="numeric"
             autoComplete="tel"
             maxLength={10}
-            disabled={loading}
+            disabled={loading || isOtpStep || Boolean(registrationToken)}
           />
 
           <TextInput
@@ -218,7 +380,7 @@ export default function Register() {
             onChange={(value) => updateField("city", value)}
             placeholder="Bengaluru"
             autoComplete="address-level2"
-            disabled={loading}
+            disabled={loading || isOtpStep}
           />
 
           <div className="sm:col-span-2">
@@ -228,7 +390,7 @@ export default function Register() {
               value={form.workType}
               onChange={(value) => updateField("workType", value)}
               options={WORK_TYPE_OPTIONS}
-              disabled={loading}
+              disabled={loading || isOtpStep}
             />
           </div>
         </div>
@@ -247,7 +409,7 @@ export default function Register() {
             value={form.platform}
             onChange={(value) => updateField("platform", value)}
             options={PLATFORM_OPTIONS}
-            disabled={loading}
+            disabled={loading || isOtpStep}
           />
 
           <TextInput
@@ -257,7 +419,7 @@ export default function Register() {
             onChange={(value) => updateField("workerId", value.toUpperCase())}
             placeholder="e.g. SWG12345"
             autoComplete="off"
-            disabled={loading}
+            disabled={loading || isOtpStep}
           />
 
           <FileUploadCard
@@ -266,14 +428,14 @@ export default function Register() {
             file={proofFile}
             previewUrl={proofPreviewUrl}
             onFileSelect={handleProofSelect}
-            disabled={loading}
+            disabled={loading || isOtpStep}
           />
 
           <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-4">
             <input
               type="checkbox"
               checked={form.declarationAccepted}
-              disabled={loading}
+              disabled={loading || isOtpStep}
               onChange={(event) => updateField("declarationAccepted", event.target.checked)}
               className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-200"
             />
@@ -283,15 +445,64 @@ export default function Register() {
           </label>
         </section>
 
+        {isOtpStep ? (
+          <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-slate-700">OTP Verification</p>
+                <p className="mt-1 text-sm text-slate-500">Code sent to +91 {form.phone}</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleBackToForm}
+                className="text-sm font-medium text-slate-500 transition-colors duration-200 hover:text-slate-900"
+              >
+                Edit details
+              </button>
+            </div>
+
+            <OtpInputGroup
+              value={otp}
+              onChange={setOtp}
+              autoFocus={isOtpStep}
+              disabled={loading}
+            />
+
+            <div className="flex items-center justify-between gap-4 text-sm">
+              <span className="text-slate-500">
+                {activeOtpCode
+                  ? `Current verification code: ${activeOtpCode}`
+                  : `Enter the latest ${otpLength}-digit OTP sent to your phone.`}
+              </span>
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                className="font-medium text-blue-600 transition-colors duration-200 hover:text-blue-700"
+              >
+                Resend OTP
+              </button>
+            </div>
+          </section>
+        ) : null}
+
         {isVerificationNoticeVisible ? (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
             Verification in progress...
           </div>
         ) : (
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            Work verification stays simple for the user while background checks continue silently.
+            {isRealRegistrationFlow && !registrationToken
+              ? "Your account details stay here while OTP verification and background checks happen in parallel."
+              : "Work verification stays simple for the user while background checks continue silently."}
           </div>
         )}
+
+        {message ? (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            {message}
+          </div>
+        ) : null}
 
         {error ? (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -300,7 +511,13 @@ export default function Register() {
         ) : null}
 
         <SurfaceButton type="submit" className="w-full" loading={loading} disabled={isContinueDisabled}>
-          Continue
+          {isOtpStep
+            ? "Verify OTP and create account"
+            : registrationToken
+              ? "Complete registration"
+              : isRealRegistrationFlow
+                ? "Send OTP"
+                : "Continue"}
         </SurfaceButton>
       </form>
     </AuthShell>

@@ -8,6 +8,7 @@ export default function OtpInputGroup({
   disabled = false,
 }) {
   const inputRefs = useRef([]);
+  const otpLength = value.length;
 
   useEffect(() => {
     if (autoFocus && inputRefs.current[0]) {
@@ -26,16 +27,16 @@ export default function OtpInputGroup({
     if (nextValue.length > 1) {
       const nextDigits = [...value];
       nextValue
-        .slice(0, 4)
+        .slice(0, otpLength)
         .split("")
         .forEach((digit, digitIndex) => {
-          if (index + digitIndex < 4) {
+          if (index + digitIndex < otpLength) {
             nextDigits[index + digitIndex] = digit;
           }
         });
 
       onChange(nextDigits);
-      inputRefs.current[Math.min(index + nextValue.length, 3)]?.focus();
+      inputRefs.current[Math.min(index + nextValue.length, otpLength - 1)]?.focus();
       return;
     }
 
@@ -43,7 +44,7 @@ export default function OtpInputGroup({
     nextDigits[index] = nextValue;
     onChange(nextDigits);
 
-    if (index < 3) {
+    if (index < otpLength - 1) {
       inputRefs.current[index + 1]?.focus();
     }
   }
@@ -56,19 +57,22 @@ export default function OtpInputGroup({
 
   function handlePaste(event) {
     event.preventDefault();
-    const pastedDigits = event.clipboardData.getData("text/plain").replace(/\D/g, "").slice(0, 4);
+    const pastedDigits = event.clipboardData
+      .getData("text/plain")
+      .replace(/\D/g, "")
+      .slice(0, otpLength);
 
     if (!pastedDigits) {
       return;
     }
 
-    const nextDigits = new Array(4).fill("");
+    const nextDigits = new Array(otpLength).fill("");
     pastedDigits.split("").forEach((digit, index) => {
       nextDigits[index] = digit;
     });
 
     onChange(nextDigits);
-    inputRefs.current[Math.min(pastedDigits.length, 4) - 1]?.focus();
+    inputRefs.current[Math.min(pastedDigits.length, otpLength) - 1]?.focus();
   }
 
   return (

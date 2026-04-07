@@ -14,7 +14,7 @@ import {
   sanitizePhoneNumber,
 } from "../utils/authRisk";
 
-const OTP_LENGTH = 4;
+const DEFAULT_OTP_LENGTH = 6;
 
 function wait(durationMs) {
   return new Promise((resolve) => {
@@ -29,8 +29,10 @@ export default function Login() {
   const formStartedAtRef = useRef(Date.now());
   const [step, setStep] = useState(1);
   const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState(new Array(OTP_LENGTH).fill(""));
+  const [otpLength, setOtpLength] = useState(DEFAULT_OTP_LENGTH);
+  const [otp, setOtp] = useState(new Array(DEFAULT_OTP_LENGTH).fill(""));
   const [sessionId, setSessionId] = useState("");
+  const [authMode, setAuthMode] = useState("demo");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -56,6 +58,9 @@ export default function Login() {
 
       setPhone(sanitizedPhone);
       setSessionId(response.sessionId);
+      setAuthMode(response.authMode || "demo");
+      setOtpLength(response.otpLength || DEFAULT_OTP_LENGTH);
+      setOtp(new Array(response.otpLength || DEFAULT_OTP_LENGTH).fill(""));
       setStep(2);
       setActiveOtpCode(response.otp ? String(response.otp) : "");
       setMessage(
@@ -75,8 +80,8 @@ export default function Login() {
     const combinedOtp = otp.join("");
     const sanitizedPhone = sanitizePhoneNumber(phone);
 
-    if (combinedOtp.length !== OTP_LENGTH) {
-      setError("Enter all 4 OTP digits to continue.");
+    if (combinedOtp.length !== otpLength) {
+      setError(`Enter all ${otpLength} OTP digits to continue.`);
       return;
     }
 
@@ -112,6 +117,7 @@ export default function Login() {
         sessionId,
         phone: sanitizedPhone,
         otp: combinedOtp,
+        authMode,
         profile: {
           ...persistedProfile,
           deviceId: authRiskSnapshot.deviceId,
@@ -121,6 +127,19 @@ export default function Login() {
           location: authRiskSnapshot.location,
         },
       });
+
+      if (response.registrationRequired && response.registrationToken) {
+        await wait(350);
+        navigate("/register", {
+          replace: true,
+          state: {
+            phone: sanitizedPhone,
+            registrationToken: response.registrationToken,
+            authMode: response.authMode || "real",
+          },
+        });
+        return;
+      }
 
       saveAuthSession({
         ...response,
@@ -154,7 +173,9 @@ export default function Login() {
       recordLoginAttempt(sanitizedPhone);
       const response = await requestOtp(sanitizedPhone);
       setSessionId(response.sessionId);
-      setOtp(new Array(OTP_LENGTH).fill(""));
+      setAuthMode(response.authMode || "demo");
+      setOtpLength(response.otpLength || DEFAULT_OTP_LENGTH);
+      setOtp(new Array(response.otpLength || DEFAULT_OTP_LENGTH).fill(""));
       setActiveOtpCode(response.otp ? String(response.otp) : "");
       setError("");
       setMessage(
@@ -169,8 +190,10 @@ export default function Login() {
 
   function handleChangeNumber() {
     setStep(1);
-    setOtp(new Array(OTP_LENGTH).fill(""));
+    setOtpLength(DEFAULT_OTP_LENGTH);
+    setOtp(new Array(DEFAULT_OTP_LENGTH).fill(""));
     setSessionId("");
+    setAuthMode("demo");
     setError("");
     setMessage("");
     setActiveOtpCode("");
@@ -190,7 +213,7 @@ export default function Login() {
     <AuthShell
       eyebrow="Login"
       title="Sign in to GigPredict AI"
-      description="Enter your mobile number and a 4-digit OTP to continue into your real-time decision workspace."
+      description="Enter your mobile number and OTP to continue into your real-time decision workspace."
       note="Fast sign-in, clean feedback, and silent trust checks run in the background while you move forward."
       footer={
         <>
@@ -262,7 +285,7 @@ export default function Login() {
                 <span className="text-slate-500">
                   {activeOtpCode
                     ? `Current verification code: ${activeOtpCode}`
-                    : "Enter the latest OTP sent to your phone."}
+                    : `Enter the latest ${otpLength}-digit OTP sent to your phone.`}
                 </span>
                 <button
                   type="button"

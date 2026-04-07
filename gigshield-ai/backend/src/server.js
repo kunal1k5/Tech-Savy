@@ -21,6 +21,7 @@ const dotenv = require("dotenv");
 
 const app = require("./app");
 const { pool, testConnection } = require("./database/connection");
+const { closeMongo, connectMongo } = require("./database/mongo");
 const logger = require("./utils/logger");
 
 const PORT = process.env.PORT || 5000;
@@ -34,6 +35,13 @@ async function startServer() {
     logger.warn(`   DB error: ${err.message}`);
   }
 
+  try {
+    await connectMongo();
+  } catch (err) {
+    logger.warn("MongoDB unavailable. Demo flows will continue with in-memory fallback storage.");
+    logger.warn(`   Mongo error: ${err.message}`);
+  }
+
   app.listen(PORT, () => {
     logger.info(`GigShield AI backend running on port ${PORT}`);
     logger.info(`   Environment: ${process.env.NODE_ENV || "development"}`);
@@ -44,6 +52,7 @@ async function startServer() {
 process.on("SIGTERM", async () => {
   logger.info("SIGTERM received. Shutting down gracefully.");
   try { await pool.end(); } catch (_) { /* pool may not be connected */ }
+  try { await closeMongo(); } catch (_) { /* mongo may not be connected */ }
   process.exit(0);
 });
 

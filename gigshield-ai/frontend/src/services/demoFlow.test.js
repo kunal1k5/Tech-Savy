@@ -22,7 +22,7 @@ describe("workerFlow", () => {
       },
     });
 
-    await expect(requestOtp("1234567890")).resolves.toEqual({
+    await expect(requestOtp("1234567890")).resolves.toMatchObject({
       sessionId: "backend-session",
       phone: "1234567890",
     });

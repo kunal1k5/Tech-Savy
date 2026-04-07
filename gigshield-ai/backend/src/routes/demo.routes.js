@@ -75,9 +75,9 @@ router.post("/auth/login", validate(loginSchema), (req, res, next) => {
   }
 });
 
-router.post("/auth/verify-otp", validate(verifySchema), (req, res, next) => {
+router.post("/auth/verify-otp", validate(verifySchema), async (req, res, next) => {
   try {
-    const result = SessionStoreService.verifyOtp({
+    const result = await SessionStoreService.verifyOtp({
       sessionId: req.body.sessionId,
       rawPhone: req.body.phone,
       otp: req.body.otp,
@@ -89,20 +89,20 @@ router.post("/auth/verify-otp", validate(verifySchema), (req, res, next) => {
   }
 });
 
-router.post("/auth/register", validate(registerSchema), (req, res, next) => {
+router.post("/auth/register", validate(registerSchema), async (req, res, next) => {
   try {
-    const result = SessionStoreService.register(req.body);
+    const result = await SessionStoreService.register(req.body);
     return sendSuccess(res, result, "Worker registered successfully.", 201);
   } catch (error) {
     return next(error);
   }
 });
 
-router.get("/policy", authenticate, (req, res, next) => {
+router.get("/policy", authenticate, async (req, res, next) => {
   try {
     return sendSuccess(
       res,
-      SessionStoreService.getPolicy(req.user),
+      await SessionStoreService.getPolicy(req.user),
       "Policy state loaded successfully."
     );
   } catch (error) {
@@ -110,11 +110,11 @@ router.get("/policy", authenticate, (req, res, next) => {
   }
 });
 
-router.post("/policy/buy", authenticate, validate(buyPolicySchema), (req, res, next) => {
+router.post("/policy/buy", authenticate, validate(buyPolicySchema), async (req, res, next) => {
   try {
     return sendSuccess(
       res,
-      SessionStoreService.buyPolicy(req.user, req.body.planId),
+      await SessionStoreService.buyPolicy(req.user, req.body.planId),
       "Policy purchased successfully.",
       201
     );
@@ -132,17 +132,21 @@ router.get("/premium", authenticate, async (req, res, next) => {
   }
 });
 
-router.get("/claims", authenticate, (req, res, next) => {
+router.get("/claims", authenticate, async (req, res, next) => {
   try {
-    return sendSuccess(res, SessionStoreService.getClaims(req.user), "Claims loaded successfully.");
+    return sendSuccess(
+      res,
+      await SessionStoreService.getClaims(req.user),
+      "Claims loaded successfully."
+    );
   } catch (error) {
     return next(error);
   }
 });
 
-router.post("/claim/trigger", authenticate, validate(triggerClaimSchema), (req, res, next) => {
+router.post("/claim/trigger", authenticate, validate(triggerClaimSchema), async (req, res, next) => {
   try {
-    const result = SessionStoreService.triggerClaim(req.user, req.body);
+    const result = await SessionStoreService.triggerClaim(req.user, req.body);
     if (result.blocked) {
       return sendError(res, 429, result.message, { data: result });
     }
