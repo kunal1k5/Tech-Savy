@@ -1,1 +1,1 @@
-module.exports = require("../gigshield-ai/backend/src/app");
+module.exports = require("../gigshield-ai/frontend/api/_lib/demoApi");

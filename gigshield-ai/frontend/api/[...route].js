@@ -1,1 +1,1 @@
-module.exports = require("../../backend/src/app");
+module.exports = require("./_lib/demoApi");

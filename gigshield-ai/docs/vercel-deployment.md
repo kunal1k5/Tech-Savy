@@ -5,7 +5,7 @@
 The repo root now supports a single Vercel deployment that serves:
 
 - the React app from `gigshield-ai/frontend`
-- the Express demo auth and dashboard API from `/api/*`
+- a self-contained demo API from `/api/*`
 
 Use these settings in Vercel when you want login and signup to work in the same deployment:
 
@@ -25,7 +25,7 @@ AI_ENGINE_URL=https://your-ai-engine-project.vercel.app
 
 Notes:
 - If `REACT_APP_API_URL` is not set, the frontend now uses `/api` on deployed hosts and `http://localhost:5000/api` locally.
-- The root `api/[...route].js` file exposes the Express app as a Vercel serverless function.
+- The root `api/[...route].js` file exposes the frontend's shared demo API handler as a Vercel serverless function.
 - The root `vercel.json` keeps `/api/*` available and rewrites all non-API routes to `index.html`.
 
 ## Frontend subdirectory deploy with demo auth
@@ -50,8 +50,9 @@ FRONTEND_URLS=https://your-project.vercel.app
 ```
 
 Notes:
-- `frontend/api/[...route].js` exposes the backend Express app inside the frontend deployment.
+- `frontend/api/[...route].js` exposes the shared demo API handler inside the frontend deployment.
 - `frontend/vercel.json` now preserves `/api/*` requests instead of rewriting them to `index.html`.
+- The frontend deployment no longer depends on installing the sibling `backend` folder.
 - This fixes the `405 Method Not Allowed` error that happens when OTP POST requests hit the SPA rewrite instead of an API function.
 
 ## Frontend-only deploy for the current demo
