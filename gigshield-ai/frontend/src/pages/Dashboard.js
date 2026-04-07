@@ -516,7 +516,10 @@ function MetricCard({
   pulse = false,
 }) {
   return (
-    <DashboardCard className={cn("group relative overflow-hidden", pulse && "ring-4")} hover>
+    <DashboardCard
+      className={cn("group relative min-w-0 overflow-hidden md:min-h-[168px]", pulse && "ring-4")}
+      hover
+    >
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-200 to-transparent" />
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
@@ -1094,7 +1097,7 @@ export default function Dashboard() {
 
   return (
     <motion.div
-      className="mx-auto flex w-full max-w-[1320px] flex-col gap-6 px-4 py-6 md:px-6 md:py-8 xl:px-8"
+      className="gigpredict-page max-w-[1320px]"
       variants={containerVariants}
       initial="hidden"
       animate="show"
@@ -1141,7 +1144,7 @@ export default function Dashboard() {
         </div>
       </motion.header>
 
-      <section className="grid gap-5 xl:grid-cols-5">
+      <section className="grid gap-5">
         <MetricCard
           icon={Activity}
           label="Risk Engine"
