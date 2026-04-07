@@ -1,4 +1,5 @@
 .venv/
+.tmp-frontend-ci/
 tmp_pycache/
 package-lock.json
 !gigshield-ai/backend/package-lock.json
