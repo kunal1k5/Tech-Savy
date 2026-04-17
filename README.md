@@ -1,163 +1,229 @@
-# 🚀 GigPredict AI
+# GigPredict AI
 
-## 👋 About the Project
+GigPredict AI is a full-stack decision-intelligence platform built for gig workers. It monitors real-world risk signals, automates claim workflows, applies explainable fraud checks, and supports dispute re-verification with proof uploads.
 
-Gig workers deal with a lot of uncertainty every day. Sometimes it’s heavy rain, sometimes pollution, and sometimes just no orders at all. In most cases, even if they lose income, there’s no simple way to recover it quickly.
+## Live Links
 
-We started thinking — why should a worker even have to apply for a claim manually?
+- Frontend Demo: https://tech-savy-8euw.vercel.app/
+- Backend API: https://tech-savy.onrender.com
+- Health Check: https://tech-savy.onrender.com/api/health
+- Repository: https://github.com/kunal1k5/Tech-Savy
 
-That’s where **GigPredict AI** comes in.
+## Problem Statement
 
-Instead of building a typical insurance platform, we built a system that can automatically detect problems, take decisions, and even correct itself if something goes wrong.
+Gig workers can lose income because of rain, air quality, route disruption, or unsafe working conditions. Traditional insurance workflows are often manual and slow, with low transparency on claim decisions.
 
----
+## Our Solution
 
-## 💡 What We Built
+GigPredict AI creates an automated decision loop:
 
-GigPredict AI is a real-time decision system that continuously monitors both environmental conditions and worker activity.
+1. Detect risk from environmental and behavior signals.
+2. Evaluate claim eligibility and expected impact.
+3. Run fraud scoring and decision logic.
+4. Allow dispute + proof upload for re-verification.
+5. Produce a final explainable claim outcome.
 
-We look at things like:
+## Core Features
 
-* AQI (air quality)
-* Rainfall
-* Wind conditions
-* Whether the worker is active or not
+- Real-time risk monitoring (weather + AQI + behavior context)
+- Dynamic risk-driven insurance intelligence
+- Automated claim trigger and evaluation flow
+- Rule-based explainable fraud scoring
+- Work-profile screenshot verification for onboarding proof
+- Dispute workflow with geo-proof and work screenshot upload
+- Re-verification flow for final claim decision
 
-But the important part is — we don’t just detect risk.
+## Product Workflow
 
-We check whether the worker is actually facing income loss.
+1. Worker registers and completes verification.
+2. Dashboard starts monitoring risk and operational signals.
+3. Trigger conditions activate auto-claim checks.
+4. Fraud engine marks claim as approve/review/reject.
+5. Worker can raise dispute and upload proof.
+6. Re-verification engine updates final status.
 
-If the system detects that the worker is active but unable to earn due to bad conditions, it automatically triggers a claim and calculates the payout instantly.
+## High-Level Architecture
 
-So there’s no need for the user to manually apply.
+```text
+Frontend (React)
+	 |
+	 v
+Backend API (Node.js + Express)
+	 |\
+	 | \-- PostgreSQL (structured persistence)
+	 | \-- MongoDB (auth + flow state)
+	 |
+	 \---- AI Engine / Risk Utilities (Python services)
+```
 
----
+## Tech Stack
 
-## 🧠 How the System Thinks
+- Frontend: React, React Router, Axios, Tailwind CSS, Framer Motion
+- Backend: Node.js, Express, Joi, Multer, Winston
+- Databases: PostgreSQL, MongoDB
+- AI Utilities: Python services (risk/fraud support modules)
+- Deployment: Vercel (frontend), Render (backend)
 
-We designed the system to take decisions based on multiple signals instead of just one condition.
+## Repository Structure
 
-It considers:
+```text
+Tech-Savy/
+	gigshield-ai/
+		ai-engine/        Python AI and scoring utilities
+		backend/          Express API services
+		frontend/         React client app
+		database/         SQL schema and seed artifacts
+		docs/             Architecture and API documentation
+```
 
-* Environmental risk
-* Worker activity
-* Claim history
-* Location consistency
+## Pitch Deck
 
-All of this is combined into a fraud score.
+Add your public pitch deck link here:
 
-Based on that, the system decides:
+https://drive.google.com/REPLACE_WITH_PUBLIC_PITCH_DECK_LINK
 
-* Approve the claim
-* Reject it
-* Or ask for verification
-
----
-
-## 🔁 What Makes It Different
-
-One thing we focused on was fairness.
-
-Instead of treating AI decisions as final, we made the system **self-correcting**.
-
-If a user feels something is wrong, they can raise a dispute and upload proof, like:
-
-* A geo-tagged image
-* A work screenshot
-
-The system then re-evaluates everything again and gives a final decision.
-
----
-
-## 🧪 Try It Yourself
-
-We added a simulation panel where you can change values and see how the system reacts in real time.
-
-👉 Try it here:
-https://tech-savy-8euw.vercel.app/
-
----
-
-## ⚙️ Tech Stack
-
-* React
-* Node.js
-* Express
-* Python
-* SQL
-* Tailwind CSS
-
----
-
-## 🔄 How to Use
-
-1. Open the app
-2. Change conditions (like rain, AQI, etc.)
-3. See how risk changes
-4. Watch how claim is triggered
-5. Test fraud scenarios
-6. Try dispute and proof upload
-
----
-
-## ⚡ Challenges We Faced
-
-* Making sure the system doesn’t crash on invalid inputs
-* Preventing false claims
-* Designing fraud detection that isn’t too strict or too loose
-* Keeping everything explainable
-* Making sure the flow works end-to-end
-
----
-
-## 📚 What We Learned
-
-This project taught us that:
-
-* Good systems are not just about AI models
-* Logic and flow matter a lot
-* Edge cases can break everything if not handled properly
-* Transparency builds trust
-
----
-
-## 🎯 Final Thought
-
-We didn’t just want to build something that detects problems.
-
-We wanted to build something that can:
-
-* Detect
-* Decide
-* Validate
-* And correct itself
-
----
-
-## 🔗 Links
-
-### 🌐 Live Demo
-
-https://tech-savy-8euw.vercel.app/
-
-### 💻 GitHub Repository
-
-https://github.com/kunal1k5/Tech-Savy
-
-### 🎥 Demo Video
+## Recorded Video
 
 https://video-gfid.vercel.app/
 
----
+## Source Code
 
-## 🙌 Team
+Repository:
+
+https://github.com/kunal1k5/Tech-Savy
+
+Dependencies and run instructions are included below for full local execution.
+
+## Local Setup
+
+### Prerequisites
+
+- Node.js 20+
+- npm 9+
+- Python 3.10+
+- MongoDB and PostgreSQL (optional for full persistence)
+
+### 1) Clone Repository
+
+```powershell
+git clone https://github.com/kunal1k5/Tech-Savy.git
+cd Tech-Savy\gigshield-ai
+```
+
+### 2) Configure Environment Files
+
+```powershell
+copy .env.example .env
+copy backend\.env.example backend\.env
+copy frontend\.env.example frontend\.env
+```
+
+Recommended local values:
+
+- backend/.env
+	- PORT=5005
+	- NODE_ENV=development
+	- JWT_SECRET=<your-secret>
+	- OTP_HASH_SECRET=<your-secret>
+	- MONGODB_URI=<your-mongodb-uri>
+	- MONGODB_DB_NAME=GigPredict-AI
+
+- frontend/.env
+	- REACT_APP_API_URL=http://localhost:5005/api
+
+### 3) Install Dependencies
+
+```powershell
+cd backend
+npm install
+cd ..\frontend
+npm install
+cd ..\ai-engine
+python -m pip install -r requirements.txt
+```
+
+### 4) Run Services
+
+Backend:
+
+```powershell
+cd backend
+npm start
+```
+
+Frontend:
+
+```powershell
+cd frontend
+npm start
+```
+
+AI Engine (optional if specific endpoints use it):
+
+```powershell
+cd ai-engine
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+## Key API Endpoints
+
+- GET /api/health
+- POST /api/ai-decision
+- POST /api/risk-premium
+- POST /api/auto-claim
+- POST /api/start-dispute
+- POST /api/upload-proof
+- POST /api/work-profile-verify
+- POST /api/reverify-claim
+
+Detailed API examples:
+
+https://github.com/kunal1k5/Tech-Savy/tree/main/gigshield-ai/docs
+
+## Testing
+
+Backend tests:
+
+```powershell
+cd backend
+npx jest --runInBand
+```
+
+Frontend tests and build:
+
+```powershell
+cd frontend
+$env:CI='true'; npm test -- --watchAll=false --runInBand
+npm run build
+```
+
+## Deployment Notes
+
+- Frontend deployed on Vercel.
+- Backend deployed on Render.
+- Health path for backend monitoring: /api/health.
+- Root path / returns 404 by design because backend is API-only.
+
+## Troubleshooting
+
+- Mongo bad auth:
+	- Verify Atlas DB user credentials and URI in deployment env.
+	- Ensure 0.0.0.0/0 is temporarily enabled in Atlas Network Access during setup.
+
+- Database unavailable warnings:
+	- Add valid PostgreSQL credentials to backend environment.
+	- Without DB credentials, backend runs with in-memory fallback for some flows.
+
+- CORS issues:
+	- Set FRONTEND_URL and FRONTEND_URLS to your deployed frontend URL.
+
+## Team
 
 Team Tech Savy
 
-* Kunal
-* Aditya
-* Akashat
-* Atharv
-* Ranjeet
+- Kunal
+- Aditya
+- Akashat
+- Atharv
+- Ranjeet
 
----
