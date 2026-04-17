@@ -1,6 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
+import BrandIdentity from "../branding/BrandIdentity";
 
 export default function AuthShell({
   eyebrow,
@@ -22,8 +23,12 @@ export default function AuthShell({
           className="w-full"
         >
           <div className="mb-5 flex items-center justify-between gap-4">
-            <Link to="/" className="text-lg font-semibold tracking-tight text-slate-900">
-              GigPredict AI
+            <Link to="/" className="block">
+              <BrandIdentity
+                showSubtitle={false}
+                logoClassName="h-9 w-9"
+                titleClassName="text-lg tracking-tight"
+              />
             </Link>
             <Link
               to={backTo}

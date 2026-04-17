@@ -1,6 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
+import BrandIdentity from "../components/branding/BrandIdentity";
 import {
   Activity,
   ArrowRight,
@@ -123,13 +124,7 @@ export default function Landing() {
       <div className="relative z-10 mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-6 md:px-6 lg:px-8">
         <header className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/90 px-4 py-4 shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur md:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#2563EB] text-white">
-              <Shield size={18} />
-            </div>
-            <div>
-              <p className="text-base font-semibold text-slate-900">GigPredict AI</p>
-                <p className="text-xs text-slate-500">AI parametric insurance platform</p>
-            </div>
+            <BrandIdentity subtitle="AI parametric insurance platform" />
           </div>
 
           <nav className="flex items-center gap-3">

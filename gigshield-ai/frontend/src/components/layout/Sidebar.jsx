@@ -1,6 +1,7 @@
 import React from "react";
-import { LogOut, Shield, X } from "lucide-react";
+import { LogOut, X } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import BrandIdentity from "../branding/BrandIdentity";
 import { useGigPredictAIData } from "../../context/GigPredictAIDataContext";
 import { clearSession } from "../../utils/auth";
 import { cn } from "../../utils/cn";
@@ -34,13 +35,11 @@ function SidebarContent({ onNavigate = () => {}, showClose = false }) {
     <div className="flex h-full flex-col bg-white">
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-5">
         <NavLink to="/dashboard" onClick={onNavigate} className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-white">
-            <Shield size={18} />
-          </div>
-          <div>
-            <p className="text-base font-semibold text-slate-900">GigPredict AI</p>
-            <p className="text-xs text-slate-500">Decision intelligence</p>
-          </div>
+          <BrandIdentity
+            subtitle="Decision intelligence"
+            logoClassName="h-10 w-10"
+            titleClassName="text-base"
+          />
         </NavLink>
 
         {showClose ? (
