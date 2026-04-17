@@ -43,10 +43,12 @@ describe("api service configuration", () => {
     expect(resolveApiBaseUrl({ hostname: "localhost" })).toBe("http://localhost:5000/api");
   });
 
-  it("defaults to same-origin /api on deployed hosts", () => {
+  it("defaults to Render backend on deployed hosts", () => {
     const { resolveApiBaseUrl } = require("./api");
 
-    expect(resolveApiBaseUrl({ hostname: "gigpredict-ai.vercel.app" })).toBe("/api");
+    expect(resolveApiBaseUrl({ hostname: "gigpredict-ai.vercel.app" })).toBe(
+      "https://tech-savy.onrender.com/api"
+    );
   });
 
   it("respects an explicit REACT_APP_API_URL value", () => {

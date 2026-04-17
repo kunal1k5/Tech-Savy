@@ -2,6 +2,7 @@ import axios from "axios";
 import { clearSession, getToken } from "../utils/auth";
 
 const LOCAL_API_BASE_URL = "http://localhost:5000/api";
+const DEFAULT_REMOTE_API_BASE_URL = "https://tech-savy.onrender.com/api";
 
 function normalizeBaseUrl(value) {
   return String(value || "").trim().replace(/\/+$/, "");
@@ -18,7 +19,9 @@ export function resolveApiBaseUrl(runtimeLocation = typeof window !== "undefined
   }
 
   if (runtimeLocation) {
-    return isLocalHostname(runtimeLocation.hostname) ? LOCAL_API_BASE_URL : "/api";
+    return isLocalHostname(runtimeLocation.hostname)
+      ? LOCAL_API_BASE_URL
+      : DEFAULT_REMOTE_API_BASE_URL;
   }
 
   return LOCAL_API_BASE_URL;
