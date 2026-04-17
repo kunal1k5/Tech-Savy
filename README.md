@@ -4,6 +4,7 @@ GigPredict AI is a full-stack decision-intelligence platform built for gig worke
 
 ## Live Links
 
+- Pitch Deck: https://1drv.ms/p/c/ebd841bd10f2a4fe/IQAlOlae6Ua3Q5-PZnHrKW-XAR0_z_vBFiGTGe-3hejA3aM?e=h3aFuu
 - Frontend Demo: https://tech-savy-8euw.vercel.app/
 - Backend API: https://tech-savy.onrender.com
 - Health Check: https://tech-savy.onrender.com/api/health
@@ -78,9 +79,7 @@ Tech-Savy/
 
 ## Pitch Deck
 
-Add your public pitch deck link here:
-
-https://drive.google.com/REPLACE_WITH_PUBLIC_PITCH_DECK_LINK
+https://1drv.ms/p/c/ebd841bd10f2a4fe/IQAlOlae6Ua3Q5-PZnHrKW-XAR0_z_vBFiGTGe-3hejA3aM?e=h3aFuu
 
 ## Recorded Video
 
