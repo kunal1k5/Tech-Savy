@@ -6,7 +6,8 @@ import FileUploadCard from "../components/onboarding/FileUploadCard";
 import SelectInput from "../components/onboarding/SelectInput";
 import TextInput from "../components/onboarding/TextInput";
 import SurfaceButton from "../components/ui/SurfaceButton";
-import { extractApiErrorMessage, getFraudStatus } from "../services/api";
+import InfoTooltip from "../components/ui/InfoTooltip";
+import { extractApiErrorMessage, verifyWorkProfileProof } from "../services/api";
 import { isRealAuthEnabled, registerWorker, requestOtp, verifyOtp } from "../services/workerFlow";
 import { saveAuthSession } from "../utils/auth";
 import { assessAndSaveAuthRisk, sanitizePhoneNumber } from "../utils/authRisk";
@@ -33,15 +34,16 @@ const INITIAL_FORM = {
   workType: "Delivery",
   platform: "",
   workerId: "",
-  idLast4: "",
   declarationAccepted: false,
 };
 
 const DEFAULT_PHONE_OTP_LENGTH = 6;
 const DEFAULT_EMAIL_OTP_LENGTH = 6;
 const LOCATION_TIMEOUT_MS = 5000;
+const MAX_WORK_PROOF_BYTES = 5 * 1024 * 1024;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
 const STEP_LABELS = ["Step 1: Personal Info", "Step 2: Work Details", "Step 3: Verification"];
+const WORK_PROOF_ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png"]);
 
 const HIGH_RISK_CITIES = new Set(["DELHI", "MUMBAI", "KOLKATA"]);
 const MEDIUM_RISK_CITIES = new Set([
@@ -62,6 +64,19 @@ function wait(durationMs) {
 
 function isValidEmail(value) {
   return EMAIL_PATTERN.test(String(value || "").trim());
+}
+
+function isValidWorkProofImage(file) {
+  if (!file) {
+    return false;
+  }
+
+  const normalizedName = String(file.name || "").toLowerCase();
+  const hasAllowedExtension = [".jpg", ".jpeg", ".png"].some((extension) =>
+    normalizedName.endsWith(extension)
+  );
+
+  return WORK_PROOF_ALLOWED_TYPES.has(String(file.type || "").toLowerCase()) || hasAllowedExtension;
 }
 
 function buildMockOtp(length = DEFAULT_EMAIL_OTP_LENGTH) {
@@ -305,7 +320,7 @@ export default function Register() {
   const redirectedRegistrationToken = location.state?.registrationToken || "";
 
   const formStartedAtRef = useRef(Date.now());
-  const documentValidationRunRef = useRef(0);
+  const proofVerificationRequestIdRef = useRef(0);
 
   const [form, setForm] = useState({
     ...INITIAL_FORM,
@@ -314,6 +329,8 @@ export default function Register() {
 
   const [proofFile, setProofFile] = useState(null);
   const [proofPreviewUrl, setProofPreviewUrl] = useState("");
+  const [proofUploadError, setProofUploadError] = useState("");
+  const [proofVerificationLoading, setProofVerificationLoading] = useState(false);
 
   const [authMode, setAuthMode] = useState(
     redirectedRegistrationToken ? "real" : isRealAuthEnabled() ? "real" : "demo"
@@ -336,10 +353,20 @@ export default function Register() {
 
   const [documentVerification, setDocumentVerification] = useState({
     status: "idle",
-    confidence: 0,
-    message: "Upload Aadhaar/PAN image to start AI validation.",
+    message: "Upload work profile proof to start verification.",
     fraudScore: null,
-    fraudStatus: "PENDING",
+    riskLevel: "UNKNOWN",
+    decision: "PENDING",
+    reasons: [],
+    signals: {
+      detectedName: "Unknown",
+      platformKeywords: [],
+      imageQuality: "unknown",
+      duplicateFound: false,
+      suspiciousMetadata: false,
+    },
+    systemNote:
+      "This is a lightweight AI-based verification system and can be extended with advanced ML models in production.",
     source: "not-started",
   });
 
@@ -397,8 +424,10 @@ export default function Register() {
     Boolean(form.workerId.trim()) &&
     Boolean(proofFile);
 
-  const isDocumentVerified = documentVerification.status === "verified";
-  const isVerificationComplete = emailVerificationStatus === "verified" && isDocumentVerified;
+  const hasWorkProofUploaded = Boolean(proofFile);
+  const initialTrustLevel = hasWorkProofUploaded ? "MEDIUM" : "LOW";
+  const initialTrustScore = hasWorkProofUploaded ? 60 : 35;
+  const isVerificationComplete = emailVerificationStatus === "verified" && hasWorkProofUploaded;
 
   const areRequiredFieldsFilled =
     isPersonalInfoComplete &&
@@ -410,6 +439,7 @@ export default function Register() {
   const isBackgroundCheckBusy =
     emailOtpLoading ||
     isDetectingLocation ||
+    proofVerificationLoading ||
     documentVerification.status === "checking";
 
   const isContinueDisabled =
@@ -434,13 +464,6 @@ export default function Register() {
         return {
           ...current,
           phone: sanitizePhoneNumber(value),
-        };
-      }
-
-      if (field === "idLast4") {
-        return {
-          ...current,
-          idLast4: String(value || "").replace(/\D/g, "").slice(0, 4),
         };
       }
 
@@ -505,117 +528,158 @@ export default function Register() {
   }
 
   async function runAiDocumentValidation(file) {
+    const requestId = proofVerificationRequestIdRef.current + 1;
+    proofVerificationRequestIdRef.current = requestId;
+
     if (!file) {
+      setProofVerificationLoading(false);
       setDocumentVerification({
         status: "idle",
-        confidence: 0,
-        message: "Upload Aadhaar/PAN image to start AI validation.",
+        message: "Upload work profile proof to start verification.",
         fraudScore: null,
-        fraudStatus: "PENDING",
+        riskLevel: "UNKNOWN",
+        decision: "PENDING",
+        reasons: [],
+        signals: {
+          detectedName: "Unknown",
+          platformKeywords: [],
+          imageQuality: "unknown",
+          duplicateFound: false,
+          suspiciousMetadata: false,
+        },
+        systemNote:
+          "This is a lightweight AI-based verification system and can be extended with advanced ML models in production.",
         source: "not-started",
       });
       return;
     }
 
-    const runId = documentValidationRunRef.current + 1;
-    documentValidationRunRef.current = runId;
-
     setDocumentVerification({
       status: "checking",
-      confidence: 0,
-      message: "AI verification in progress...",
+      message: "Running lightweight screenshot verification...",
       fraudScore: null,
-      fraudStatus: "CHECKING",
-      source: "processing",
+      riskLevel: "UNKNOWN",
+      decision: "PENDING",
+      reasons: [],
+      signals: {
+        detectedName: "Unknown",
+        platformKeywords: [],
+        imageQuality: "unknown",
+        duplicateFound: false,
+        suspiciousMetadata: false,
+      },
+      systemNote:
+        "This is a lightweight AI-based verification system and can be extended with advanced ML models in production.",
+      source: "rule-engine",
     });
 
-    try {
-      await wait(650);
+    setProofVerificationLoading(true);
 
-      const dynamicRisk = buildRiskPreview({
-        workType: form.workType,
-        city: form.city,
-        platform: form.platform,
+    try {
+      const result = await verifyWorkProfileProof({
+        file,
+        name: form.fullName || "Unknown Worker",
+        city: form.city || "Unknown City",
+        workType: form.workType || "Delivery",
+        metadata: {
+          platform: form.platform,
+          workerId: form.workerId,
+          originalFileName: file.name,
+        },
       });
 
-      let fraudScore = 28;
-      let fraudStatus = "CHECKED";
-      let source = "mock";
-
-      try {
-        const fraudResult = await getFraudStatus({
-          risk: dynamicRisk.level,
-          locationMatch: true,
-          claimsCount: 0,
-          loginAttempts: 0,
-          contextValid: true,
-          suspiciousPattern: dynamicRisk.level === "HIGH",
-          weather: {
-            aqi: dynamicRisk.level === "HIGH" ? 230 : dynamicRisk.level === "MEDIUM" ? 150 : 90,
-            precip_mm: dynamicRisk.level === "HIGH" ? 40 : dynamicRisk.level === "MEDIUM" ? 22 : 10,
-            wind_kph: dynamicRisk.level === "HIGH" ? 28 : 17,
-            humidity: 72,
-            temperature: 31,
-          },
-        });
-
-        fraudScore = Number(fraudResult?.fraud_score ?? 28);
-        fraudStatus = String(fraudResult?.status || "CHECKED").toUpperCase();
-        source = "fraud-engine";
-      } catch {
-        source = "mock-fallback";
-      }
-
-      const isImageDocument = String(file.type || "").startsWith("image/");
-      const sizePenalty =
-        file.size > 5 * 1024 * 1024 ? 16 : file.size > 2 * 1024 * 1024 ? 8 : 2;
-      const fraudPenalty = Math.round(Math.min(24, fraudScore / 5));
-      const confidence = Math.max(
-        52,
-        Math.min(98, (isImageDocument ? 96 : 78) - sizePenalty - fraudPenalty + 2)
-      );
-      const isValidDocument = confidence >= 70;
-
-      if (documentValidationRunRef.current !== runId) {
+      if (proofVerificationRequestIdRef.current !== requestId) {
         return;
       }
 
       setDocumentVerification({
-        status: isValidDocument ? "verified" : "flagged",
-        confidence,
-        message: isValidDocument
-          ? "Valid document detected"
-          : "Document requires manual review",
-        fraudScore,
-        fraudStatus,
-        source,
+        status: "completed",
+        message: "Proof uploaded successfully",
+        fraudScore: Number(result?.fraudScore ?? 0),
+        riskLevel: String(result?.riskLevel || "UNKNOWN").toUpperCase(),
+        decision: String(result?.decision || "PENDING").toUpperCase(),
+        reasons: Array.isArray(result?.reasons) ? result.reasons : [],
+        signals: {
+          detectedName: result?.signals?.detectedName || "Unknown",
+          platformKeywords: Array.isArray(result?.signals?.platformKeywords)
+            ? result.signals.platformKeywords
+            : [],
+          imageQuality: result?.signals?.imageQuality || "unknown",
+          duplicateFound: Boolean(result?.signals?.duplicateFound),
+          suspiciousMetadata: Boolean(result?.signals?.suspiciousMetadata),
+        },
+        systemNote:
+          result?.systemNote ||
+          "This is a lightweight AI-based verification system and can be extended with advanced ML models in production.",
+        source: "work-profile-rule-engine",
       });
     } catch (validationError) {
-      if (documentValidationRunRef.current !== runId) {
+      if (proofVerificationRequestIdRef.current !== requestId) {
         return;
       }
 
       setDocumentVerification({
         status: "error",
-        confidence: 0,
-        message:
-          validationError?.message ||
-          "AI validation could not complete. Please retry with a clear document image.",
+        message: extractApiErrorMessage(
+          validationError,
+          "Work profile verification failed. Please retry with a clear screenshot."
+        ),
         fraudScore: null,
-        fraudStatus: "ERROR",
-        source: "failed",
+        riskLevel: "UNKNOWN",
+        decision: "PENDING",
+        reasons: [],
+        signals: {
+          detectedName: "Unknown",
+          platformKeywords: [],
+          imageQuality: "unknown",
+          duplicateFound: false,
+          suspiciousMetadata: false,
+        },
+        systemNote:
+          "This is a lightweight AI-based verification system and can be extended with advanced ML models in production.",
+        source: "work-profile-rule-engine",
       });
+    } finally {
+      if (proofVerificationRequestIdRef.current === requestId) {
+        setProofVerificationLoading(false);
+      }
     }
   }
 
-  function handleProofSelect(file) {
+  async function handleProofSelect(file) {
+    setProofUploadError("");
+
     if (proofPreviewUrl) {
       URL.revokeObjectURL(proofPreviewUrl);
     }
 
+    if (!file || Number(file.size) <= 0) {
+      setProofFile(null);
+      setProofPreviewUrl("");
+      setProofUploadError("Please upload a valid image");
+      await runAiDocumentValidation(null);
+      return;
+    }
+
+    if (!isValidWorkProofImage(file)) {
+      setProofFile(null);
+      setProofPreviewUrl("");
+      setProofUploadError("Please upload a valid image");
+      await runAiDocumentValidation(null);
+      return;
+    }
+
+    if (Number(file.size) > MAX_WORK_PROOF_BYTES) {
+      setProofFile(null);
+      setProofPreviewUrl("");
+      setProofUploadError("File size too large");
+      await runAiDocumentValidation(null);
+      return;
+    }
+
     setProofFile(file);
     setProofPreviewUrl(file?.type?.startsWith("image/") ? URL.createObjectURL(file) : "");
-    runAiDocumentValidation(file);
+    await runAiDocumentValidation(file);
   }
 
   async function handleSendEmailOtp() {
@@ -704,6 +768,8 @@ export default function Register() {
       auth_risk_score: authRiskSnapshot.riskScore,
       auth_risk_level: authRiskSnapshot.riskLevel,
       auth_risk_status: authRiskSnapshot.riskStatus,
+      trust_score: responseUser?.trust_score ?? initialTrustScore,
+      trust_level: responseUser?.trust_level ?? initialTrustLevel.toLowerCase(),
       signup_time: responseUser?.signup_time || authRiskSnapshot.signupTime,
       location: authRiskSnapshot.location,
     };
@@ -729,6 +795,8 @@ export default function Register() {
         weeklyIncome: form.workType === "Driver" ? 22000 : 18000,
         deviceId: authRiskSnapshot.deviceId,
         location: authRiskSnapshot.location,
+        trustScore: initialTrustScore,
+        trustLevel: initialTrustLevel,
       },
       {
         authMode,
@@ -826,6 +894,8 @@ export default function Register() {
       authRiskScore: authRiskSnapshot.riskScore,
       authRiskLevel: authRiskSnapshot.riskLevel,
       authRiskStatus: authRiskSnapshot.riskStatus,
+      trustScore: initialTrustScore,
+      trustLevel: initialTrustLevel,
     });
 
     saveAuthSession({
@@ -873,7 +943,7 @@ export default function Register() {
     }
 
     if (!isOtpStep && !canRequestPhoneOtp) {
-      setError("Complete email verification and AI document validation before continuing.");
+      setError("Complete email verification and upload work profile proof before continuing.");
       return;
     }
 
@@ -1122,42 +1192,66 @@ export default function Register() {
             disabled={loading || isOtpStep}
           />
 
-          <div className="grid gap-5 sm:grid-cols-2">
-            <TextInput
-              id="worker-id"
-              label="Partner ID / Worker ID"
-              value={form.workerId}
-              onChange={(value) => updateField("workerId", value.toUpperCase())}
-              placeholder="e.g. SWG12345"
-              autoComplete="off"
-              disabled={loading || isOtpStep}
-            />
+          <TextInput
+            id="worker-id"
+            label="Partner ID / Worker ID"
+            value={form.workerId}
+            onChange={(value) => updateField("workerId", value.toUpperCase())}
+            placeholder="e.g. SWG12345"
+            autoComplete="off"
+            disabled={loading || isOtpStep}
+          />
 
-            <TextInput
-              id="id-last4"
-              label="Last 4 digits of ID (optional)"
-              value={form.idLast4}
-              onChange={(value) => updateField("idLast4", value)}
-              placeholder="1234"
-              inputMode="numeric"
-              maxLength={4}
-              autoComplete="off"
-              disabled={loading || isOtpStep}
-            />
+          <div className="space-y-2 rounded-xl border border-slate-200 bg-white px-4 py-4">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-slate-900">Upload Work Profile Proof</p>
+              <InfoTooltip
+                label="Work profile proof information"
+                text="This helps verify that you are an active gig worker without requiring sensitive documents."
+              />
+            </div>
+            <p className="text-sm text-slate-600">
+              Upload a screenshot of your gig platform profile to verify your work activity.
+            </p>
+            <div className="text-xs text-slate-500">
+              <p>Examples:</p>
+              <p>- Swiggy / Zomato profile screen</p>
+              <p>- Uber / Ola driver profile</p>
+              <p>- Delivery partner dashboard</p>
+              <p>- Worker ID screen</p>
+            </div>
           </div>
 
-          <p className="text-xs text-slate-500">
-            For privacy, do not enter full Aadhaar/PAN number. Only optional last 4 digits are accepted.
-          </p>
-
           <FileUploadCard
-            label="Upload Aadhaar / PAN image"
-            helperText="Upload a clear image of Aadhaar or PAN (or worker profile proof)."
+            label="Upload Work Profile Proof"
+            helperText="Upload a screenshot of your gig platform profile to verify your work activity."
             file={proofFile}
             previewUrl={proofPreviewUrl}
             onFileSelect={handleProofSelect}
             disabled={loading || isOtpStep}
+            accept="image/png,image/jpeg,.png,.jpg,.jpeg"
+            dropTitle="Drag and drop your work profile screenshot here"
+            dropDescription="Make sure your name and platform details are visible"
+            actionLabel="Upload Work Proof"
+            replaceActionLabel="Upload Work Proof"
           />
+
+          {proofUploadError ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {proofUploadError}
+            </div>
+          ) : null}
+
+          {proofFile ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <p className="font-semibold">Proof uploaded successfully</p>
+              <p className="mt-1">Status: Pending AI Verification</p>
+            </div>
+          ) : null}
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+            We do not collect sensitive government IDs. Your data is used only for verification purposes.
+          </div>
         </section>
 
         <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5">
@@ -1169,19 +1263,76 @@ export default function Register() {
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-sm font-semibold text-slate-900">Document AI result</p>
+            <p className="text-sm font-semibold text-slate-900">Work Proof Verification</p>
             <p className="mt-2 text-sm text-slate-600">{documentVerification.message}</p>
-            {documentVerification.status !== "idle" ? (
+            {proofFile ? (
               <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                 <p className="text-slate-700">
-                  Confidence score: <span className="font-semibold">{documentVerification.confidence}%</span>
+                  Upload status: <span className="font-semibold">Proof uploaded successfully</span>
                 </p>
                 <p className="text-slate-700">
-                  Fraud engine status: <span className="font-semibold">{documentVerification.fraudStatus}</span>
+                  Verification status:{" "}
+                  <span className="font-semibold">
+                    {proofVerificationLoading
+                      ? "Pending AI Verification"
+                      : documentVerification.status === "completed"
+                        ? "Completed"
+                        : "Pending AI Verification"}
+                  </span>
                 </p>
                 <p className="text-slate-500 sm:col-span-2">
                   Source: {documentVerification.source}
                 </p>
+              </div>
+            ) : null}
+
+            {documentVerification.status === "completed" ? (
+              <div className="mt-4 space-y-3">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Fraud Score
+                    </p>
+                    <p className="mt-2 text-xl font-semibold text-slate-900">
+                      {documentVerification.fraudScore}/100
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Risk Level
+                    </p>
+                    <p className="mt-2 text-xl font-semibold text-slate-900">
+                      {documentVerification.riskLevel}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Decision
+                    </p>
+                    <p className="mt-2 text-xl font-semibold text-slate-900">
+                      {documentVerification.decision}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                  <p className="text-sm font-semibold text-slate-900">Explanation</p>
+                  {documentVerification.reasons.length ? (
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+                      {documentVerification.reasons.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-sm text-slate-600">No additional reasons available.</p>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-3 text-sm text-blue-900">
+                  {documentVerification.systemNote}
+                </div>
               </div>
             ) : null}
           </div>
@@ -1196,6 +1347,9 @@ export default function Register() {
             <p className="mt-2 text-sm text-slate-600">{riskPreview.summary}</p>
             <p className="mt-2 text-xs text-slate-500">Risk score: {riskPreview.score}</p>
             <p className="mt-2 text-xs text-slate-500">{riskPreview.factors.join(" | ")}</p>
+            <p className="mt-2 text-xs text-slate-600">
+              Initial Trust Level: <span className="font-semibold">{initialTrustLevel}</span>
+            </p>
           </div>
 
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
@@ -1210,10 +1364,13 @@ export default function Register() {
             <p className="mt-2 text-sm text-slate-600">✔ Secure verification</p>
             <p className="text-sm text-slate-600">✔ AI fraud protection</p>
             <p className="text-sm text-slate-600">✔ Real-time monitoring</p>
+            <p className="mt-2 text-sm text-slate-700">
+              Initial Trust: <span className="font-semibold">{initialTrustLevel}</span>
+            </p>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-            User enters details → uploads document → AI verifies → risk score shown → policy suggested → OTP verification → account created
+            User enters details → uploads work profile proof → AI verifies → risk score shown → policy suggested → OTP verification → account created
           </div>
 
           <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-4">
@@ -1281,7 +1438,7 @@ export default function Register() {
           >
             {canRequestPhoneOtp
               ? "All checks completed. You can now send OTP."
-              : "Complete required fields, verify email, and pass AI document check to enable Send OTP."}
+              : "Complete required fields, verify email, and upload work profile proof to enable Send OTP."}
           </div>
         ) : null}
 

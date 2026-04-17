@@ -13,6 +13,11 @@ export default function FileUploadCard({
   previewUrl,
   onFileSelect,
   disabled = false,
+  accept = "image/png,image/jpeg,.png,.jpg,.jpeg",
+  dropTitle = "Drag and drop your proof here",
+  dropDescription = "Upload a screenshot of your app profile or your worker ID card",
+  actionLabel = "Upload Proof",
+  replaceActionLabel,
 }) {
   const inputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -79,10 +84,10 @@ export default function FileUploadCard({
             </div>
             <div>
               <p className="text-sm font-semibold text-slate-900">
-                Drag and drop your proof here
+                {dropTitle}
               </p>
               <p className="mt-1 text-sm text-slate-500">
-                Upload a screenshot of your app profile or your worker ID card
+                {dropDescription}
               </p>
             </div>
           </div>
@@ -92,7 +97,7 @@ export default function FileUploadCard({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*,.pdf"
+        accept={accept}
         className="hidden"
         disabled={disabled}
         onChange={(event) => handleFiles(event.target.files?.[0])}
@@ -106,7 +111,7 @@ export default function FileUploadCard({
         disabled={disabled}
         className="w-full sm:w-auto"
       >
-        {file ? "Replace file" : "Upload Proof"}
+        {file ? replaceActionLabel || actionLabel : actionLabel}
       </SurfaceButton>
     </div>
   );

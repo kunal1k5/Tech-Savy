@@ -4,6 +4,7 @@ const multer = require("multer");
 const ProofUploadController = require("../controllers/proofUpload.controller");
 const { validate } = require("../middleware/validate");
 const { uploadProofSchema } = require("../services/proofUpload.service");
+const { workProfileVerifySchema } = require("../services/workProfileFraud.service");
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -14,6 +15,13 @@ const upload = multer({
 });
 
 const router = Router();
+
+router.post(
+  "/work-profile-verify",
+  upload.single("file"),
+  validate(workProfileVerifySchema),
+  ProofUploadController.verifyWorkProfile
+);
 
 router.post(
   "/upload-proof",

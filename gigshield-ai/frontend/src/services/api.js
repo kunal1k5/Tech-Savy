@@ -301,6 +301,26 @@ export async function uploadClaimProof({
   return unwrapAxiosResponse(response);
 }
 
+export async function verifyWorkProfileProof({
+  file,
+  name,
+  city,
+  workType,
+  ocrText,
+  metadata = {},
+}) {
+  const response = await api.postForm(normalizeRequestPath("/work-profile-verify"), {
+    file,
+    name,
+    city,
+    workType,
+    ocrText,
+    metadata_json: JSON.stringify(metadata),
+  });
+
+  return unwrapAxiosResponse(response);
+}
+
 export async function reverifyClaim(payload) {
   const response = await apiPost("/reverify-claim", payload);
   return unwrapAxiosResponse(response);

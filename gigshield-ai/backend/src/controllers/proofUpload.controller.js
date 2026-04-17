@@ -1,4 +1,5 @@
 const { receiveProofUpload } = require("../services/proofUpload.service");
+const { verifyWorkProfileScreenshot } = require("../services/workProfileFraud.service");
 const { sendSuccess } = require("../utils/apiResponse");
 
 function resolvePrimaryProofFile(req) {
@@ -33,6 +34,23 @@ function inferProofType(req) {
 }
 
 const ProofUploadController = {
+  async verifyWorkProfile(req, res, next) {
+    try {
+      const result = await verifyWorkProfileScreenshot({
+        file: req.file || req.files?.file?.[0] || req.files?.workScreenshot?.[0],
+        name: req.body.name,
+        city: req.body.city,
+        workType: req.body.workType || req.body.work_type,
+        ocrText: req.body.ocrText,
+        metadataJson: req.body.metadata_json,
+      });
+
+      return sendSuccess(res, result, "Work profile proof analyzed successfully.");
+    } catch (error) {
+      return next(error);
+    }
+  },
+
   async upload(req, res, next) {
     try {
       const result = await receiveProofUpload({
