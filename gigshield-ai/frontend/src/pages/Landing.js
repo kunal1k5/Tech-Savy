@@ -5,69 +5,104 @@ import {
   Activity,
   ArrowRight,
   CheckCircle2,
+  FileText,
   Shield,
   ShieldCheck,
   Wallet,
 } from "lucide-react";
 
 const stats = [
-  { label: "Avg AI review", value: "4 min" },
-  { label: "Trust baseline", value: "82%" },
-  { label: "Live monitoring zones", value: "14" },
+  { label: "Claims Auto Processed", value: "1,200+" },
+  { label: "Avg Response Time", value: "< 5 sec" },
+  { label: "Fraud Detection Accuracy", value: "92%" },
 ];
 
 const features = [
   {
     icon: Activity,
-    title: "Decision engine",
-    description: "Real-time monitoring turns weather and route signals into live claim actions.",
-  },
-  {
-    icon: Wallet,
-    title: "Fraud Intelligence Engine",
-    description: "Behavior, location, and context are fused into one trust-aware signal.",
+    title: "Real-time Trigger Engine",
+    description:
+      "Real-time triggers monitor weather and AQI APIs and activate policy conditions instantly.",
   },
   {
     icon: ShieldCheck,
-    title: "Self-correcting AI",
-    description: "Disputes and proof uploads let the system re-check itself in real time.",
+    title: "AI Fraud Detection System",
+    description:
+      "AI fraud detection evaluates each claim event before payout to stop suspicious activity early.",
+  },
+  {
+    icon: Wallet,
+    title: "Auto Claim + AI Validation",
+    description:
+      "Auto claim generation creates claims as soon as triggers fire and AI validation finalizes decisions.",
   },
 ];
 
 const snapshotItems = [
   {
-    label: "Decision Engine",
-    value: "Live",
-    note: "Real-time monitoring is active in Bengaluru",
+    label: "Live Rain Detected",
+    value: "72mm",
+    valueClassName: "text-slate-900",
   },
   {
-    label: "Latest event",
-    value: "Rainfall detected",
-    note: "Decision routed and reviewed in real time",
+    label: "Trigger Status",
+    value: "ACTIVE",
+    valueClassName: "text-emerald-700",
   },
   {
-    label: "Trust Signal",
-    value: "Stable",
-    note: "Location and timing confidence validated",
+    label: "Claim",
+    value: "GENERATED",
+    valueClassName: "text-blue-700",
   },
+  {
+    label: "Fraud Score",
+    value: "0.12",
+    valueClassName: "text-slate-900",
+  },
+  {
+    label: "Decision",
+    value: "APPROVED",
+    valueClassName: "text-emerald-700",
+  },
+];
+
+const flowSteps = [
+  { icon: Shield, label: "Policy" },
+  { icon: Activity, label: "Trigger" },
+  { icon: FileText, label: "Claim" },
+  { icon: ShieldCheck, label: "AI Decision" },
+  { icon: Wallet, label: "Payout" },
+];
+
+const trustItems = [
+  "Real-time API data (Weather + AQI)",
+  "AI fraud detection engine",
+  "Automatic claim processing",
+  "Secure KYC verification",
+];
+
+const liveSignals = [
+  { label: "Rain", value: "72mm", emoji: "🌧" },
+  { label: "AQI", value: "180", emoji: "🌫" },
+  { label: "Status", value: "Monitoring Active", emoji: "🟢" },
 ];
 
 const lifecycleSteps = [
   {
     label: "Detect",
-    note: "Live monitoring watches risk, location, and behavioral signals.",
+    note: "Live weather and AQI streams are monitored continuously for policy conditions.",
   },
   {
-    label: "Decide",
-    note: "The decision engine classifies the claim and sets the next action.",
+    label: "Generate",
+    note: "Auto claim generation starts immediately after a confirmed trigger.",
   },
   {
     label: "Validate",
-    note: "Users can challenge the result with disputes and proof uploads.",
+    note: "AI fraud detection scores each claim and checks supporting context.",
   },
   {
-    label: "Correct",
-    note: "AI re-verification refines the outcome and updates the final claim state.",
+    label: "Pay",
+    note: "Approved claims move directly to payout with no manual request needed.",
   },
 ];
 
@@ -93,7 +128,7 @@ export default function Landing() {
             </div>
             <div>
               <p className="text-base font-semibold text-slate-900">GigPredict AI</p>
-              <p className="text-xs text-slate-500">Decision intelligence</p>
+                <p className="text-xs text-slate-500">AI parametric insurance platform</p>
             </div>
           </div>
 
@@ -122,18 +157,18 @@ export default function Landing() {
             >
               <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
                 <CheckCircle2 size={16} />
-                Real-time decision intelligence for delivery and mobility workers
+                Built for delivery and mobility workers
               </div>
 
               <div className="space-y-5">
                 <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-slate-950 md:text-6xl md:leading-[1.05]">
-                  An AI Decision Intelligence System for gig workers
+                  Real-Time AI Insurance for Gig Workers
                 </h1>
                 <p className="max-w-xl text-base leading-8 text-slate-600 md:text-lg">
-                  We are not an insurance platform - we are an AI Decision Intelligence System and real-time protection system for gig workers.
+                  Automatically detect risk, trigger claims, and approve payouts using real-time data and AI - no manual requests needed.
                 </p>
                 <p className="max-w-xl text-base leading-8 text-slate-600 md:text-lg">
-                  Risk Engine, Decision Engine, Fraud Intelligence, and self-correcting AI work in one connected loop.
+                  An AI-powered parametric insurance platform for gig workers that automatically detects risk, generates claims, and prevents fraud in real time.
                 </p>
               </div>
 
@@ -142,15 +177,49 @@ export default function Landing() {
                   to="/login"
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#2563EB] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
                 >
-                  Open Workspace
+                  Start Monitoring
                   <ArrowRight size={16} />
                 </Link>
                 <Link
-                  to="/register"
+                  to="/login"
                   className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition-colors hover:border-slate-300 hover:bg-slate-50"
                 >
-                  Create Account
+                  Try Simulation
                 </Link>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Live demo</p>
+                    <p className="text-sm text-slate-500">
+                      Test how the system reacts to real-world scenarios
+                    </p>
+                  </div>
+                  <Link
+                    to="/login"
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                  >
+                    Try Live Simulation
+                    <ArrowRight size={14} />
+                  </Link>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Live System Signals
+                </p>
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  {liveSignals.map((signal) => (
+                    <div
+                      key={signal.label}
+                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700"
+                    >
+                      {signal.label}: {signal.value} {signal.emoji}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
@@ -175,9 +244,9 @@ export default function Landing() {
               <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.07)] md:p-7">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-slate-500">Live decision view</p>
+                    <p className="text-sm font-medium text-slate-500">Live system output</p>
                     <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
-                      Visible, fast, self-correcting
+                      Real-time claim execution
                     </h2>
                   </div>
                   <div className="rounded-2xl border border-blue-100 bg-white p-3 text-[#2563EB]">
@@ -188,9 +257,9 @@ export default function Landing() {
                 <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                     <div>
-                      <p className="text-sm font-medium text-slate-500">Decision Engine</p>
+                      <p className="text-sm font-medium text-slate-500">Event stream</p>
                       <p className="mt-1 text-lg font-semibold text-slate-950">
-                        Self-correcting AI checks running
+                        Parametric policy check in progress
                       </p>
                     </div>
                     <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
@@ -202,19 +271,57 @@ export default function Landing() {
                     {snapshotItems.map((item) => (
                       <div
                         key={item.label}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4"
+                        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
                       >
                         <div className="flex items-center justify-between gap-4">
                           <p className="text-sm font-medium text-slate-500">{item.label}</p>
-                          <p className="text-sm font-semibold text-slate-950">{item.value}</p>
+                          <p className={`text-sm font-semibold ${item.valueClassName}`}>{item.value}</p>
                         </div>
-                        <p className="mt-2 text-sm text-slate-600">{item.note}</p>
                       </div>
                     ))}
                   </div>
+
+                  <p className="mt-4 text-xs text-slate-500">Updated 2s ago from live signals</p>
                 </div>
               </div>
             </motion.div>
+          </section>
+
+          <section className="mt-10 rounded-[28px] border border-slate-200 bg-white px-6 py-6 shadow-[0_14px_36px_rgba(15,23,42,0.05)] md:px-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
+              Core flow
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-3 md:gap-4">
+              {flowSteps.map((step, index) => {
+                const Icon = step.icon;
+                const isLast = index === flowSteps.length - 1;
+
+                return (
+                  <React.Fragment key={step.label}>
+                    <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2">
+                      <Icon size={16} className="text-blue-600" />
+                      <span className="text-sm font-semibold text-slate-900">{step.label}</span>
+                    </div>
+                    {!isLast ? <ArrowRight size={16} className="text-slate-400" /> : null}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="mt-6 rounded-[28px] border border-slate-200 bg-slate-50 px-6 py-6 md:px-8">
+            <p className="text-sm font-semibold text-slate-900">Trust and reliability</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {trustItems.map((item) => (
+                <div
+                  key={item}
+                  className="flex items-start gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"
+                >
+                  <CheckCircle2 size={16} className="mt-0.5 text-emerald-600" />
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
           </section>
 
           <section className="mt-16 rounded-[32px] bg-slate-50 px-6 py-16 md:px-8">
@@ -226,10 +333,10 @@ export default function Landing() {
               <div className="max-w-2xl">
                 <p className="text-sm font-medium text-blue-700">Product features</p>
                 <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
-                  Decision intelligence designed to feel simple
+                  Real-time insurance automation, made clear
                 </h2>
                 <p className="mt-3 text-base leading-7 text-slate-600">
-                  Clear signals, fast decisions, and self-correcting AI in one clean workflow.
+                  Auto claim generation, real-time triggers, and AI fraud detection in one clean workflow.
                 </p>
               </div>
 
@@ -259,12 +366,12 @@ export default function Landing() {
               <div className="mt-10 rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.05)] md:p-7">
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div className="max-w-2xl">
-                    <p className="text-sm font-medium text-blue-700">Self-Correcting AI System</p>
+                    <p className="text-sm font-medium text-blue-700">Live automation loop</p>
                     <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                      AI Decision Lifecycle
+                      Trigger-to-payout lifecycle
                     </h3>
                     <p className="mt-3 text-sm leading-7 text-slate-600 md:text-base">
-                      Our system not only detects problems, it validates and corrects decisions.
+                      Real-time triggers, auto claim generation, and AI fraud detection work as one connected pipeline.
                     </p>
                   </div>
 
@@ -289,6 +396,12 @@ export default function Landing() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="mt-10 rounded-[28px] border border-blue-100 bg-blue-50 px-6 py-8 text-center">
+                <p className="text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl">
+                  We built a system that doesn&apos;t just predict risk - it acts on it.
+                </p>
               </div>
             </motion.div>
           </section>

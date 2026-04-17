@@ -48,10 +48,10 @@ export default function AppLayout() {
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={location.pathname}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.34, ease: "easeOut" }}
+              initial={{ opacity: 0, x: 18, y: 8, filter: "blur(3px)" }}
+              animate={{ opacity: 1, x: 0, y: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, x: -14, y: -6, filter: "blur(2px)" }}
+              transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
             >
               <Outlet />
             </motion.div>
@@ -64,11 +64,11 @@ export default function AppLayout() {
         toastOptions={{
           duration: 2800,
           style: {
-            background: "#ffffff",
+            background: "linear-gradient(120deg, #ffffff, #f8fafc)",
             color: "#0f172a",
             border: "1px solid #e2e8f0",
             borderRadius: "16px",
-            boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
+            boxShadow: "0 16px 36px rgba(15, 23, 42, 0.1)",
           },
           success: {
             iconTheme: {

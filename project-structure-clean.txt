@@ -1,0 +1,425 @@
+F:\guide
+|-- .tmp-frontend-ci
+|   +-- .tmp-frontend-ci\gigshield-ai
+|       +-- .tmp-frontend-ci\gigshield-ai\frontend
+|           |-- .tmp-frontend-ci\gigshield-ai\frontend\api
+|           |   +-- .tmp-frontend-ci\gigshield-ai\frontend\api\_lib
+|           |       +-- .tmp-frontend-ci\gigshield-ai\frontend\api\_lib\demoApi.js
+|           |-- .tmp-frontend-ci\gigshield-ai\frontend\public
+|           |   +-- .tmp-frontend-ci\gigshield-ai\frontend\public\index.html
+|           |-- .tmp-frontend-ci\gigshield-ai\frontend\src
+|           |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\auth
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\auth\AuthField.jsx
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\auth\AuthShell.jsx
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\auth\OtpInputGroup.jsx
+|           |   |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\auth\ProtectedRoute.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\claims
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\claims\ClaimCard.jsx
+|           |   |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\claims\ProgressBar.jsx
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\layout
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\layout\AppLayout.jsx
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\layout\Navbar.jsx
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\layout\navigation.js
+|           |   |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\layout\Sidebar.jsx
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\onboarding
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\onboarding\FileUploadCard.jsx
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\onboarding\SelectInput.jsx
+|           |   |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\onboarding\TextInput.jsx
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\policy
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\policy\ActivePolicyCard.jsx
+|           |   |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\policy\PlanCard.jsx
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\profile
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\profile\DocumentUploadCard.jsx
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\profile\InputField.jsx
+|           |   |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\profile\ProfileCard.jsx
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\ui
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\ui\Badge.js
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\ui\Button.js
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\ui\Card.js
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\ui\EmptyState.js
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\ui\InfoTooltip.js
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\ui\Loader.js
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\ui\SectionHeader.js
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\ui\StatusBadge.jsx
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\ui\StatusPill.js
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\ui\SurfaceButton.jsx
+|           |   |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\ui\SurfaceLoadingPanel.jsx
+|           |   |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\ui\SurfaceScanPanel.jsx
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\RiskBadge.js
+|           |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\components\StatCard.js
+|           |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\context
+|           |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\context\GigPredictAIDataContext.js
+|           |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\hooks
+|           |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\hooks\useLiveBackendData.js
+|           |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\modules
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\modules\auth
+|           |   |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\modules\auth\index.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\modules\claims
+|           |   |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\modules\claims\index.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\modules\dashboard
+|           |   |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\modules\dashboard\index.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\modules\policy
+|           |   |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\modules\policy\index.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\modules\profile
+|           |   |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\modules\profile\index.js
+|           |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\modules\index.js
+|           |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\pages
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\pages\AdminDashboard.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\pages\Claims.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\pages\Dashboard.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\pages\Landing.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\pages\LocationPredictor.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\pages\Login.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\pages\PolicyQuote.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\pages\Profile.jsx
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\pages\Register.js
+|           |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\pages\RiskMap.js
+|           |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\services
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\services\api.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\services\api.test.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\services\behaviorCheck.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\services\demoFlow.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\services\demoFlow.test.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\services\fraudOrchestrator.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\services\locationCheck.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\services\locationPrediction.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\services\premiumQuote.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\services\riskPrediction.js
+|           |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\services\workerFlow.js
+|           |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\utils
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\utils\auth.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\utils\auth.test.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\utils\authRisk.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\utils\authRisk.test.js
+|           |   |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\utils\cn.js
+|           |   |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\utils\helpers.js
+|           |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\App.js
+|           |   |-- .tmp-frontend-ci\gigshield-ai\frontend\src\index.css
+|           |   +-- .tmp-frontend-ci\gigshield-ai\frontend\src\index.js
+|           |-- .tmp-frontend-ci\gigshield-ai\frontend\.env.example
+|           |-- .tmp-frontend-ci\gigshield-ai\frontend\Dockerfile
+|           |-- .tmp-frontend-ci\gigshield-ai\frontend\package.json
+|           |-- .tmp-frontend-ci\gigshield-ai\frontend\package-lock.json
+|           |-- .tmp-frontend-ci\gigshield-ai\frontend\postcss.config.js
+|           |-- .tmp-frontend-ci\gigshield-ai\frontend\tailwind.config.js
+|           +-- .tmp-frontend-ci\gigshield-ai\frontend\vercel.json
+|-- api
+|   +-- api\[...route].js
+|-- gigshield-ai
+|   |-- gigshield-ai\ai-engine
+|   |   |-- gigshield-ai\ai-engine\artifacts
+|   |   |   +-- gigshield-ai\ai-engine\artifacts\next-location-demo
+|   |   |       |-- gigshield-ai\ai-engine\artifacts\next-location-demo\next_location_confusion_matrix.png
+|   |   |       |-- gigshield-ai\ai-engine\artifacts\next-location-demo\next_location_model.pkl
+|   |   |       |-- gigshield-ai\ai-engine\artifacts\next-location-demo\next_location_reference.csv
+|   |   |       +-- gigshield-ai\ai-engine\artifacts\next-location-demo\next_location_report.json
+|   |   |-- gigshield-ai\ai-engine\data
+|   |   |   +-- gigshield-ai\ai-engine\data\next_location_reference.csv
+|   |   |-- gigshield-ai\ai-engine\models
+|   |   |   |-- gigshield-ai\ai-engine\models\fraud_model.pkl
+|   |   |   |-- gigshield-ai\ai-engine\models\location_model.pkl
+|   |   |   +-- gigshield-ai\ai-engine\models\risk_model.pkl
+|   |   |-- gigshield-ai\ai-engine\routes
+|   |   |   |-- gigshield-ai\ai-engine\routes\__init__.py
+|   |   |   |-- gigshield-ai\ai-engine\routes\fraud_routes.py
+|   |   |   |-- gigshield-ai\ai-engine\routes\location_routes.py
+|   |   |   |-- gigshield-ai\ai-engine\routes\premium_routes.py
+|   |   |   |-- gigshield-ai\ai-engine\routes\proof_routes.py
+|   |   |   +-- gigshield-ai\ai-engine\routes\risk_routes.py
+|   |   |-- gigshield-ai\ai-engine\services
+|   |   |   |-- gigshield-ai\ai-engine\services\__init__.py
+|   |   |   |-- gigshield-ai\ai-engine\services\advanced_fraud_detection.py
+|   |   |   |-- gigshield-ai\ai-engine\services\fraud_service.py
+|   |   |   |-- gigshield-ai\ai-engine\services\location_service.py
+|   |   |   |-- gigshield-ai\ai-engine\services\premium_service.py
+|   |   |   +-- gigshield-ai\ai-engine\services\risk_service.py
+|   |   |-- gigshield-ai\ai-engine\utils
+|   |   |   |-- gigshield-ai\ai-engine\utils\__init__.py
+|   |   |   |-- gigshield-ai\ai-engine\utils\config.py
+|   |   |   |-- gigshield-ai\ai-engine\utils\model_loader.py
+|   |   |   +-- gigshield-ai\ai-engine\utils\scoring.py
+|   |   |-- gigshield-ai\ai-engine\.env
+|   |   |-- gigshield-ai\ai-engine\.env.example
+|   |   |-- gigshield-ai\ai-engine\app.py
+|   |   |-- gigshield-ai\ai-engine\Dockerfile
+|   |   |-- gigshield-ai\ai-engine\fraud_detection.py
+|   |   |-- gigshield-ai\ai-engine\fraud_orchestrator.py
+|   |   |-- gigshield-ai\ai-engine\image_forensics.py
+|   |   |-- gigshield-ai\ai-engine\location_prediction_service.py
+|   |   |-- gigshield-ai\ai-engine\main.py
+|   |   |-- gigshield-ai\ai-engine\premium_calculator.py
+|   |   |-- gigshield-ai\ai-engine\proof_analyzer.py
+|   |   |-- gigshield-ai\ai-engine\requirements.txt
+|   |   |-- gigshield-ai\ai-engine\requirements-train.txt
+|   |   |-- gigshield-ai\ai-engine\risk_model.py
+|   |   |-- gigshield-ai\ai-engine\train_models.py
+|   |   +-- gigshield-ai\ai-engine\train_next_location_model.py
+|   |-- gigshield-ai\backend
+|   |   |-- gigshield-ai\backend\api
+|   |   |   +-- gigshield-ai\backend\api\[...route].js
+|   |   |-- gigshield-ai\backend\src
+|   |   |   |-- gigshield-ai\backend\src\controllers
+|   |   |   |   |-- gigshield-ai\backend\src\controllers\admin.controller.js
+|   |   |   |   |-- gigshield-ai\backend\src\controllers\aiDecision.controller.js
+|   |   |   |   |-- gigshield-ai\backend\src\controllers\claim.controller.js
+|   |   |   |   |-- gigshield-ai\backend\src\controllers\dispute.controller.js
+|   |   |   |   |-- gigshield-ai\backend\src\controllers\payment.controller.js
+|   |   |   |   |-- gigshield-ai\backend\src\controllers\policy.controller.js
+|   |   |   |   |-- gigshield-ai\backend\src\controllers\proofUpload.controller.js
+|   |   |   |   |-- gigshield-ai\backend\src\controllers\reverification.controller.js
+|   |   |   |   |-- gigshield-ai\backend\src\controllers\risk.controller.js
+|   |   |   |   |-- gigshield-ai\backend\src\controllers\trigger.controller.js
+|   |   |   |   +-- gigshield-ai\backend\src\controllers\worker.controller.js
+|   |   |   |-- gigshield-ai\backend\src\database
+|   |   |   |   |-- gigshield-ai\backend\src\database\connection.js
+|   |   |   |   +-- gigshield-ai\backend\src\database\mongo.js
+|   |   |   |-- gigshield-ai\backend\src\integrations
+|   |   |   |   +-- gigshield-ai\backend\src\integrations\aiService.js
+|   |   |   |-- gigshield-ai\backend\src\middleware
+|   |   |   |   |-- gigshield-ai\backend\src\middleware\auth.js
+|   |   |   |   |-- gigshield-ai\backend\src\middleware\errorHandler.js
+|   |   |   |   +-- gigshield-ai\backend\src\middleware\validate.js
+|   |   |   |-- gigshield-ai\backend\src\models
+|   |   |   |   |-- gigshield-ai\backend\src\models\claim.model.js
+|   |   |   |   |-- gigshield-ai\backend\src\models\policy.model.js
+|   |   |   |   +-- gigshield-ai\backend\src\models\worker.model.js
+|   |   |   |-- gigshield-ai\backend\src\routes
+|   |   |   |   |-- gigshield-ai\backend\src\routes\activity.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\admin.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\aiDecision.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\aiDecision.routes.test.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\aiProxy.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\autoClaim.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\autoClaim.routes.test.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\behavior.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\claim.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\demo.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\demo.routes.test.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\dispute.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\dispute.routes.test.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\finalQa.audit.test.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\fraudAnalysis.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\fraudOrchestrator.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\fraudOrchestrator.routes.test.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\locationFlow.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\payment.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\policy.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\premiumFlow.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\proofUpload.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\proofUpload.routes.test.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\realAuth.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\reverification.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\reverification.routes.test.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\risk.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\riskPremium.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\riskPremium.routes.test.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\testFlow.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\trigger.routes.js
+|   |   |   |   |-- gigshield-ai\backend\src\routes\worker.routes.js
+|   |   |   |   +-- gigshield-ai\backend\src\routes\workflow.audit.test.js
+|   |   |   |-- gigshield-ai\backend\src\services
+|   |   |   |   |-- gigshield-ai\backend\src\services\activityService.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\advancedFraudService.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\aiDecision.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\aiDecision.service.test.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\aiProxy.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\anomalyService.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\autoClaim.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\behavior.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\claim.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\claimCooldown.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\demoStore.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\dispute.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\fraudOrchestrator.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\imageValidationService.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\location.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\otpProvider.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\payment.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\policy.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\premium.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\proofService.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\proofUpload.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\proofValidationService.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\realAuth.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\reverification.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\risk.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\riskPremium.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\trigger.service.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\trustScoreService.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\warningService.js
+|   |   |   |   |-- gigshield-ai\backend\src\services\worker.service.js
+|   |   |   |   +-- gigshield-ai\backend\src\services\workSessionService.js
+|   |   |   |-- gigshield-ai\backend\src\utils
+|   |   |   |   |-- gigshield-ai\backend\src\utils\apiResponse.js
+|   |   |   |   |-- gigshield-ai\backend\src\utils\explanations.js
+|   |   |   |   |-- gigshield-ai\backend\src\utils\inputSafety.js
+|   |   |   |   |-- gigshield-ai\backend\src\utils\logger.js
+|   |   |   |   |-- gigshield-ai\backend\src\utils\seedData.js
+|   |   |   |   |-- gigshield-ai\backend\src\utils\systemResponse.js
+|   |   |   |   +-- gigshield-ai\backend\src\utils\trustScore.js
+|   |   |   |-- gigshield-ai\backend\src\app.js
+|   |   |   +-- gigshield-ai\backend\src\server.js
+|   |   |-- gigshield-ai\backend\uploads
+|   |   |   +-- gigshield-ai\backend\uploads\proofs
+|   |   |       |-- gigshield-ai\backend\uploads\proofs\claim-demo-1-selfie-b66f070a-418b-4a14-a4c5-27bd2739fddc.png
+|   |   |       |-- gigshield-ai\backend\uploads\proofs\claim-demo-2-parcel-a1e0b940-0d2d-4327-a3ca-34beee3fb62f.png
+|   |   |       |-- gigshield-ai\backend\uploads\proofs\claim-demo-2-selfie-a73135c4-b83e-4f57-bba2-4cc68217bb8b.png
+|   |   |       |-- gigshield-ai\backend\uploads\proofs\claim-demo-3-selfie-d105f6a4-0122-45b7-a305-5cb032690172.png
+|   |   |       |-- gigshield-ai\backend\uploads\proofs\claim-demo-4-selfie-1f732ec9-ef12-49e4-b57e-7572bfa23c9a.png
+|   |   |       |-- gigshield-ai\backend\uploads\proofs\claim-test-1-selfie-0ebe85c7-f45e-44ee-8cd1-f9d919f5efe8.png
+|   |   |       |-- gigshield-ai\backend\uploads\proofs\claim-test-1-selfie-ac3b1a0a-4c2e-4c22-b8df-f86d0d451be4.png
+|   |   |       |-- gigshield-ai\backend\uploads\proofs\claim-test-2-parcel-6b6ce70e-dda6-4a10-8516-9c92854516f2.png
+|   |   |       |-- gigshield-ai\backend\uploads\proofs\claim-test-2-parcel-e3f8ae8a-facb-427e-b43d-f5c4dbb0b1ab.png
+|   |   |       |-- gigshield-ai\backend\uploads\proofs\claim-test-2-selfie-11be2178-666c-4e4a-b021-ef314ed3f5e3.png
+|   |   |       |-- gigshield-ai\backend\uploads\proofs\claim-test-2-selfie-aad3e8c3-3816-4d6b-b2ef-1b866e714723.png
+|   |   |       |-- gigshield-ai\backend\uploads\proofs\CLM-3001-parcel-42d9576f-8751-4046-bb90-0e1847073b48.jpeg
+|   |   |       |-- gigshield-ai\backend\uploads\proofs\CLM-3001-selfie-fcb210f5-8445-4af8-91a5-a7efde6256f2.jpeg
+|   |   |       |-- gigshield-ai\backend\uploads\proofs\CLM-3001-work_screen-a5df5278-fbac-48b2-b38d-843e4db9aa9a.jpeg
+|   |   |       +-- gigshield-ai\backend\uploads\proofs\qa-claim-1-selfie-34127f15-6026-45d8-84d8-a01337bfa122.png
+|   |   |-- gigshield-ai\backend\.env
+|   |   |-- gigshield-ai\backend\.env.example
+|   |   |-- gigshield-ai\backend\Dockerfile
+|   |   |-- gigshield-ai\backend\index.js
+|   |   |-- gigshield-ai\backend\package.json
+|   |   |-- gigshield-ai\backend\package-lock.json
+|   |   |-- gigshield-ai\backend\server.js
+|   |   +-- gigshield-ai\backend\vercel.json
+|   |-- gigshield-ai\database
+|   |   |-- gigshield-ai\database\dummy_fraud_data.sql
+|   |   +-- gigshield-ai\database\schema.sql
+|   |-- gigshield-ai\docs
+|   |   |-- gigshield-ai\docs\anti-fraud-strategy.md
+|   |   |-- gigshield-ai\docs\api.md
+|   |   |-- gigshield-ai\docs\API_REFERENCE.md
+|   |   |-- gigshield-ai\docs\api-reference.md
+|   |   |-- gigshield-ai\docs\architecture.md
+|   |   |-- gigshield-ai\docs\fraud-system.md
+|   |   |-- gigshield-ai\docs\IMPLEMENTATION_GUIDE.md
+|   |   |-- gigshield-ai\docs\premium-white-design-system.md
+|   |   |-- gigshield-ai\docs\TEST_PIPELINE.sh
+|   |   |-- gigshield-ai\docs\ui-redesign-notes.md
+|   |   |-- gigshield-ai\docs\vercel-deployment.md
+|   |   +-- gigshield-ai\docs\workflow.md
+|   |-- gigshield-ai\frontend
+|   |   |-- gigshield-ai\frontend\api
+|   |   |   |-- gigshield-ai\frontend\api\_lib
+|   |   |   |   +-- gigshield-ai\frontend\api\_lib\demoApi.js
+|   |   |   +-- gigshield-ai\frontend\api\[...route].js
+|   |   |-- gigshield-ai\frontend\public
+|   |   |   +-- gigshield-ai\frontend\public\index.html
+|   |   |-- gigshield-ai\frontend\src
+|   |   |   |-- gigshield-ai\frontend\src\components
+|   |   |   |   |-- gigshield-ai\frontend\src\components\auth
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\auth\AuthField.jsx
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\auth\AuthShell.jsx
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\auth\OtpInputGroup.jsx
+|   |   |   |   |   +-- gigshield-ai\frontend\src\components\auth\ProtectedRoute.js
+|   |   |   |   |-- gigshield-ai\frontend\src\components\claims
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\claims\ClaimCard.jsx
+|   |   |   |   |   +-- gigshield-ai\frontend\src\components\claims\ProgressBar.jsx
+|   |   |   |   |-- gigshield-ai\frontend\src\components\layout
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\layout\AppLayout.jsx
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\layout\Navbar.jsx
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\layout\navigation.js
+|   |   |   |   |   +-- gigshield-ai\frontend\src\components\layout\Sidebar.jsx
+|   |   |   |   |-- gigshield-ai\frontend\src\components\onboarding
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\onboarding\FileUploadCard.jsx
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\onboarding\SelectInput.jsx
+|   |   |   |   |   +-- gigshield-ai\frontend\src\components\onboarding\TextInput.jsx
+|   |   |   |   |-- gigshield-ai\frontend\src\components\policy
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\policy\ActivePolicyCard.jsx
+|   |   |   |   |   +-- gigshield-ai\frontend\src\components\policy\PlanCard.jsx
+|   |   |   |   |-- gigshield-ai\frontend\src\components\profile
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\profile\DocumentUploadCard.jsx
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\profile\InputField.jsx
+|   |   |   |   |   +-- gigshield-ai\frontend\src\components\profile\ProfileCard.jsx
+|   |   |   |   |-- gigshield-ai\frontend\src\components\ui
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\ui\Badge.js
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\ui\Button.js
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\ui\Card.js
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\ui\EmptyState.js
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\ui\InfoTooltip.js
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\ui\Loader.js
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\ui\SectionHeader.js
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\ui\StatusBadge.jsx
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\ui\StatusPill.js
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\ui\SurfaceButton.jsx
+|   |   |   |   |   |-- gigshield-ai\frontend\src\components\ui\SurfaceLoadingPanel.jsx
+|   |   |   |   |   +-- gigshield-ai\frontend\src\components\ui\SurfaceScanPanel.jsx
+|   |   |   |   |-- gigshield-ai\frontend\src\components\RiskBadge.js
+|   |   |   |   +-- gigshield-ai\frontend\src\components\StatCard.js
+|   |   |   |-- gigshield-ai\frontend\src\context
+|   |   |   |   +-- gigshield-ai\frontend\src\context\GigPredictAIDataContext.js
+|   |   |   |-- gigshield-ai\frontend\src\data
+|   |   |   |-- gigshield-ai\frontend\src\hooks
+|   |   |   |   +-- gigshield-ai\frontend\src\hooks\useLiveBackendData.js
+|   |   |   |-- gigshield-ai\frontend\src\modules
+|   |   |   |   |-- gigshield-ai\frontend\src\modules\auth
+|   |   |   |   |   +-- gigshield-ai\frontend\src\modules\auth\index.js
+|   |   |   |   |-- gigshield-ai\frontend\src\modules\claims
+|   |   |   |   |   +-- gigshield-ai\frontend\src\modules\claims\index.js
+|   |   |   |   |-- gigshield-ai\frontend\src\modules\dashboard
+|   |   |   |   |   +-- gigshield-ai\frontend\src\modules\dashboard\index.js
+|   |   |   |   |-- gigshield-ai\frontend\src\modules\policy
+|   |   |   |   |   +-- gigshield-ai\frontend\src\modules\policy\index.js
+|   |   |   |   |-- gigshield-ai\frontend\src\modules\profile
+|   |   |   |   |   +-- gigshield-ai\frontend\src\modules\profile\index.js
+|   |   |   |   +-- gigshield-ai\frontend\src\modules\index.js
+|   |   |   |-- gigshield-ai\frontend\src\pages
+|   |   |   |   |-- gigshield-ai\frontend\src\pages\AdminDashboard.js
+|   |   |   |   |-- gigshield-ai\frontend\src\pages\Claims.js
+|   |   |   |   |-- gigshield-ai\frontend\src\pages\Dashboard.js
+|   |   |   |   |-- gigshield-ai\frontend\src\pages\Landing.js
+|   |   |   |   |-- gigshield-ai\frontend\src\pages\LocationPredictor.js
+|   |   |   |   |-- gigshield-ai\frontend\src\pages\Login.js
+|   |   |   |   |-- gigshield-ai\frontend\src\pages\PolicyQuote.js
+|   |   |   |   |-- gigshield-ai\frontend\src\pages\Profile.jsx
+|   |   |   |   |-- gigshield-ai\frontend\src\pages\Register.js
+|   |   |   |   +-- gigshield-ai\frontend\src\pages\RiskMap.js
+|   |   |   |-- gigshield-ai\frontend\src\services
+|   |   |   |   |-- gigshield-ai\frontend\src\services\api.js
+|   |   |   |   |-- gigshield-ai\frontend\src\services\api.test.js
+|   |   |   |   |-- gigshield-ai\frontend\src\services\behaviorCheck.js
+|   |   |   |   |-- gigshield-ai\frontend\src\services\demoFlow.js
+|   |   |   |   |-- gigshield-ai\frontend\src\services\demoFlow.test.js
+|   |   |   |   |-- gigshield-ai\frontend\src\services\fraudOrchestrator.js
+|   |   |   |   |-- gigshield-ai\frontend\src\services\locationCheck.js
+|   |   |   |   |-- gigshield-ai\frontend\src\services\locationPrediction.js
+|   |   |   |   |-- gigshield-ai\frontend\src\services\premiumQuote.js
+|   |   |   |   |-- gigshield-ai\frontend\src\services\riskPrediction.js
+|   |   |   |   +-- gigshield-ai\frontend\src\services\workerFlow.js
+|   |   |   |-- gigshield-ai\frontend\src\utils
+|   |   |   |   |-- gigshield-ai\frontend\src\utils\auth.js
+|   |   |   |   |-- gigshield-ai\frontend\src\utils\auth.test.js
+|   |   |   |   |-- gigshield-ai\frontend\src\utils\authRisk.js
+|   |   |   |   |-- gigshield-ai\frontend\src\utils\authRisk.test.js
+|   |   |   |   |-- gigshield-ai\frontend\src\utils\cn.js
+|   |   |   |   +-- gigshield-ai\frontend\src\utils\helpers.js
+|   |   |   |-- gigshield-ai\frontend\src\App.js
+|   |   |   |-- gigshield-ai\frontend\src\index.css
+|   |   |   +-- gigshield-ai\frontend\src\index.js
+|   |   |-- gigshield-ai\frontend\.env
+|   |   |-- gigshield-ai\frontend\.env.example
+|   |   |-- gigshield-ai\frontend\Dockerfile
+|   |   |-- gigshield-ai\frontend\package.json
+|   |   |-- gigshield-ai\frontend\package-lock.json
+|   |   |-- gigshield-ai\frontend\postcss.config.js
+|   |   |-- gigshield-ai\frontend\tailwind.config.js
+|   |   +-- gigshield-ai\frontend\vercel.json
+|   |-- gigshield-ai\.env
+|   |-- gigshield-ai\.env.example
+|   |-- gigshield-ai\.gitignore
+|   |-- gigshield-ai\ARCHITECTURE.md
+|   |-- gigshield-ai\BACKEND_IMPLEMENTATION.md
+|   |-- gigshield-ai\docker-compose.yml
+|   |-- gigshield-ai\FILE_MANIFEST.md
+|   |-- gigshield-ai\IMPLEMENTATION_COMPLETE.md
+|   |-- gigshield-ai\QUICK_START.sh
+|   |-- gigshield-ai\README.md
+|   +-- gigshield-ai\start-gigshield-ai.ps1
+|-- .gitignore
+|-- gigshield-ai-structure.txt
+|-- project-structure-clean.txt
+|-- README.md
++-- vercel.json

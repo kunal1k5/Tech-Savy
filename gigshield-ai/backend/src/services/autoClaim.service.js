@@ -1,4 +1,9 @@
 const DEFAULT_HOURLY_RATE = 150;
+const { pool } = require("../database/connection");
+const ClaimModel = require("../models/claim.model");
+const PolicyModel = require("../models/policy.model");
+const logger = require("../utils/logger");
+const { runFraudOrchestrator } = require("./fraudOrchestrator.service");
 const { buildRiskReason, joinReasonParts } = require("../utils/explanations");
 const { clampInteger, clampNumber, ensureObject, sanitizeBoolean } = require("../utils/inputSafety");
 const {
@@ -10,6 +15,12 @@ const ELIGIBLE_RISK = "HIGH";
 const CLAIM_DURATION_THRESHOLD_MINUTES = 30;
 const MIN_WORKING_MINUTES_FOR_INCOME_LOSS = 120;
 
+const TRIGGER_TYPE_TO_DB = {
+  Rain: "extreme_weather",
+  AQI: "high_aqi",
+  Demand: "zone_shutdown",
+};
+
 const INCOME_LOSS_REASONS = Object.freeze({
   NO_ORDERS_COMPLETED: "NO_ORDERS_COMPLETED",
   ZERO_EARNINGS_AFTER_THRESHOLD: "ZERO_EARNINGS_AFTER_THRESHOLD",
@@ -19,6 +30,189 @@ const INCOME_LOSS_REASONS = Object.freeze({
 
 function normalizeRisk(risk) {
   return String(risk || "").trim().toUpperCase();
+}
+
+function normalizeTriggerType(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "aqi") {
+    return "AQI";
+  }
+  if (normalized === "demand") {
+    return "Demand";
+  }
+  return "Rain";
+}
+
+function buildPayoutRef(eventId) {
+  return `auto-claim-${eventId}`;
+}
+
+async function ensureTriggerRecord({
+  triggerType,
+  actualValue,
+  threshold,
+  city,
+  zone,
+  signals = {},
+}) {
+  const dbTriggerType = TRIGGER_TYPE_TO_DB[triggerType] || "zone_shutdown";
+  const severity = triggerType === "Rain" && Number(actualValue) > Number(threshold) + 20
+    ? "critical"
+    : "high";
+
+  const result = await pool.query(
+    `INSERT INTO parametric_triggers (trigger_type, city, zone, severity, data_snapshot, threshold_met)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING *`,
+    [
+      dbTriggerType,
+      city || "Unknown",
+      zone || "Unknown",
+      severity,
+      JSON.stringify({
+        triggerType,
+        actualValue,
+        threshold,
+        source: "trigger_monitor",
+        signals,
+      }),
+      `${triggerType} value ${actualValue} crossed threshold ${threshold}`,
+    ]
+  );
+
+  return result.rows[0];
+}
+
+async function buildPolicyContext(triggeredPolicy) {
+  const policyId = triggeredPolicy.policyId;
+  const policy = await PolicyModel.findById(policyId);
+
+  if (!policy) {
+    const error = new Error(`Policy not found for auto-claim (${policyId})`);
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return {
+    policy,
+    workerId: policy.worker_id,
+    payout: Number(policy.coverage_amount ?? policy.base_payout ?? policy.basePayout ?? 0),
+  };
+}
+
+function mapFraudStatusToRiskLevel(status) {
+  const normalized = String(status || "SAFE").trim().toUpperCase();
+  if (normalized === "FRAUD") {
+    return "high";
+  }
+
+  if (normalized === "WARNING") {
+    return "medium";
+  }
+
+  return "low";
+}
+
+function mapRiskLevelToClaimStatus(riskLevel) {
+  const normalized = String(riskLevel || "medium").trim().toLowerCase();
+  if (normalized === "low") {
+    return "approved";
+  }
+
+  if (normalized === "high") {
+    return "rejected";
+  }
+
+  return "pending";
+}
+
+async function runFraudCheck({ userId, policyId, triggerType, triggerValue, signals = {}, location = {} }) {
+  const fraudPayload = {
+    userId,
+    policyId,
+    triggerType,
+    triggerValue,
+    risk: "MEDIUM",
+    claimTriggered: true,
+    locationMatch: true,
+    contextValid: true,
+    suspiciousPattern: false,
+    claimsCount: 1,
+    loginAttempts: 1,
+    aqi: Number(signals?.aqi ?? 0),
+    rain: Number(signals?.rain ?? signals?.rainfall ?? 0),
+    weather: {
+      aqi: Number(signals?.aqi ?? 0),
+      rain: Number(signals?.rain ?? signals?.rainfall ?? 0),
+      temperature: Number(signals?.temperature ?? 0),
+      condition: String(signals?.condition || "Unknown"),
+    },
+    location: {
+      current_location: location?.city || "Unknown",
+      actual_location: location?.city || "Unknown",
+    },
+  };
+
+  const orchestratorResult = await runFraudOrchestrator(fraudPayload);
+  const fraudScore = Number(orchestratorResult?.fraudScore ?? orchestratorResult?.fraud_score ?? 0);
+  const riskLevel = mapFraudStatusToRiskLevel(orchestratorResult?.status);
+
+  return {
+    fraudScore,
+    riskLevel,
+    decision: riskLevel === "low" ? "approve" : "reject",
+    reason: orchestratorResult?.reason || "Fraud analysis completed.",
+  };
+}
+
+function processAutoClaimFraudAsync({
+  claimId,
+  userId,
+  policyId,
+  triggerType,
+  triggerValue,
+  signals,
+  location,
+  autoClaimMetadata,
+}) {
+  setImmediate(() => {
+    void (async () => {
+      try {
+        const result = await runFraudCheck({
+          userId,
+          policyId,
+          triggerType,
+          triggerValue,
+          signals,
+          location,
+        });
+        const processedAt = new Date().toISOString();
+        const nextStatus = mapRiskLevelToClaimStatus(result.riskLevel);
+
+        await ClaimModel.updateStatus(claimId, nextStatus, {
+          fraudScore: result.fraudScore,
+          riskLevel: result.riskLevel,
+          decisionReason: result.reason,
+          processedAt,
+          fraud_flags: {
+            auto_claim: autoClaimMetadata,
+            ai_decision: {
+              fraudScore: result.fraudScore,
+              riskLevel: result.riskLevel,
+              decision: result.decision,
+              decisionReason: result.reason,
+              processedAt,
+            },
+          },
+        });
+
+        console.log(`Claim processed: ${result.decision} (score: ${result.fraudScore})`);
+        logger.info(`Claim processed: ${result.decision} (score: ${result.fraudScore})`);
+      } catch (error) {
+        logger.warn(`Auto-claim fraud processing failed for claim ${claimId}: ${error.message}`);
+      }
+    })();
+  });
 }
 
 function normalizeOptionalNumber(value, fieldName, { integer = false } = {}) {
@@ -259,6 +453,163 @@ module.exports = {
   calculatePayout,
   deriveIncomeLoss,
   getAutoClaimDecision,
+  async createAutoClaim(triggeredPolicyData) {
+    const triggerType = normalizeTriggerType(triggeredPolicyData?.triggerType);
+    const actualValue = Number(triggeredPolicyData?.actualValue || 0);
+    const threshold = Number(triggeredPolicyData?.threshold || 0);
+    const triggerWeather = triggeredPolicyData?.weather || {};
+    const triggerRain = Number(
+      triggerType === "Rain"
+        ? actualValue
+        : triggerWeather.rain ?? triggerWeather.rainfall ?? triggeredPolicyData?.rain ?? 0
+    );
+    const triggerAqi = Number(
+      triggerType === "AQI"
+        ? actualValue
+        : triggeredPolicyData?.aqi ?? triggerWeather.aqi ?? 0
+    );
+    const triggerTemperature = Number(triggerWeather.temperature ?? triggeredPolicyData?.temperature ?? 0);
+    const triggerCondition = String(triggerWeather.condition ?? triggeredPolicyData?.condition ?? "Unknown");
+
+    const eventId =
+      triggeredPolicyData?.eventId ||
+      `${triggeredPolicyData?.policyId}-${triggerType}-${Date.now()}`;
+    const payoutRef = buildPayoutRef(eventId);
+    const { policy, workerId, payout } = await buildPolicyContext(triggeredPolicyData);
+
+    const existingClaim = await ClaimModel.findByPayoutRef(payoutRef);
+    const samePolicyDuplicate =
+      existingClaim && String(existingClaim.policy_id) === String(policy.id);
+
+    if (samePolicyDuplicate) {
+      return {
+        created: false,
+        duplicate: true,
+        claim: {
+          claimId: existingClaim.id,
+          userId: existingClaim.worker_id,
+          policyId: existingClaim.policy_id,
+          triggerType,
+          triggerValue: actualValue,
+          payout: Number(existingClaim.claim_amount || payout),
+          status: String(existingClaim.status || "pending").toUpperCase(),
+          createdAt: existingClaim.created_at || null,
+        },
+      };
+    }
+
+    const triggerRecord = await ensureTriggerRecord({
+      triggerType,
+      actualValue,
+      threshold,
+      city: triggeredPolicyData?.location?.city,
+      zone: triggeredPolicyData?.location?.zone,
+      signals: {
+        rain: triggerRain,
+        aqi: triggerAqi,
+        temperature: triggerTemperature,
+        condition: triggerCondition,
+      },
+    });
+
+    const createdClaim = await ClaimModel.create({
+      policy_id: policy.id,
+      worker_id: workerId,
+      trigger_id: triggerRecord.id,
+      claim_amount: payout,
+    });
+
+    const autoClaimMetadata = {
+      generated: true,
+      eventId,
+      triggerType,
+      triggerValue: actualValue,
+      threshold,
+      signals: {
+        rain: triggerRain,
+        aqi: triggerAqi,
+        temperature: triggerTemperature,
+        condition: triggerCondition,
+      },
+      basePayout: payout,
+      finalPayout: payout,
+      severityLevel: "medium",
+      multiplier: 1,
+      policyName:
+        triggeredPolicyData?.policyName ||
+        `Policy ${String(policy.id).slice(0, 8)}`,
+      generatedAt: new Date().toISOString(),
+    };
+
+    const enrichedClaim = await ClaimModel.updateStatus(createdClaim.id, "pending", {
+      payout_ref: payoutRef,
+      fraud_flags: {
+        auto_claim: autoClaimMetadata,
+      },
+    });
+
+    logger.info(`Auto claim generated for policy ${policy.id}`);
+
+    // Fraud evaluation runs in the background so trigger->claim creation stays non-blocking.
+    processAutoClaimFraudAsync({
+      claimId: enrichedClaim.id,
+      userId: workerId,
+      policyId: policy.id,
+      triggerType,
+      triggerValue: actualValue,
+      signals: {
+        rain: triggerRain,
+        aqi: triggerAqi,
+        temperature: triggerTemperature,
+        condition: triggerCondition,
+      },
+      location: {
+        city: triggeredPolicyData?.location?.city,
+        zone: triggeredPolicyData?.location?.zone,
+      },
+      autoClaimMetadata,
+    });
+
+    return {
+      created: true,
+      duplicate: false,
+      claim: {
+        claimId: enrichedClaim.id,
+        userId: workerId,
+        policyId: policy.id,
+        triggerType,
+        triggerValue: actualValue,
+        triggerSignals: {
+          rain: triggerRain,
+          aqi: triggerAqi,
+          temperature: triggerTemperature,
+          condition: triggerCondition,
+        },
+        basePayout: payout,
+        finalPayout: payout,
+        payout,
+        severityLevel: "medium",
+        status: "PENDING",
+        createdAt: enrichedClaim.created_at,
+      },
+    };
+  },
+  async createAutoClaimsFromTriggeredPolicies(triggeredPolicies = []) {
+    const results = [];
+
+    for (const triggeredPolicy of triggeredPolicies) {
+      try {
+        const result = await this.createAutoClaim(triggeredPolicy);
+        results.push(result);
+      } catch (error) {
+        logger.warn(
+          `Auto claim generation failed for policy ${triggeredPolicy?.policyId}: ${error.message}`
+        );
+      }
+    }
+
+    return results;
+  },
   normalizeOptionalNumber,
   normalizeBoolean: sanitizeBoolean,
   validateAutoClaimPayload,

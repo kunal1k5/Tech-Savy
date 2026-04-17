@@ -3,15 +3,21 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
-  BadgeCheck,
+  AlertTriangle,
   Briefcase,
   Camera,
+  CheckCircle2,
   Clock3,
   FileText,
   Fingerprint,
+  Loader2,
   LogOut,
   PencilLine,
+  ScanFace,
   ShieldCheck,
+  Sparkles,
+  TrendingUp,
+  XCircle,
 } from "lucide-react";
 import DocumentUploadCard from "../components/profile/DocumentUploadCard";
 import InputField from "../components/profile/InputField";
@@ -234,11 +240,33 @@ function getPreviewState(file, currentPreview) {
   return "";
 }
 
+function getDocumentValidationState(status) {
+  if (status === "verified") {
+    return {
+      badgeStatus: "verified",
+      label: "Verified",
+    };
+  }
+
+  if (status === "rejected") {
+    return {
+      badgeStatus: "rejected",
+      label: "Failed",
+    };
+  }
+
+  return {
+    badgeStatus: "pending",
+    label: "Processing",
+  };
+}
+
 export default function Profile() {
   const navigate = useNavigate();
   const [user, setUser] = useState(() => getCurrentStoredUser());
   const [form, setForm] = useState(() => getEditableProfile(getCurrentStoredUser()));
   const [isEditing, setIsEditing] = useState(false);
+  const [isKycUpdating, setIsKycUpdating] = useState(false);
   const [documents, setDocuments] = useState(() => getInitialDocuments());
   const [previewUrls, setPreviewUrls] = useState({});
 
@@ -309,6 +337,11 @@ export default function Profile() {
     );
   }, [documents, requiredDocumentIds]);
 
+  const hasPendingDocuments = useMemo(
+    () => Object.values(documents).some((document) => document.status === "pending"),
+    [documents]
+  );
+
   const overallStatus = useMemo(
     () => getOverallStatus(documents, isProfileComplete),
     [documents, isProfileComplete]
@@ -362,7 +395,7 @@ export default function Profile() {
     requiredDocumentsUploaded,
   ]);
 
-  const trustLevel = useMemo(() => {
+  const trustScore = useMemo(() => {
     let trustScore = 100;
 
     if (internalFraudFlags.duplicatePhoneAccount) {
@@ -384,6 +417,10 @@ export default function Profile() {
       trustScore -= 10;
     }
 
+    return Math.max(5, Math.min(100, trustScore));
+  }, [documents, internalFraudFlags]);
+
+  const trustLevel = useMemo(() => {
     if (trustScore >= 80) {
       return "high";
     }
@@ -391,24 +428,130 @@ export default function Profile() {
       return "medium";
     }
     return "low";
-  }, [documents, internalFraudFlags]);
+  }, [trustScore]);
 
-  const verificationChecklist = useMemo(() => {
+  const trustFactors = useMemo(() => {
+    const aadhaarVerified = documents.aadhaar?.status === "verified";
+    const hasProfilePhoto = documents.profilePhoto?.status === "verified";
+    const locationConsistencyGood = !onboardingRiskProfile?.signals?.locationChange;
+    const activityPatternStable =
+      !internalFraudFlags.onboardingFlagged && !internalFraudFlags.onboardingMonitor;
+
     return [
       {
-        label: "Profile details complete",
-        done: isProfileComplete,
+        label: "Aadhaar verified",
+        healthy: aadhaarVerified,
       },
       {
-        label: "Aadhaar uploaded",
-        done: documents.aadhaar.status !== "not_uploaded",
+        label: hasProfilePhoto ? "Profile photo available" : "Profile photo missing",
+        healthy: hasProfilePhoto,
       },
       {
-        label: "Profile photo uploaded",
-        done: documents.profilePhoto.status !== "not_uploaded",
+        label: "Location consistency good",
+        healthy: locationConsistencyGood,
+      },
+      {
+        label: "Activity pattern stable",
+        healthy: activityPatternStable,
       },
     ];
-  }, [documents, isProfileComplete]);
+  }, [
+    documents.aadhaar?.status,
+    documents.profilePhoto?.status,
+    internalFraudFlags.onboardingFlagged,
+    internalFraudFlags.onboardingMonitor,
+    onboardingRiskProfile?.signals?.locationChange,
+  ]);
+
+  const identityMatchScore = useMemo(() => {
+    let score = 58;
+
+    if (documents.aadhaar?.status === "verified") {
+      score += 16;
+    }
+    if (documents.profilePhoto?.status === "verified") {
+      score += 12;
+    }
+    if (!onboardingRiskProfile?.signals?.locationChange) {
+      score += 6;
+    }
+    if (isProfileComplete) {
+      score += 4;
+    }
+
+    score += Math.round(trustScore * 0.12);
+    return Math.max(30, Math.min(98, score));
+  }, [
+    documents.aadhaar?.status,
+    documents.profilePhoto?.status,
+    isProfileComplete,
+    onboardingRiskProfile?.signals?.locationChange,
+    trustScore,
+  ]);
+
+  const trustLevelLabel = `${trustLevel[0].toUpperCase()}${trustLevel.slice(1)}`;
+  const kycStatusLabel =
+    overallStatus === "verified" && !isKycUpdating
+      ? "KYC Status: Verified"
+      : "KYC Status: Under AI Verification";
+
+  const claimsImpactMessage = useMemo(() => {
+    if (trustLevel === "high") {
+      return "High trust -> Auto-approval enabled.";
+    }
+    if (trustLevel === "medium") {
+      return "Medium trust -> Claims may go for manual review.";
+    }
+    return "Low trust -> Additional manual review and fraud checks are required.";
+  }, [trustLevel]);
+
+  const verificationTimeline = useMemo(() => {
+    const profileCreated = Boolean(user?.id || user?.phone);
+    const aiVerificationRunning = hasPendingDocuments || isKycUpdating;
+
+    return [
+      {
+        label: "Profile created",
+        note: profileCreated ? "Identity profile saved" : "Waiting for profile details",
+        state: profileCreated ? "complete" : "upcoming",
+      },
+      {
+        label: "Document uploaded",
+        note: requiredDocumentsUploaded
+          ? "Required documents received"
+          : "Aadhaar and profile photo needed",
+        state: requiredDocumentsUploaded ? "complete" : profileCreated ? "active" : "upcoming",
+      },
+      {
+        label: "AI verification running",
+        note: aiVerificationRunning
+          ? "Cross-checking identity, location, and activity"
+          : overallStatus === "verified"
+            ? "Verification checks completed"
+            : "Runs instantly after upload",
+        state: aiVerificationRunning
+          ? "active"
+          : overallStatus === "verified"
+            ? "complete"
+            : "upcoming",
+      },
+      {
+        label: "Approved",
+        note:
+          overallStatus === "verified"
+            ? "Profile approved for trust-based automation"
+            : "Approval triggers instant-claim eligibility",
+        state: overallStatus === "verified" ? "complete" : "upcoming",
+      },
+    ];
+  }, [
+    hasPendingDocuments,
+    isKycUpdating,
+    overallStatus,
+    requiredDocumentsUploaded,
+    user?.id,
+    user?.phone,
+  ]);
 
   function updateField(field, value) {
     setForm((current) => ({
@@ -457,6 +600,8 @@ export default function Profile() {
   }
 
   function handleDocumentUpload(documentId, file) {
+    setIsKycUpdating(false);
+
     setPreviewUrls((current) => ({
       ...current,
       [documentId]: getPreviewState(file, current[documentId]),
@@ -472,7 +617,7 @@ export default function Profile() {
       },
     }));
 
-    toast.success("Document uploaded. Verification is pending.");
+    toast.success("Document uploaded. AI verification moved to processing.");
   }
 
   function handleCheckStatus() {
@@ -486,27 +631,29 @@ export default function Profile() {
       return;
     }
 
-    const hasPendingDocuments = Object.values(documents).some(
-      (document) => document.status === "pending"
-    );
-
     if (!hasPendingDocuments && overallStatus === "verified") {
       toast.success("Profile is already verified.");
       return;
     }
 
-    setDocuments((current) =>
-      Object.fromEntries(
-        Object.entries(current).map(([documentId, document]) => [
-          documentId,
-          document.status === "pending"
-            ? { ...document, status: "verified" }
-            : document,
-        ])
-      )
-    );
+    setIsKycUpdating(true);
+    toast.success("KYC Status: Under AI Verification");
 
-    toast.success("Verification status updated.");
+    window.setTimeout(() => {
+      setDocuments((current) =>
+        Object.fromEntries(
+          Object.entries(current).map(([documentId, document]) => [
+            documentId,
+            document.status === "pending"
+              ? { ...document, status: "verified" }
+              : document,
+          ])
+        )
+      );
+
+      setIsKycUpdating(false);
+      toast.success("Verification updated. Trust intelligence refreshed.");
+    }, 1800);
   }
 
   function handleLogout() {
@@ -514,6 +661,7 @@ export default function Profile() {
     setUser(null);
     setForm(EMPTY_PROFILE_FORM);
     setDocuments(getInitialDocuments());
+    setIsKycUpdating(false);
     setIsEditing(false);
     toast.success("Logged out successfully.");
     navigate("/login", { replace: true });
@@ -534,6 +682,7 @@ export default function Profile() {
           workType={form.workType}
           verificationStatus={overallStatus}
           trustLevel={trustLevel}
+          trustScore={trustScore}
         />
       </motion.div>
 
@@ -543,12 +692,12 @@ export default function Profile() {
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-sm font-medium text-slate-500">Profile Settings</p>
+            <p className="text-sm font-medium text-slate-500">Identity Controls</p>
             <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
-              Dynamic worker profile
+              Live trust profile settings
             </h3>
             <p className="mt-2 text-sm text-slate-600">
-              Profile data is loaded from your saved session and updates instantly after every save.
+              Identity details update trust scoring and claim automation in real time.
             </p>
           </div>
 
@@ -634,7 +783,7 @@ export default function Profile() {
           >
             {isEditing
               ? "Editing is active. Save changes to update the profile everywhere."
-              : "Profile is locked. Use Edit Profile to update your details."}
+              : "Profile secured to prevent fraud. Edit access enabled when verification completes."}
           </div>
         </form>
       </motion.section>
@@ -710,20 +859,25 @@ export default function Profile() {
         </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
-          {DOCUMENT_CONFIG.map((document) => (
-            <DocumentUploadCard
-              key={document.id}
-              title={document.title}
-              description={document.description}
-              required={document.required}
-              accept={document.accept}
-              icon={document.icon}
-              status={documents[document.id].status}
-              fileName={documents[document.id].fileName}
-              previewUrl={previewUrls[document.id]}
-              onUpload={(file) => handleDocumentUpload(document.id, file)}
-            />
-          ))}
+          {DOCUMENT_CONFIG.map((document) => {
+            const validationState = getDocumentValidationState(documents[document.id].status);
+
+            return (
+              <DocumentUploadCard
+                key={document.id}
+                title={document.title}
+                description={document.description}
+                required={document.required}
+                accept={document.accept}
+                icon={document.icon}
+                status={validationState.badgeStatus}
+                statusLabel={validationState.label}
+                fileName={documents[document.id].fileName}
+                previewUrl={previewUrls[document.id]}
+                onUpload={(file) => handleDocumentUpload(document.id, file)}
+              />
+            );
+          })}
         </div>
       </motion.section>
 
@@ -733,76 +887,153 @@ export default function Profile() {
       >
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-sm font-medium text-slate-500">Verification Status</p>
+            <p className="text-sm font-medium text-slate-500">Trust Intelligence</p>
             <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-900">
-              KYC review progress
+              Trust &amp; Verification Intelligence System
             </h3>
+            <p className="mt-2 text-sm text-slate-600">
+              Higher trust = faster payouts. Verified users get priority processing.
+            </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <StatusBadge status={overallStatus} />
+            <StatusBadge
+              status={isKycUpdating || hasPendingDocuments ? "pending" : overallStatus}
+              label={kycStatusLabel}
+            />
             <StatusBadge
               status={trustLevel}
-              label={`Trust Level: ${trustLevel[0].toUpperCase()}${trustLevel.slice(1)}`}
+              label={`Trust Level: ${trustLevelLabel}`}
+            />
+            <StatusBadge
+              status="active"
+              label={isKycUpdating || hasPendingDocuments ? "Live updates running" : "Live monitoring active"}
             />
           </div>
         </div>
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-[220px_220px_minmax(0,1fr)]">
-          <div className="rounded-2xl bg-slate-50 p-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-              <ShieldCheck size={16} />
-              Profile status
-            </div>
-            <div className="mt-3">
-              <StatusBadge status={overallStatus} className="text-sm" />
-            </div>
-          </div>
-
+        <div className="mt-6 grid gap-4 lg:grid-cols-2">
           <div className="rounded-2xl bg-slate-50 p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
               <Clock3 size={16} />
-              Review state
+              KYC Status
             </div>
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              {overallStatus === "verified"
-                ? "All required details are approved."
-                : "Uploaded details stay pending until review is complete."}
+            <p className="mt-3 text-sm font-semibold text-slate-900">{kycStatusLabel}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              {overallStatus === "verified" && !isKycUpdating
+                ? "Estimated completion: Completed"
+                : "Estimated completion: 2-5 minutes"}
             </p>
           </div>
 
           <div className="rounded-2xl bg-slate-50 p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
-              <BadgeCheck size={16} />
-              Checklist
+              <TrendingUp size={16} />
+              Impact on Claims
+            </div>
+            <div className="mt-3 space-y-2 text-sm text-slate-700">
+              <p>Medium trust -&gt; Claims may go for manual review</p>
+              <p>High trust -&gt; Auto-approval enabled</p>
+            </div>
+            <p className="mt-3 text-sm font-semibold text-slate-900">{claimsImpactMessage}</p>
+          </div>
+
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+              <ScanFace size={16} />
+              Identity Match Score
+            </div>
+            <p className="mt-3 text-lg font-semibold text-slate-900">
+              Face matches ID: {identityMatchScore}%
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              This profile contributes to fraud risk analysis
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-blue-700">
+              <Sparkles size={16} />
+              Quick Action
+            </div>
+            <p className="mt-3 text-sm font-semibold text-blue-900">
+              Complete verification to unlock instant claim approvals
+            </p>
+            <SurfaceButton
+              onClick={handleCheckStatus}
+              variant="secondary"
+              className="mt-4 w-full sm:w-auto"
+            >
+              Check verification status
+            </SurfaceButton>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+              <ShieldCheck size={16} />
+              Trust Factors
             </div>
 
             <div className="mt-4 space-y-3">
-              {verificationChecklist.map((item) => (
+              {trustFactors.map((factor) => {
+                const FactorIcon = factor.healthy ? CheckCircle2 : XCircle;
+
+                return (
                 <div
-                  key={item.label}
+                  key={factor.label}
                   className="flex items-center justify-between gap-4 rounded-xl bg-white px-3 py-3"
                 >
-                  <span className="text-sm font-medium text-slate-700">{item.label}</span>
-                  <span
-                    className={cn(
-                      "h-2.5 w-2.5 rounded-full",
-                      item.done ? "bg-emerald-500" : "bg-amber-400"
-                    )}
+                  <span className="text-sm font-medium text-slate-700">{factor.label}</span>
+                  <FactorIcon
+                    size={16}
+                    className={factor.healthy ? "text-emerald-600" : "text-rose-500"}
                   />
+                </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-slate-50 p-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+              <Loader2 size={16} className={isKycUpdating ? "animate-spin" : ""} />
+              Verification Timeline
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {verificationTimeline.map((step) => (
+                <div
+                  key={step.label}
+                  className="flex items-start justify-between gap-4 rounded-xl bg-white px-3 py-3"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">{step.label}</p>
+                    <p className="mt-1 text-xs text-slate-500">{step.note}</p>
+                  </div>
+
+                  {step.state === "complete" ? (
+                    <CheckCircle2 size={16} className="mt-0.5 text-emerald-600" />
+                  ) : step.state === "active" ? (
+                    <Loader2 size={16} className="mt-0.5 animate-spin text-amber-600" />
+                  ) : (
+                    <Clock3 size={16} className="mt-0.5 text-slate-400" />
+                  )}
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        <SurfaceButton
-          onClick={handleCheckStatus}
-          variant="secondary"
-          className="mt-6 w-full sm:w-auto"
-        >
-          Check verification status
-        </SurfaceButton>
+        <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <div className="flex items-start gap-2">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+            <p>
+              Trust intelligence is live and updating. This profile now feeds claim routing and fraud prevention decisions continuously.
+            </p>
+          </div>
+        </div>
       </motion.section>
     </motion.div>
   );

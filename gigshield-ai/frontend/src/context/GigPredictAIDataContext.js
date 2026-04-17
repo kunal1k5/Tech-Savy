@@ -17,6 +17,7 @@ import {
   triggerClaim,
 } from "../services/workerFlow";
 import { getToken, getUserFromToken } from "../utils/auth";
+import { playUiAlert, playUiSuccess } from "../utils/soundFeedback";
 
 const GigPredictAIDataContext = createContext(null);
 
@@ -285,6 +286,7 @@ export function GigPredictAIDataProvider({ children }) {
   const timeoutIdsRef = useRef([]);
   const intervalIdsRef = useRef([]);
   const hasBootstrappedRef = useRef(false);
+  const lastFraudStatusRef = useRef("unknown");
 
   function schedule(callback, delay) {
     const timeoutId = window.setTimeout(callback, delay);
@@ -369,6 +371,31 @@ export function GigPredictAIDataProvider({ children }) {
     return undefined;
   }, []);
 
+  useEffect(() => {
+    const fraudStatus = platformState.fraudWatch?.status;
+
+    if (!fraudStatus) {
+      return;
+    }
+
+    if (fraudStatus === lastFraudStatusRef.current) {
+      return;
+    }
+
+    if (fraudStatus === "flagged") {
+      toast.error("High risk detected - review required.");
+      playUiAlert();
+    } else if (
+      fraudStatus === "verified" &&
+      lastFraudStatusRef.current === "flagged"
+    ) {
+      toast.success("Fraud risk normalized. Monitoring remains active.");
+      playUiSuccess();
+    }
+
+    lastFraudStatusRef.current = fraudStatus;
+  }, [platformState.fraudWatch?.status]);
+
   async function simulateRisk(riskKey, { silent = false } = {}) {
     setUiState((current) => ({ ...current, riskUpdating: true, riskTarget: riskKey }));
 
@@ -389,9 +416,11 @@ export function GigPredictAIDataProvider({ children }) {
 
       if (!silent) {
         toast.success(`Premium updated to ${premiumData.premium} INR.`);
+        playUiSuccess();
       }
     } catch (error) {
       toast.error(extractApiErrorMessage(error, "Service unavailable."));
+      playUiAlert();
     } finally {
       setUiState((current) => ({ ...current, riskUpdating: false, riskTarget: "" }));
     }
@@ -416,8 +445,10 @@ export function GigPredictAIDataProvider({ children }) {
       });
 
       toast.success("Policy activated");
+      playUiSuccess();
     } catch (error) {
       toast.error(extractApiErrorMessage(error, "Service unavailable."));
+      playUiAlert();
     } finally {
       setUiState((current) => ({ ...current, planUpdating: false, planTarget: "" }));
     }
@@ -466,16 +497,29 @@ export function GigPredictAIDataProvider({ children }) {
 
       if (!response.triggered) {
         toast.error(response.message || "No claim was triggered.", { id: loadingToastId });
+        playUiAlert();
         return;
       }
 
-      toast.success(response.message, { id: loadingToastId });
+      toast.success("Claim auto-generated successfully.", { id: loadingToastId });
+      playUiSuccess();
+
+      const hasFraudAlert = (response.claims || []).some(
+        (claim) => claim.fraudStatus === "flagged" || claim.status === "manual_review"
+      );
+
+      if (hasFraudAlert) {
+        toast.error("High risk detected - review required.");
+        playUiAlert();
+      }
+
       schedule(() => syncBackendState(), 2100);
       schedule(() => syncBackendState(), 4100);
     } catch (error) {
       toast.error(extractApiErrorMessage(error, "Service unavailable."), {
         id: loadingToastId,
       });
+      playUiAlert();
     } finally {
       setUiState((current) => ({
         ...current,

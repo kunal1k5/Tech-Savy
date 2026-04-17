@@ -41,11 +41,11 @@ export default function PlanCard({
 
       <div className="mt-4 flex flex-wrap gap-2">
         {isRecommended ? <StatusBadge status="recommended" /> : null}
-        {isActive ? <StatusBadge status="active" /> : null}
+        {isActive ? <StatusBadge status="active" label="Policy Active" /> : null}
       </div>
 
       <div className="mt-6 rounded-2xl bg-slate-50 p-4">
-        <p className="text-sm font-medium text-slate-500">Engine Cost</p>
+        <p className="text-sm font-medium text-slate-500">Live Insurance Premium</p>
         <div className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
           {premiumLabel}
         </div>
@@ -74,7 +74,7 @@ export default function PlanCard({
         )}
         variant={isActive ? "success" : "primary"}
       >
-        {isActive ? "Active Profile" : "Use Profile"}
+        {isActive ? "Policy Active" : "Use Policy"}
       </SurfaceButton>
     </motion.article>
   );

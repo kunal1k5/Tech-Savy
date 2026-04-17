@@ -179,7 +179,7 @@ export default function LocationPredictor() {
               <div>
                 <div className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Route Response</div>
                 <CardTitle className="mt-2">
-                  {response?.predicted_destination_name || "Waiting for prediction"}
+                  {response?.predicted_destination_name || "Analyzing live signals..."}
                 </CardTitle>
                 <CardDescription className="mt-2">
                   The result prioritizes route trust: clear destination output, confidence, and fraud verdict in one panel.
@@ -197,7 +197,9 @@ export default function LocationPredictor() {
                   Predicted ID
                 </div>
                 <div className="mt-3 text-2xl font-semibold text-white">
-                  {response?.predicted_destination_id ?? "-"}
+                  {response?.predicted_destination_id ?? (
+                    <span className="inline-block h-8 w-16 rounded-md bg-[linear-gradient(90deg,rgba(148,163,184,0.2),rgba(226,232,240,0.35),rgba(148,163,184,0.2))] bg-[length:200%_100%] align-middle animate-shimmer" />
+                  )}
                 </div>
               </div>
               <div className="rounded-[22px] border border-white/10 bg-slate-950/55 p-4">
@@ -206,7 +208,9 @@ export default function LocationPredictor() {
                   Actual ID
                 </div>
                 <div className="mt-3 text-2xl font-semibold text-white">
-                  {response?.actual_destination_id ?? "N/A"}
+                  {response?.actual_destination_id ?? (
+                    <span className="inline-block h-8 w-16 rounded-md bg-[linear-gradient(90deg,rgba(148,163,184,0.2),rgba(226,232,240,0.35),rgba(148,163,184,0.2))] bg-[length:200%_100%] align-middle animate-shimmer" />
+                  )}
                 </div>
               </div>
               <div className="rounded-[22px] border border-white/10 bg-slate-950/55 p-4">
@@ -215,7 +219,9 @@ export default function LocationPredictor() {
                   Confidence
                 </div>
                 <div className="mt-3 text-2xl font-semibold text-white">
-                  {response?.confidence != null ? `${(response.confidence * 100).toFixed(1)}%` : "N/A"}
+                  {response?.confidence != null ? `${(response.confidence * 100).toFixed(1)}%` : (
+                    <span className="inline-block h-8 w-20 rounded-md bg-[linear-gradient(90deg,rgba(148,163,184,0.2),rgba(226,232,240,0.35),rgba(148,163,184,0.2))] bg-[length:200%_100%] align-middle animate-shimmer" />
+                  )}
                 </div>
               </div>
             </div>

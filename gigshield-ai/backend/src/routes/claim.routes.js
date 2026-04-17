@@ -11,6 +11,7 @@ const { authenticate, authorize } = require("../middleware/auth");
 
 const router = Router();
 
+router.get("/", authenticate, ClaimController.getClaims);
 router.get("/my", authenticate, ClaimController.getMyClaims);
 router.post("/:id/process", authenticate, authorize("super_admin", "analyst"), ClaimController.processClaim);
 

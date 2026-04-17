@@ -6,6 +6,15 @@ const ClaimService = require("../services/claim.service");
 const { sendSuccess } = require("../utils/apiResponse");
 
 const ClaimController = {
+  async getClaims(req, res, next) {
+    try {
+      const result = await ClaimService.getClaimsFeed(req.user);
+      return sendSuccess(res, result, "Claims loaded successfully.");
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async getMyClaims(req, res, next) {
     try {
       const claims = await ClaimService.getWorkerClaims(req.user.id);

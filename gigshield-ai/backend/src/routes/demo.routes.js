@@ -1,6 +1,7 @@
 const { Router } = require("express");
 const Joi = require("joi");
 const SessionStoreService = require("../services/demoStore.service");
+const { runDemoFlowSimulation } = require("../services/demoFlow.service");
 const { authenticate } = require("../middleware/auth");
 const { validate } = require("../middleware/validate");
 const { sendError, sendSuccess } = require("../utils/apiResponse");
@@ -66,6 +67,13 @@ const triggerClaimSchema = Joi.object({
   mode: Joi.string().valid("auto", "fraud_drill").optional(),
 });
 
+const runSimulationSchema = Joi.object({
+  rain: Joi.number().min(0).max(300).required(),
+  aqi: Joi.number().min(0).max(500).required(),
+  demand: Joi.number().min(0).max(100).required(),
+  time: Joi.string().trim().optional(),
+});
+
 router.post("/auth/login", validate(loginSchema), (req, res, next) => {
   try {
     const result = SessionStoreService.requestOtp(req.body.phone);
@@ -93,6 +101,15 @@ router.post("/auth/register", validate(registerSchema), async (req, res, next) =
   try {
     const result = await SessionStoreService.register(req.body);
     return sendSuccess(res, result, "Worker registered successfully.", 201);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post("/demo/simulate", validate(runSimulationSchema), async (req, res, next) => {
+  try {
+    const result = await runDemoFlowSimulation(req.body);
+    return sendSuccess(res, result, "Simulation completed successfully.");
   } catch (error) {
     return next(error);
   }

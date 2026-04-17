@@ -32,5 +32,7 @@ const manualSchema = Joi.object({
 
 router.post("/evaluate", authenticate, validate(evaluateSchema), TriggerController.evaluate);
 router.post("/manual", authenticate, authorize("super_admin"), validate(manualSchema), TriggerController.manualTrigger);
+// Keep list endpoint public for the dashboard live feed; write operations stay protected.
+router.get("/", TriggerController.listActive);
 
 module.exports = router;

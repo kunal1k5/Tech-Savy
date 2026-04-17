@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -53,9 +53,12 @@
 
   body {
     @apply min-h-screen bg-slate-50 text-slate-900 antialiased;
-    font-family: "Inter", sans-serif;
+    font-family: "Manrope", sans-serif;
     background-color: var(--app-bg);
-    background-image: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    background-image:
+      radial-gradient(circle at 8% -2%, rgba(56, 189, 248, 0.1), transparent 28%),
+      radial-gradient(circle at 88% -8%, rgba(52, 211, 153, 0.08), transparent 30%),
+      linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
     background-attachment: fixed;
   }
 
@@ -68,7 +71,7 @@
   h3,
   h4,
   .font-display {
-    font-family: "Poppins", sans-serif;
+    font-family: "Sora", sans-serif;
   }
 
   button,
@@ -240,6 +243,36 @@
     animation: dangerPulse 1.8s ease-in-out infinite;
   }
 
+  .status-glow-safe {
+    animation: statusSafePulse 1.9s ease-in-out infinite;
+  }
+
+  .status-glow-warning {
+    animation: statusWarningPulse 1.8s ease-in-out infinite;
+  }
+
+  .status-glow-danger {
+    animation: statusDangerPulse 1.6s ease-in-out infinite;
+  }
+
+  .button-ripple {
+    position: absolute;
+    border-radius: 9999px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.02) 72%);
+    transform: scale(0);
+    animation: buttonRipple 560ms ease-out forwards;
+    pointer-events: none;
+  }
+
+  .pipeline-flow-dot {
+    animation: flowDotTravel 2.4s linear infinite;
+  }
+
+  .pipeline-link-wave {
+    background-size: 220% 100%;
+    animation: flowLinkWave 1.9s linear infinite;
+  }
+
   .scan-ring {
     animation: scanRing 1.8s ease-out infinite;
   }
@@ -280,5 +313,80 @@
   100% {
     opacity: 0;
     transform: scale(1.25);
+  }
+}
+
+@keyframes buttonRipple {
+  0% {
+    opacity: 0.45;
+    transform: scale(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(2.7);
+  }
+}
+
+@keyframes statusSafePulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.12);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0.03);
+  }
+}
+
+@keyframes statusWarningPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.14);
+  }
+
+  50% {
+    box-shadow: 0 0 0 8px rgba(245, 158, 11, 0.03);
+  }
+}
+
+@keyframes statusDangerPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.14);
+  }
+
+  50% {
+    box-shadow: 0 0 0 10px rgba(244, 63, 94, 0.03);
+  }
+}
+
+@keyframes flowDotTravel {
+  0% {
+    transform: translateX(-4px);
+    opacity: 0.3;
+  }
+
+  20% {
+    opacity: 0.9;
+  }
+
+  80% {
+    opacity: 0.9;
+  }
+
+  100% {
+    transform: translateX(calc(100% + 4px));
+    opacity: 0.35;
+  }
+}
+
+@keyframes flowLinkWave {
+  0% {
+    background-position: 0% 0;
+  }
+
+  100% {
+    background-position: 220% 0;
   }
 }

@@ -10,6 +10,7 @@ export default function DocumentUploadCard({
   accept,
   icon: Icon = FileText,
   status,
+  statusLabel,
   fileName,
   previewUrl,
   onUpload,
@@ -44,7 +45,7 @@ export default function DocumentUploadCard({
           </div>
         </div>
 
-        <StatusBadge status={status} />
+        <StatusBadge status={status === "not_uploaded" ? "pending" : status} label={statusLabel} />
       </div>
 
       <div className="mt-5 rounded-2xl bg-slate-50 p-4">
@@ -67,10 +68,10 @@ export default function DocumentUploadCard({
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-slate-900">
-                {fileName || "No file uploaded"}
+                {fileName || "Upload clear image for faster approval"}
               </p>
               <p className="text-sm text-slate-500">
-                {fileName ? "Document received" : "Upload a clear file"}
+                {fileName ? "AI validation is updating in real time" : "Upload clear image for faster approval"}
               </p>
             </div>
           </div>

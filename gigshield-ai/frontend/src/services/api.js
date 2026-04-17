@@ -97,6 +97,13 @@ export const DEFAULT_AI_DECISION_INPUT = {
   contextValid: true,
 };
 
+export const DEFAULT_DEMO_SIMULATION_INPUT = {
+  rain: 120,
+  aqi: 100,
+  demand: 50,
+  time: "afternoon",
+};
+
 export const DEFAULT_LOCATION_PAYLOAD = {
   current_location: "Zone-A",
   actual_location: "Zone-Z",
@@ -296,6 +303,16 @@ export async function uploadClaimProof({
 
 export async function reverifyClaim(payload) {
   const response = await apiPost("/reverify-claim", payload);
+  return unwrapAxiosResponse(response);
+}
+
+export async function getActiveTriggers() {
+  const response = await apiGet("/triggers");
+  return unwrapAxiosResponse(response);
+}
+
+export async function runDemoSimulation(payload = DEFAULT_DEMO_SIMULATION_INPUT) {
+  const response = await apiPost("/demo/simulate", payload);
   return unwrapAxiosResponse(response);
 }
 

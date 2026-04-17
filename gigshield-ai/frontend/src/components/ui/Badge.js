@@ -20,11 +20,22 @@ const SIZES = {
 };
 
 export function badgeStyles({ tone = "default", size = "md", pulse = false } = {}) {
+  const pulseClassName =
+    pulse && tone === "danger"
+      ? "status-glow-danger"
+      : pulse && tone === "warning"
+        ? "status-glow-warning"
+        : pulse && (tone === "success" || tone === "info" || tone === "violet")
+          ? "status-glow-safe"
+          : pulse
+            ? "risk-pulse"
+            : "";
+
   return cn(
     "inline-flex items-center gap-2 rounded-full border font-semibold uppercase tracking-[0.22em] backdrop-blur-xl transition-colors",
     TONES[tone] || TONES.default,
     SIZES[size] || SIZES.md,
-    pulse && "risk-pulse"
+    pulseClassName
   );
 }
 

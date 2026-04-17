@@ -6,6 +6,15 @@ const TriggerService = require("../services/trigger.service");
 const { sendSuccess } = require("../utils/apiResponse");
 
 const TriggerController = {
+  async listActive(req, res, next) {
+    try {
+      const result = TriggerService.getTriggeredPolicies();
+      return sendSuccess(res, result, "Triggered policies fetched.");
+    } catch (err) {
+      next(err);
+    }
+  },
+
   /**
    * POST /api/triggers/evaluate
    * Accepts zone weather data, evaluates thresholds, and fires triggers.

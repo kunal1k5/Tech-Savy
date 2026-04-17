@@ -32,22 +32,25 @@ function getIcon(claim) {
 }
 
 function getStatus(claim) {
-  if (claim.status === "paid") {
-    return { status: "paid", label: "Paid" };
+  const normalizedStatus = String(claim.status || "pending").trim().toLowerCase();
+
+  if (normalizedStatus === "paid") {
+    return { status: "paid", label: "Payout Completed" };
   }
 
-  if (claim.status === "approved") {
-    return { status: "approved", label: "Approved" };
+  if (normalizedStatus === "approved") {
+    return { status: "approved", label: "Approved by AI" };
   }
 
-  return { status: "pending", label: "Pending" };
+  return { status: "pending", label: "Under AI Review" };
 }
 
 export default function ClaimCard({ claim }) {
   const Icon = getIcon(claim);
   const status = getStatus(claim);
-  const isPaid = claim.status === "paid";
-  const isPending = claim.status === "pending";
+  const normalizedStatus = String(claim.status || "pending").trim().toLowerCase();
+  const isPaid = normalizedStatus === "paid";
+  const isPending = normalizedStatus === "pending" || normalizedStatus === "manual_review";
 
   return (
     <motion.article
@@ -119,7 +122,7 @@ export default function ClaimCard({ claim }) {
       </div>
 
       <div className="mt-6">
-        <ProgressBar status={claim.status} />
+        <ProgressBar status={normalizedStatus} />
       </div>
     </motion.article>
   );

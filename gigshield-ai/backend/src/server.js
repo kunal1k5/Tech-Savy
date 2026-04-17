@@ -23,8 +23,18 @@ const app = require("./app");
 const { pool, testConnection } = require("./database/connection");
 const { closeMongo, connectMongo } = require("./database/mongo");
 const logger = require("./utils/logger");
+const TriggerService = require("./services/trigger.service");
 
 const PORT = process.env.PORT || 5000;
+
+function clampMonitoringInterval(intervalMs) {
+  const numericInterval = Number(intervalMs);
+  if (!Number.isFinite(numericInterval)) {
+    return 20000;
+  }
+
+  return Math.max(15000, Math.min(numericInterval, 30000));
+}
 
 async function startServer() {
   // Start even when PostgreSQL is unavailable so the API can run with in-memory fallbacks.
@@ -45,12 +55,19 @@ async function startServer() {
   app.listen(PORT, () => {
     logger.info(`GigShield AI backend running on port ${PORT}`);
     logger.info(`   Environment: ${process.env.NODE_ENV || "development"}`);
+
+    const monitorIntervalMs = clampMonitoringInterval(
+      process.env.TRIGGER_MONITOR_INTERVAL_MS || 20000
+    );
+    TriggerService.startAutoMonitoringLoop({ intervalMs: monitorIntervalMs });
+    logger.info(`Trigger monitoring loop started (${monitorIntervalMs} ms interval).`);
   });
 }
 
 // Graceful shutdown
 process.on("SIGTERM", async () => {
   logger.info("SIGTERM received. Shutting down gracefully.");
+  TriggerService.stopAutoMonitoringLoop();
   try { await pool.end(); } catch (_) { /* pool may not be connected */ }
   try { await closeMongo(); } catch (_) { /* mongo may not be connected */ }
   process.exit(0);

@@ -6,21 +6,30 @@ import {
   BadgeCheck,
   CheckCircle2,
   CloudRain,
+  MapPin,
   ShieldAlert,
   ShieldCheck,
+  Wind,
   Wallet,
+  Zap,
 } from "lucide-react";
+import AnimatedPipeline from "../components/ui/AnimatedPipeline";
+import InfoTooltip from "../components/ui/InfoTooltip";
 import SurfaceButton from "../components/ui/SurfaceButton";
+import SystemStatusBar from "../components/ui/SystemStatusBar";
 import { useGigPredictAIData } from "../context/GigPredictAIDataContext";
 import useLiveBackendData from "../hooks/useLiveBackendData";
 import {
+  DEFAULT_DEMO_SIMULATION_INPUT,
   DEFAULT_RISK_PREMIUM_INPUT,
   extractApiErrorMessage,
+  getActiveTriggers,
   getAiDecision,
   getAutoClaim,
   getFraudStatus,
   getRiskPremium,
   reverifyClaim,
+  runDemoSimulation,
   startDispute,
   uploadProof,
 } from "../services/api";
@@ -109,6 +118,15 @@ const HEAVY_RAIN_SIMULATION_SCENARIO = createMonitoringScenarioFromForm(
 const HIGH_FRAUD_SIMULATION_SCENARIO = createMonitoringScenarioFromForm(
   SIMULATION_PRESETS.HIGH_FRAUD
 );
+const DEFAULT_PIPELINE_SIMULATION_FORM = Object.freeze({
+  ...DEFAULT_DEMO_SIMULATION_INPUT,
+});
+const PIPELINE_TIME_OPTIONS = Object.freeze([
+  { label: "Morning", value: "morning" },
+  { label: "Afternoon", value: "afternoon" },
+  { label: "Evening", value: "evening" },
+  { label: "Night", value: "night" },
+]);
 
 const AUTO_CLAIM_STEPS = ["CREATED", "PROCESSING", "PAID"];
 const DEFAULT_HOURLY_RATE = 150;
@@ -117,38 +135,31 @@ const AI_LIFECYCLE_STEPS = [
   {
     key: "detect",
     label: "Detect",
-    note: "Signals are monitored across risk, behavior, and location.",
+    note: "Real-time trigger monitoring watches weather, AQI, and activity signals.",
   },
   {
     key: "decide",
     label: "Decide",
-    note: "The decision engine classifies the claim and chooses the next action.",
+    note: "AI fraud decision classifies claim risk and selects the next action.",
   },
   {
     key: "validate",
     label: "Validate",
-    note: "Users can challenge the result with disputes and proof uploads.",
+    note: "Auto claim validation checks proof, behavior, and location context.",
   },
   {
     key: "correct",
     label: "Correct",
-    note: "AI re-verification refines the final outcome and claim state.",
+    note: "AI re-verification finalizes payout and claim state in real time.",
   },
 ];
-const LIVE_SYSTEM_SIGNALS = [
-  {
-    label: "Monitoring Active",
-    dotClassName: "bg-blue-500",
-  },
-  {
-    label: "Decision Engine Running",
-    dotClassName: "bg-emerald-500",
-  },
-  {
-    label: "Fraud Detection Active",
-    dotClassName: "bg-amber-500",
-  },
-];
+const LIVE_SIGNAL_DEFAULTS = Object.freeze({
+  rain: 18,
+  aqi: 140,
+  location: "Mathura",
+  rainThreshold: 40,
+  aqiThreshold: 150,
+});
 
 function formatClaimTime(date = new Date()) {
   const hours = String(date.getHours()).padStart(2, "0");
@@ -163,6 +174,49 @@ function formatSignalLabel(value) {
   }
 
   return `${normalized.charAt(0)}${normalized.slice(1).toLowerCase()}`;
+}
+
+function getRiskConditionLabel(value) {
+  const normalized = String(value || "").trim().toUpperCase();
+  if (normalized === "HIGH") {
+    return "High Alert";
+  }
+
+  if (normalized === "MEDIUM") {
+    return "Watch Conditions";
+  }
+
+  return "Safe Conditions";
+}
+
+function getFraudRiskLevel(status) {
+  const normalized = String(status || "SAFE").trim().toUpperCase();
+  if (normalized === "FRAUD") {
+    return "HIGH";
+  }
+
+  if (normalized === "WARNING") {
+    return "MEDIUM";
+  }
+
+  return "LOW";
+}
+
+function getDecisionConfidence(score) {
+  const numericScore = Number(score);
+  if (!Number.isFinite(numericScore)) {
+    return "HIGH";
+  }
+
+  if (numericScore > 65) {
+    return "LOW";
+  }
+
+  if (numericScore > 30) {
+    return "MEDIUM";
+  }
+
+  return "HIGH";
 }
 
 function getDefaultHourlyRate(weeklyIncome) {
@@ -479,10 +533,10 @@ function DashboardCard({ children, className, hover = true }) {
   return (
     <motion.section
       variants={itemVariants}
-      whileHover={hover ? { y: -2, scale: 1.01 } : undefined}
+      whileHover={hover ? { y: -4, scale: 1.015 } : undefined}
       transition={{ type: "spring", stiffness: 320, damping: 26 }}
       className={cn(
-        "rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)] transition-[border-color,box-shadow,transform] duration-200 hover:border-slate-300 hover:shadow-[0_24px_48px_rgba(15,23,42,0.08)]",
+        "rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_4%_0%,rgba(56,189,248,0.08),transparent_28%),linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-6 shadow-[0_18px_42px_rgba(15,23,42,0.07)] transition-[border-color,box-shadow,transform] duration-300 hover:border-slate-300 hover:shadow-[0_28px_52px_rgba(15,23,42,0.1)]",
         className
       )}
     >
@@ -508,6 +562,7 @@ function StatusPill({ label, className, dotClassName = "" }) {
 function MetricCard({
   icon: Icon,
   label,
+  labelTooltip,
   value,
   supporting,
   loading = false,
@@ -523,7 +578,10 @@ function MetricCard({
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-200 to-transparent" />
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-slate-500">{label}</p>
+          <p className="inline-flex items-center gap-2 text-sm font-medium text-slate-500">
+            <span>{label}</span>
+            {labelTooltip ? <InfoTooltip label={`${label} info`} text={labelTooltip} /> : null}
+          </p>
           {loading ? (
             <>
               <SurfaceSkeleton className="mt-4 h-9 w-28" />
@@ -673,6 +731,15 @@ export default function Dashboard() {
   const [reverificationError, setReverificationError] = useState("");
   const [reverificationLoading, setReverificationLoading] = useState(false);
   const [claimHoursLost, setClaimHoursLost] = useState(DEFAULT_AUTOMATION_SCENARIO.hoursLost);
+  const [triggerFeed, setTriggerFeed] = useState({ triggers: [], signals: null, evaluatedAt: null });
+  const [triggerLoading, setTriggerLoading] = useState(true);
+  const [triggerError, setTriggerError] = useState("");
+  const [pipelineSimulationForm, setPipelineSimulationForm] = useState({
+    ...DEFAULT_PIPELINE_SIMULATION_FORM,
+  });
+  const [pipelineSimulationResult, setPipelineSimulationResult] = useState(null);
+  const [pipelineSimulationLoading, setPipelineSimulationLoading] = useState(false);
+  const [pipelineSimulationError, setPipelineSimulationError] = useState("");
   const mountedRef = useRef(true);
   const requestIdRef = useRef(0);
   const {
@@ -791,6 +858,39 @@ export default function Dashboard() {
     }
   }
 
+  async function loadTriggerFeed({ silent = false } = {}) {
+    if (!silent) {
+      setTriggerLoading(true);
+    }
+
+    try {
+      const data = await getActiveTriggers();
+
+      if (!mountedRef.current) {
+        return;
+      }
+
+      setTriggerFeed({
+        triggers: Array.isArray(data?.triggers) ? data.triggers : [],
+        signals: data?.signals || null,
+        evaluatedAt: data?.evaluatedAt || null,
+      });
+      setTriggerError("");
+    } catch (error) {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      setTriggerError(extractApiErrorMessage(error, "Unable to fetch trigger feed."));
+    } finally {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      setTriggerLoading(false);
+    }
+  }
+
   function updateSimulationField(field, value, limits = {}) {
     setSimulationForm((current) => ({
       ...current,
@@ -799,6 +899,56 @@ export default function Dashboard() {
           ? value
           : clampNumber(value, limits.min ?? 0, limits.max ?? 500),
     }));
+  }
+
+  function updatePipelineSimulationField(field, value, limits = {}) {
+    setPipelineSimulationForm((current) => ({
+      ...current,
+      [field]:
+        typeof value === "number"
+          ? value
+          : typeof value === "string" && field === "time"
+            ? value
+            : clampNumber(value, limits.min ?? 0, limits.max ?? 500),
+    }));
+  }
+
+  async function runPipelineSimulation(formInput = pipelineSimulationForm) {
+    const payload = {
+      rain: clampNumber(formInput?.rain, 0, 300),
+      aqi: clampNumber(formInput?.aqi, 0, 500),
+      demand: clampNumber(formInput?.demand, 0, 100),
+      time: String(formInput?.time || "morning"),
+    };
+
+    setPipelineSimulationLoading(true);
+    setPipelineSimulationError("");
+
+    try {
+      const result = await runDemoSimulation(payload);
+
+      if (!mountedRef.current) {
+        return;
+      }
+
+      setPipelineSimulationResult(result);
+      setPipelineSimulationForm(payload);
+    } catch (error) {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      setPipelineSimulationResult(null);
+      setPipelineSimulationError(
+        extractApiErrorMessage(error, "Unable to run full simulation right now.")
+      );
+    } finally {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      setPipelineSimulationLoading(false);
+    }
   }
 
   async function applySimulationPreset(presetKey) {
@@ -825,6 +975,10 @@ export default function Dashboard() {
       createMonitoringScenarioFromForm(simulationForm),
       "manual"
     );
+  }
+
+  async function handleRunPipelineSimulation() {
+    await runPipelineSimulation(pipelineSimulationForm);
   }
 
   async function handleStartDispute() {
@@ -1018,9 +1172,16 @@ export default function Dashboard() {
   useEffect(() => {
     mountedRef.current = true;
     loadMonitoringScenario(DEFAULT_AUTOMATION_SCENARIO, "load");
+    loadTriggerFeed();
+    runPipelineSimulation(DEFAULT_PIPELINE_SIMULATION_FORM);
+
+    const triggerInterval = setInterval(() => {
+      loadTriggerFeed({ silent: true });
+    }, 12000);
 
     return () => {
       mountedRef.current = false;
+      clearInterval(triggerInterval);
     };
   }, []);
 
@@ -1084,16 +1245,84 @@ export default function Dashboard() {
   const fraudPanelError = fraudError || aiDecisionError || (!fraudSnapshot ? liveBackendError : "");
   const systemBusy = riskLoading || claimLoading || fraudLoading || aiDecisionLoading;
   const showSuccessState = claimTriggered && claimStatus === "PAID";
-  const statusBannerLabel = systemBusy || liveBackendRefreshing ? "Processing..." : "Decision updated";
-  const statusBannerCopy =
-    systemBusy || liveBackendRefreshing
-      ? "Live signals are syncing across the system."
-      : "Monitoring remains active across decisions and fraud checks.";
-  const claimStatusLabel = formatSignalLabel(claimStatus || (claimTriggered ? "PAID" : "NOT TRIGGERED"));
+  const claimStatusLabel = formatSignalLabel(claimStatus || (claimTriggered ? "PAID" : "NOT GENERATED"));
+  const claimStatusDisplay = claimTriggered
+    ? "Claim Status: AUTO GENERATED"
+    : "Claim Status: NOT GENERATED";
+  const claimReasonText =
+    claimData?.reason ||
+    claimData?.message ||
+    "Auto-triggered based on real conditions";
   const fraudStatusLabel = formatSignalLabel(fraudState.label);
+  const fraudRiskLevel = getFraudRiskLevel(fraudState.label);
+  const decisionConfidence = getDecisionConfidence(fraudScore);
   const trustScoreSnapshot = aiDecisionData || fraudSnapshot;
   const simulationPanelError = riskError || claimError || fraudPanelError;
   const decisionLabel = formatSignalLabel(smartDecisionState.label);
+  const activeTriggers = triggerFeed.triggers;
+  const liveRainValue = Number(triggerFeed.signals?.rain ?? triggerFeed.signals?.rainfall ?? 0);
+  const liveAqiValue = Number(triggerFeed.signals?.aqi ?? 0);
+  const liveTriggerStatus =
+    triggerFeed.signals?.triggerStatus || (activeTriggers.length ? "TRIGGERED" : "IDLE");
+  const hasLiveSignals = Boolean(triggerFeed.signals);
+  const liveRainSignal = hasLiveSignals ? liveRainValue : LIVE_SIGNAL_DEFAULTS.rain;
+  const liveAqiSignal = hasLiveSignals ? liveAqiValue : LIVE_SIGNAL_DEFAULTS.aqi;
+  const liveLocationSignal =
+    triggerFeed.signals?.location?.city ||
+    LIVE_SIGNAL_DEFAULTS.location;
+  const liveSystemStatus = systemBusy || liveBackendRefreshing ? "Monitoring..." : "Monitoring Active";
+  const livePipelineTriggerStatus = activeTriggers.length || liveTriggerStatus === "TRIGGERED" ? "ACTIVE" : "IDLE";
+  const livePipelineClaimStatus = claimTriggered ? "GENERATED" : "NONE";
+  const livePipelineDecisionStatus =
+    smartDecisionState.label === "SAFE"
+      ? "APPROVED"
+      : smartDecisionState.label === "VERIFY"
+        ? "REVIEW"
+        : smartDecisionState.label === "FRAUD"
+          ? "REJECTED"
+          : "PENDING";
+  const formattedLiveRain = Number.isFinite(liveRainSignal)
+    ? String(Number(liveRainSignal.toFixed(1)))
+    : String(LIVE_SIGNAL_DEFAULTS.rain);
+  const formattedLiveAqi = Number.isFinite(liveAqiSignal)
+    ? String(Math.round(liveAqiSignal))
+    : String(LIVE_SIGNAL_DEFAULTS.aqi);
+  const riskLevelDisplay = `Risk Level: ${automatedRisk.toUpperCase()} (${getRiskConditionLabel(
+    automatedRisk
+  )})`;
+  const riskSignalSummary = `Rain value: ${formattedLiveRain} mm | AQI value: ${formattedLiveAqi}`;
+  const pipelineTriggerActive = Boolean(pipelineSimulationResult?.trigger);
+  const pipelineClaimGenerated = Boolean(pipelineSimulationResult?.claimGenerated);
+  const pipelineFraudScore = Number(pipelineSimulationResult?.fraudScore ?? 0);
+  const pipelinePayout = Number(pipelineSimulationResult?.payout ?? 0);
+  const pipelineDecision = String(pipelineSimulationResult?.decision || "Pending");
+  const pipelineRiskLevel = formatSignalLabel(pipelineSimulationResult?.riskLevel || "low");
+  const pipelineExplanation =
+    pipelineSimulationResult?.explanation ||
+    "Run Simulation to see why trigger, claim, and fraud decisions happened.";
+  const pipelineTriggerClassName = pipelineTriggerActive
+    ? "bg-emerald-50 text-emerald-700"
+    : "bg-slate-100 text-slate-700";
+  const pipelineClaimClassName = pipelineClaimGenerated
+    ? "bg-emerald-50 text-emerald-700"
+    : "bg-slate-100 text-slate-700";
+  const pipelineDecisionClassName =
+    pipelineDecision.toLowerCase() === "approved"
+      ? "bg-emerald-50 text-emerald-700"
+      : pipelineDecision.toLowerCase() === "rejected"
+        ? "bg-red-50 text-red-700"
+        : "bg-amber-50 text-amber-700";
+  const pipelineFlowSteps = [
+    { key: "trigger", label: "Trigger", active: pipelineTriggerActive },
+    { key: "claim", label: "Claim", active: pipelineClaimGenerated },
+    { key: "fraud", label: "Fraud", active: Boolean(pipelineSimulationResult) },
+    {
+      key: "decision",
+      label: "Decision",
+      active: pipelineDecision.toLowerCase() !== "pending",
+    },
+    { key: "payout", label: "Payout", active: pipelinePayout > 0 },
+  ];
 
   return (
     <motion.div
@@ -1102,6 +1331,76 @@ export default function Dashboard() {
       initial="hidden"
       animate="show"
     >
+      <motion.section variants={itemVariants}>
+        <SystemStatusBar
+          monitoringLabel={liveSystemStatus}
+          engineLabel="Decision Engine Running"
+          fraudLabel={fraudState.tone === "danger" ? "Fraud Alert Active" : "Fraud Detection Active"}
+          engineBusy={systemBusy || liveBackendRefreshing}
+          fraudHighRisk={fraudState.tone === "danger" || Number(fraudScore) > 60}
+        />
+      </motion.section>
+
+      <motion.section
+        variants={itemVariants}
+        className="mb-5 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)] md:px-6"
+      >
+        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
+          Live System Signals
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+              <CloudRain size={16} className="text-blue-600" />
+              Rain
+            </div>
+            <div className="mt-1 text-lg font-semibold text-slate-900">
+              <CountUp
+                end={Number(formattedLiveRain)}
+                duration={0.9}
+                decimals={formattedLiveRain.includes(".") ? 1 : 0}
+                formattingFn={(value) => `${value}mm`}
+                preserveValue
+              />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+              <Wind size={16} className="text-blue-600" />
+              AQI
+            </div>
+            <div className="mt-1 text-lg font-semibold text-slate-900">
+              <CountUp
+                end={Number(formattedLiveAqi)}
+                duration={0.9}
+                formattingFn={(value) => `${Math.round(value)}`}
+                preserveValue
+              />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+              <MapPin size={16} className="text-blue-600" />
+              Location
+            </div>
+            <div className="mt-1 text-lg font-semibold text-slate-900">{liveLocationSignal}</div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+              <Zap size={16} className="text-blue-600" />
+              Status
+            </div>
+            <div className="mt-1 inline-flex items-center gap-2 text-lg font-semibold text-emerald-700">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              {liveSystemStatus}
+            </div>
+          </div>
+        </div>
+      </motion.section>
+
       <motion.header
         variants={itemVariants}
         className="rounded-[28px] border border-slate-200 bg-white px-6 py-6 shadow-[0_18px_40px_rgba(15,23,42,0.06)]"
@@ -1112,33 +1411,40 @@ export default function Dashboard() {
               Real-Time Monitoring
             </p>
             <h2 className="text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
-              GigPredict AI Command Center
+              AI Insurance Intelligence Control Room
             </h2>
             <p className="text-sm leading-6 text-slate-500 md:text-base">
-              We are not an insurance platform - we are an AI Decision Intelligence System and real-time protection system for gig workers.
+              Every signal is interpreted in milliseconds to keep claims accurate, fair, and fast.
+            </p>
+            <p className="text-sm leading-6 text-slate-500 md:text-base">
+              Weather, fraud, and claim events are connected in one adaptive decision stream.
             </p>
           </div>
 
           <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-left shadow-sm">
             <div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">
-              Live Status
+              Live Pipeline Output
             </div>
-            <div className="mt-2 text-sm font-semibold text-slate-900">
-              {statusBannerLabel}
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {LIVE_SYSTEM_SIGNALS.map((signal) => (
-                <span
-                  key={signal.label}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm"
-                >
-                  <span className={cn("h-2 w-2 rounded-full animate-pulse", signal.dotClassName)} />
-                  {signal.label}
-                </span>
-              ))}
+            <div className="mt-3 grid gap-2">
+              <DetailRow label="Trigger" value={livePipelineTriggerStatus} className={livePipelineTriggerStatus === "ACTIVE" ? "text-emerald-700" : "text-slate-700"} />
+              <DetailRow label="Claim" value={livePipelineClaimStatus} className={livePipelineClaimStatus === "GENERATED" ? "text-emerald-700" : "text-slate-700"} />
+              <DetailRow
+                label={(
+                  <span className="inline-flex items-center gap-2">
+                    <span>Fraud Score</span>
+                    <InfoTooltip
+                      label="Fraud score explanation"
+                      text="Fraud score combines behavior, location, and claim context. Higher values indicate stronger fraud risk and stricter review."
+                    />
+                  </span>
+                )}
+                value={Number(fraudScore).toFixed(2)}
+                className={Number(fraudScore) > 30 ? "text-amber-700" : "text-emerald-700"}
+              />
+              <DetailRow label="Decision" value={livePipelineDecisionStatus} className={livePipelineDecisionStatus === "APPROVED" ? "text-emerald-700" : livePipelineDecisionStatus === "REJECTED" ? "text-red-700" : "text-amber-700"} />
             </div>
             <div className="mt-3 text-xs text-slate-500">
-              {statusBannerCopy}
+              Auto-triggered from real-time risk conditions
             </div>
           </div>
         </div>
@@ -1150,14 +1456,12 @@ export default function Dashboard() {
           label="Risk Engine"
           loading={riskLoading && !riskData}
           value={
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 text-lg md:text-2xl">
               <span className={cn("h-3 w-3 rounded-full", riskStyle.dot, automatedRisk === "High" && "risk-pulse")} />
-              <span className={riskStyle.accent}>{automatedRisk}</span>
+              <span className={riskStyle.accent}>{riskLevelDisplay}</span>
             </div>
           }
-          supporting={
-            riskData?.reason || "Real-time monitoring keeps risk signals fresh."
-          }
+          supporting={riskSignalSummary}
           iconClassName="bg-blue-50 text-blue-600"
           valueClassName={riskStyle.accent}
           pulse={automatedRisk === "High"}
@@ -1184,22 +1488,24 @@ export default function Dashboard() {
           icon={CheckCircle2}
           label="Claim Status"
           loading={claimLoading && !claimData}
-          value={claimStatusLabel}
-          supporting={
-            claimData?.reason ||
-            claimData?.message ||
-            "Claims trigger only when high risk, active work, income loss, and more than 30 minutes of duration are confirmed."
-          }
+          value={claimStatusDisplay}
+          supporting={claimReasonText}
           iconClassName="bg-emerald-50 text-emerald-600"
           valueClassName={claimTriggered ? "text-emerald-700" : "text-slate-900"}
         />
 
         <MetricCard
           icon={ShieldAlert}
-          label="Fraud Intelligence"
+          label="AI Fraud Decision"
+          labelTooltip="Fraud score evaluates behavior integrity, location consistency, and claim context confidence."
           loading={fraudLoading && !fraudSnapshot}
-          value={fraudStatusLabel}
-          supporting={fraudSnapshot?.reason || `Fraud score: ${fraudScore}`}
+          value={
+            <span className="inline-flex items-center gap-2">
+              <span>Fraud Score:</span>
+              <CountUp end={Number(fraudScore)} decimals={2} duration={0.95} preserveValue />
+            </span>
+          }
+          supporting={`Risk Level: ${fraudRiskLevel} | Decision Confidence: ${decisionConfidence}`}
           iconClassName="bg-slate-100 text-slate-700"
           valueClassName={
             fraudState.tone === "danger"
@@ -1214,12 +1520,298 @@ export default function Dashboard() {
           icon={ShieldCheck}
           label="Trust Score"
           loading={fraudLoading && !trustScoreSnapshot}
-          value={`${trustScore}%`}
-          supporting={`User Trust Score: ${trustScore}%`}
+          value={<CountUp end={Number(trustScore)} duration={0.9} suffix="%" preserveValue />}
+          supporting="Based on behavior, location, and activity signals"
           iconClassName="bg-emerald-50 text-emerald-600"
           valueClassName={trustScore >= 80 ? "text-emerald-700" : trustScore >= 50 ? "text-amber-700" : "text-red-700"}
         />
       </section>
+
+      <DashboardCard>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-500">Trigger Monitoring</p>
+              <h3 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+                Live trigger feed
+              </h3>
+            </div>
+            <StatusPill
+              label={triggerLoading ? "Refreshing" : "Live"}
+              className={triggerLoading ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}
+              dotClassName={triggerLoading ? "bg-blue-500" : "bg-emerald-500"}
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <SimulationResultCard
+              label="Rain"
+              value={`${formattedLiveRain} mm`}
+              supporting={`Current vs Threshold: ${formattedLiveRain}mm / ${LIVE_SIGNAL_DEFAULTS.rainThreshold}mm`}
+            />
+            <SimulationResultCard
+              label="AQI"
+              value={formattedLiveAqi}
+              supporting={`Current vs Threshold: ${formattedLiveAqi} / ${LIVE_SIGNAL_DEFAULTS.aqiThreshold}`}
+            />
+            <SimulationResultCard
+              label="Trigger Status"
+              value={livePipelineTriggerStatus}
+              supporting={
+                activeTriggers.length
+                  ? `${activeTriggers.length} active policy trigger(s)`
+                  : "No active policy triggers"
+              }
+              toneClassName={activeTriggers.length ? "text-red-700" : "text-emerald-700"}
+            />
+          </div>
+
+          {triggerError ? (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {triggerError}
+            </div>
+          ) : null}
+
+          {!triggerLoading && !activeTriggers.length ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+              No claims yet - system is actively monitoring risk conditions
+            </div>
+          ) : null}
+
+          {activeTriggers.length ? (
+            <div className="grid gap-3">
+              {activeTriggers.map((trigger) => (
+                <div
+                  key={trigger.policyId}
+                  className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4"
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-red-800">{trigger.policyName}</p>
+                      <p className="mt-1 text-xs font-medium text-red-700">
+                        {trigger.triggerType} | Current vs Threshold: {trigger.actualValue} / {trigger.threshold}
+                      </p>
+                    </div>
+                    <span className="inline-flex w-fit items-center rounded-full border border-red-300 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-red-700">
+                      {trigger.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </DashboardCard>
+
+      <DashboardCard>
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-500">Simulation Mode</p>
+              <h3 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+                Full insurance pipeline simulator
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Test how the system behaves under real-world scenarios
+              </p>
+            </div>
+
+            <StatusPill
+              label={pipelineSimulationLoading ? "Running" : "Ready"}
+              className={pipelineSimulationLoading ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}
+              dotClassName={pipelineSimulationLoading ? "bg-blue-500" : "bg-emerald-500"}
+            />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-4">
+            <SimulationControlCard label="Rain" value={`${pipelineSimulationForm.rain}`} helper="0 - 300">
+              <input
+                type="range"
+                min="0"
+                max="300"
+                step="1"
+                value={pipelineSimulationForm.rain}
+                onChange={(event) =>
+                  updatePipelineSimulationField("rain", event.target.value, {
+                    min: 0,
+                    max: 300,
+                  })
+                }
+                className="h-2 w-full cursor-pointer accent-blue-600"
+              />
+            </SimulationControlCard>
+
+            <SimulationControlCard label="AQI" value={pipelineSimulationForm.aqi} helper="0 - 500">
+              <input
+                type="number"
+                min="0"
+                max="500"
+                value={pipelineSimulationForm.aqi}
+                onChange={(event) =>
+                  updatePipelineSimulationField("aqi", event.target.value, {
+                    min: 0,
+                    max: 500,
+                  })
+                }
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+              />
+            </SimulationControlCard>
+
+            <SimulationControlCard
+              label="Demand"
+              value={`${pipelineSimulationForm.demand}`}
+              helper="0 - 100"
+            >
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={pipelineSimulationForm.demand}
+                onChange={(event) =>
+                  updatePipelineSimulationField("demand", event.target.value, {
+                    min: 0,
+                    max: 100,
+                  })
+                }
+                className="h-2 w-full cursor-pointer accent-blue-600"
+              />
+            </SimulationControlCard>
+
+            <SimulationControlCard
+              label="Time"
+              value={formatSignalLabel(pipelineSimulationForm.time)}
+              helper="Time slot"
+            >
+              <select
+                value={pipelineSimulationForm.time}
+                onChange={(event) =>
+                  updatePipelineSimulationField("time", event.target.value)
+                }
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+              >
+                {PIPELINE_TIME_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </SimulationControlCard>
+          </div>
+
+          <div className="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+            <SurfaceButton
+              onClick={handleRunPipelineSimulation}
+              loading={pipelineSimulationLoading}
+              disabled={pipelineSimulationLoading}
+              leftIcon={BadgeCheck}
+              className="w-full bg-slate-900 text-white hover:bg-slate-800 lg:w-auto"
+            >
+              Run Simulation
+            </SurfaceButton>
+
+            <div className="flex flex-wrap gap-2">
+              <StatusPill
+                label={`Trigger: ${pipelineTriggerActive ? "Activated" : "Idle"}`}
+                className={pipelineTriggerClassName}
+                dotClassName={pipelineTriggerActive ? "bg-emerald-500" : "bg-slate-400"}
+              />
+              <StatusPill
+                label={`Claim: ${pipelineClaimGenerated ? "Generated" : "Not Generated"}`}
+                className={pipelineClaimClassName}
+                dotClassName={pipelineClaimGenerated ? "bg-emerald-500" : "bg-slate-400"}
+              />
+              <StatusPill
+                label={`Decision: ${pipelineDecision}`}
+                className={pipelineDecisionClassName}
+                dotClassName={
+                  pipelineDecision.toLowerCase() === "approved"
+                    ? "bg-emerald-500"
+                    : pipelineDecision.toLowerCase() === "rejected"
+                      ? "bg-red-500"
+                      : "bg-amber-500"
+                }
+              />
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+            <AnimatedPipeline
+              steps={pipelineFlowSteps}
+              activeIndex={pipelineFlowSteps.reduce(
+                (lastActiveIndex, step, index) => (step.active ? index : lastActiveIndex),
+                0
+              )}
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <SimulationResultCard
+              label="Trigger Status"
+              value={pipelineTriggerActive ? "Activated" : "Inactive"}
+              supporting="Checks rain, AQI, and demand thresholds."
+              toneClassName={pipelineTriggerActive ? "text-emerald-700" : "text-slate-900"}
+            />
+            <SimulationResultCard
+              label="Claim Generated"
+              value={pipelineClaimGenerated ? "Yes" : "No"}
+              supporting="Claim is generated only when trigger and payout conditions pass."
+              toneClassName={pipelineClaimGenerated ? "text-emerald-700" : "text-slate-900"}
+            />
+            <SimulationResultCard
+              label={
+                <span className="inline-flex items-center gap-2">
+                  <span>Fraud Score</span>
+                  <InfoTooltip
+                    label="Simulation fraud score"
+                    text="This simulated fraud score is generated from trigger strength, claim validity, and behavior consistency."
+                  />
+                </span>
+              }
+              value={pipelineFraudScore.toFixed(2)}
+              supporting={`Risk Level: ${pipelineRiskLevel}`}
+              toneClassName={
+                pipelineFraudScore > 60
+                  ? "text-red-700"
+                  : pipelineFraudScore > 30
+                    ? "text-amber-700"
+                    : "text-emerald-700"
+              }
+            />
+            <SimulationResultCard
+              label="Decision"
+              value={pipelineDecision}
+              supporting="AI fraud decision from live trigger and claim context."
+              toneClassName={
+                pipelineDecision.toLowerCase() === "approved"
+                  ? "text-emerald-700"
+                  : pipelineDecision.toLowerCase() === "rejected"
+                    ? "text-red-700"
+                    : "text-amber-700"
+              }
+            />
+            <SimulationResultCard
+              label="Final Payout"
+              value={formatINR(Math.round(pipelinePayout))}
+              supporting="Dynamic payout engine result."
+              toneClassName="text-slate-900"
+            />
+          </div>
+
+          <div className="rounded-2xl border border-blue-300 bg-blue-100 px-4 py-4 shadow-sm">
+            <p className="text-sm font-bold uppercase tracking-[0.14em] text-blue-800">
+              AI Decision Explanation
+            </p>
+            <p className="mt-2 text-sm leading-6 font-medium text-slate-800">{pipelineExplanation}</p>
+          </div>
+
+          {pipelineSimulationError ? (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {pipelineSimulationError}
+            </div>
+          ) : null}
+        </div>
+      </DashboardCard>
 
       <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <DashboardCard className="overflow-hidden">
@@ -1231,7 +1823,7 @@ export default function Dashboard() {
                   Test live decision scenarios
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Adjust risk and fraud signals, then run the system to update Risk Engine, premium, claim status, Fraud Intelligence, decision, and trust score in one pass.
+                  Adjust risk and fraud signals, then run the system to update real-time trigger status, auto claim outputs, AI fraud decisions, and trust score in one pass.
                 </p>
               </div>
 
@@ -1456,20 +2048,28 @@ export default function Dashboard() {
               />
               <SimulationResultCard
                 label="Claim Status"
-                value={claimStatusLabel}
+                value={claimStatusDisplay}
                 supporting={
                   claimData?.reason ||
                   claimData?.message ||
-                  "Claim automation checks high risk, active work, income loss, and duration above 30 minutes."
+                  "Auto claim checks high risk, active work, income loss, and duration above 30 minutes."
                 }
                 toneClassName={claimTriggered ? "text-emerald-700" : "text-slate-900"}
               />
               <SimulationResultCard
-                label="Fraud Score"
+                label={
+                  <span className="inline-flex items-center gap-2">
+                    <span>Fraud Score</span>
+                    <InfoTooltip
+                      label="Live fraud score"
+                      text="Live fraud score updates after every simulation run based on behavior, location, and claim evidence."
+                    />
+                  </span>
+                }
                 value={fraudScore}
                 supporting={
                   fraudSnapshot?.reason ||
-                  `Fraud Intelligence status: ${fraudStatusLabel}`
+                  `AI fraud decision status: ${fraudStatusLabel}`
                 }
                 toneClassName={
                   fraudState.tone === "danger"
@@ -1544,27 +2144,27 @@ export default function Dashboard() {
             <div className="flex h-full flex-col gap-5">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <p className="text-sm font-medium text-slate-500">Claim</p>
+                  <p className="text-sm font-medium text-slate-500">Claim Panel</p>
                   <h3 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
                     {claimLoading
                       ? "Processing..."
                       : showSuccessState
                         ? "Decision updated"
-                        : "Claim status"}
+                        : "Live claim output"}
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-slate-500">
                     {showSuccessState
                       ? "Result highlighted for quick review."
-                      : "Claim automation runs only when high risk, active work, income loss, and duration above 30 minutes are confirmed."}
+                      : "Claim Status, payout, and reason are shown from the auto claim engine."}
                   </p>
                 </div>
 
                 {claimLoading ? (
                   <StatusPill label="Processing..." className="bg-blue-50 text-blue-700" dotClassName="bg-blue-500" />
                 ) : claimStatus ? (
-                  <StatusPill label={claimStatus} className="bg-emerald-50 text-emerald-700" dotClassName="bg-emerald-500" />
+                  <StatusPill label={claimStatusDisplay} className="bg-emerald-50 text-emerald-700" dotClassName="bg-emerald-500" />
                 ) : (
-                  <StatusPill label="Not eligible" className="bg-slate-100 text-slate-700" dotClassName="bg-slate-400" />
+                  <StatusPill label={claimStatusDisplay} className="bg-slate-100 text-slate-700" dotClassName="bg-slate-400" />
                 )}
               </div>
 
@@ -1604,22 +2204,26 @@ export default function Dashboard() {
               ) : (
                 <div className="grid gap-3 sm:grid-cols-3">
                   <DetailRow
-                    label="Active Work"
-                    value={claimData?.eligibility?.activeWorkConfirmed ? "Confirmed" : "Not confirmed"}
-                    className={claimData?.eligibility?.activeWorkConfirmed ? "text-emerald-700" : "text-slate-900"}
-                  />
-                  <DetailRow
-                    label="Income Loss"
-                    value={claimData?.eligibility?.incomeLossDetected ? "Detected" : "Clear"}
-                    className={claimData?.eligibility?.incomeLossDetected ? "text-emerald-700" : "text-slate-900"}
-                  />
-                  <DetailRow
-                    label="Decision"
-                    value={claimTriggered ? "Triggered" : "On hold"}
+                    label="Claim Status"
+                    value={claimStatusDisplay}
                     className={claimTriggered ? "text-emerald-700" : "text-slate-900"}
+                  />
+                  <DetailRow
+                    label="Payout"
+                    value={formatINR(Math.round(claimPayout))}
+                    className={claimPayout > 0 ? "text-emerald-700" : "text-slate-900"}
+                  />
+                  <DetailRow
+                    label="Reason"
+                    value={claimReasonText}
+                    className="text-slate-900"
                   />
                 </div>
               )}
+
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+                Auto-triggered based on real conditions
+              </div>
 
               <div className="flex flex-wrap gap-3">
                 {AUTO_CLAIM_STEPS.map((step) => (
@@ -1650,10 +2254,10 @@ export default function Dashboard() {
           <div>
             <p className="text-sm font-medium text-slate-500">Fraud</p>
             <h3 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
-              Fraud Intelligence Engine
+              AI Fraud Decision System
             </h3>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              Behavior, location, and context are checked in real time.
+              Behavior, location, and context are checked for AI fraud decisions in real time.
             </p>
           </div>
 
@@ -1730,7 +2334,7 @@ export default function Dashboard() {
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                    Decision Engine
+                    AI Fraud Decision
                   </div>
                   <h4 className="mt-2 text-lg font-semibold tracking-tight text-slate-900">
                     {aiDecisionLoading && !aiDecisionData
@@ -1776,13 +2380,13 @@ export default function Dashboard() {
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div className="max-w-2xl">
                     <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-                      Self-Correcting AI System
+                        Auto Claim + AI Validation
                     </div>
                     <h5 className="mt-2 text-lg font-semibold tracking-tight text-slate-900">
-                      AI Decision Lifecycle
+                        Real-Time Trigger Lifecycle
                     </h5>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Our system not only detects problems, it validates and corrects decisions.
+                        Auto claim, real-time trigger monitoring, and AI fraud decisions run as one connected loop.
                     </p>
                   </div>
 
@@ -1806,7 +2410,7 @@ export default function Dashboard() {
                     Not satisfied with this decision?
                   </p>
                   <p className="mt-1 text-sm leading-6 text-slate-600">
-                    Start the Self-Correcting AI System flow by raising a dispute and uploading proof.
+                    Start the Auto Claim + AI Validation flow by raising a dispute and uploading proof.
                   </p>
 
                   <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">

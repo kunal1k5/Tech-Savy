@@ -76,7 +76,12 @@ export default function OtpInputGroup({
   }
 
   return (
-    <div className="flex justify-between gap-3 sm:gap-4">
+    <div
+      className="mx-auto grid w-full max-w-[460px] gap-2 sm:gap-3"
+      style={{
+        gridTemplateColumns: `repeat(${otpLength}, minmax(0, 1fr))`,
+      }}
+    >
       {value.map((digit, index) => (
         <input
           key={index}
@@ -93,8 +98,8 @@ export default function OtpInputGroup({
           onPaste={handlePaste}
           aria-label={`OTP digit ${index + 1}`}
           className={cn(
-            "h-16 w-16 rounded-2xl border border-slate-200 bg-white text-center text-2xl font-semibold text-slate-900 outline-none transition-all duration-200 focus:border-blue-300 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50",
-            "sm:h-[72px] sm:w-[72px]"
+            "h-14 w-full min-w-0 rounded-2xl border border-slate-200 bg-white text-center text-xl font-semibold text-slate-900 outline-none transition-all duration-200 focus:border-blue-300 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50",
+            "sm:h-16 sm:text-2xl"
           )}
         />
       ))}

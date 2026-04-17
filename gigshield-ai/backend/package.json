@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "jest --coverage",
+    "test": "jest --coverage --detectOpenHandles",
     "lint": "eslint src/",
     "db:migrate": "node src/database/migrate.js"
   },

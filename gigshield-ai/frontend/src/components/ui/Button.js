@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useCallback, useState } from "react";
 import { motion } from "framer-motion";
 import { cn } from "../../utils/cn";
+import { playUiClick } from "../../utils/soundFeedback";
 
 const VARIANTS = {
   primary:
@@ -28,7 +29,7 @@ export function buttonStyles({
   className,
 } = {}) {
   return cn(
-    "inline-flex items-center justify-center gap-2 rounded-2xl font-semibold tracking-[0.01em] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sky-400/30 disabled:cursor-not-allowed disabled:opacity-60",
+    "relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-2xl font-semibold tracking-[0.01em] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-sky-400/30 disabled:cursor-not-allowed disabled:opacity-60",
     VARIANTS[variant] || VARIANTS.secondary,
     SIZES[size] || SIZES.md,
     block && "w-full",
@@ -46,24 +47,76 @@ export default function Button({
   rightIcon: RightIcon,
   loading = false,
   disabled,
+  onMouseDown,
   ...props
 }) {
+  const [ripples, setRipples] = useState([]);
+
+  const handleMouseDown = useCallback(
+    (event) => {
+      if (disabled || loading) {
+        onMouseDown?.(event);
+        return;
+      }
+
+      const rect = event.currentTarget.getBoundingClientRect();
+      const size = Math.max(rect.width, rect.height);
+      const id = Date.now() + Math.random();
+
+      setRipples((current) => [
+        ...current,
+        {
+          id,
+          size,
+          x: event.clientX - rect.left - size / 2,
+          y: event.clientY - rect.top - size / 2,
+        },
+      ]);
+
+      window.setTimeout(() => {
+        setRipples((current) => current.filter((ripple) => ripple.id !== id));
+      }, 560);
+
+      playUiClick();
+      onMouseDown?.(event);
+    },
+    [disabled, loading, onMouseDown]
+  );
+
   return (
     <motion.button
       whileHover={disabled ? undefined : { y: -2, scale: 1.02 }}
-      whileTap={disabled ? undefined : { scale: 0.96 }}
+      whileTap={disabled ? undefined : { scale: 0.97 }}
       transition={{ type: "spring", stiffness: 360, damping: 24 }}
       className={buttonStyles({ variant, size, block, className })}
       disabled={disabled || loading}
+      onMouseDown={handleMouseDown}
       {...props}
     >
-      {loading ? (
-        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
-      ) : LeftIcon ? (
-        <LeftIcon size={16} />
-      ) : null}
-      <span>{children}</span>
-      {RightIcon ? <RightIcon size={16} /> : null}
+      <span aria-hidden className="pointer-events-none absolute inset-0">
+        {ripples.map((ripple) => (
+          <span
+            key={ripple.id}
+            className="button-ripple"
+            style={{
+              width: ripple.size,
+              height: ripple.size,
+              left: ripple.x,
+              top: ripple.y,
+            }}
+          />
+        ))}
+      </span>
+
+      <span className="relative z-[1] inline-flex items-center gap-2">
+        {loading ? (
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent" />
+        ) : LeftIcon ? (
+          <LeftIcon size={16} />
+        ) : null}
+        <span>{children}</span>
+        {RightIcon ? <RightIcon size={16} /> : null}
+      </span>
     </motion.button>
   );
 }

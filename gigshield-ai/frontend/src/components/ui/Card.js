@@ -21,12 +21,16 @@ export default function Card({
   className,
   glow = "sky",
   padding = "lg",
-  interactive = false,
+  interactive = true,
 }) {
   const Component = interactive ? motion.div : "div";
   const motionProps = interactive
     ? {
-        whileHover: { y: -4, scale: 1.015 },
+        whileHover: {
+          y: -6,
+          scale: 1.02,
+          boxShadow: "0 24px 65px rgba(2, 6, 23, 0.38)",
+        },
         transition: { type: "spring", stiffness: 320, damping: 24 },
       }
     : {};
@@ -34,7 +38,7 @@ export default function Card({
   return (
     <Component
       className={cn(
-        "relative overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.95),rgba(9,13,27,0.98))] shadow-[0_10px_28px_rgba(2,6,23,0.26)] after:absolute after:inset-x-10 after:top-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/25 after:to-transparent",
+        "relative overflow-hidden rounded-[26px] border border-white/12 bg-[radial-gradient(circle_at_8%_0%,rgba(56,189,248,0.14),transparent_40%),linear-gradient(180deg,rgba(15,23,42,0.95),rgba(9,13,27,0.98))] shadow-[0_12px_34px_rgba(2,6,23,0.28)] transition-[transform,box-shadow,border-color,background] duration-300 after:absolute after:inset-x-10 after:top-0 after:h-px after:bg-gradient-to-r after:from-transparent after:via-white/25 after:to-transparent",
         GLOWS[glow] || GLOWS.sky,
         PADDING[padding] || PADDING.lg,
         className
